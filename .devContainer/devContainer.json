@@ -1,7 +1,6 @@
 {
   "name": "Thermal Learning Dev",
   "image": "ghcr.io/home-assistant/core:dev",
-  "postCreateCommand": "script/setup",
   "forwardPorts": [
     8123
   ],

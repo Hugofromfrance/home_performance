@@ -1,7 +1,7 @@
 # Thermal Learning
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/ton-username/thermal_learning.svg)](https://github.com/ton-username/thermal_learning/releases)
+[![GitHub Release](https://img.shields.io/github/release/Hugofromfrance/thermal_learning.svg)](https://github.com/Hugofromfrance/thermal_learning/releases)
 
 A Home Assistant integration that learns the thermal characteristics of your home.
 
@@ -32,7 +32,7 @@ This integration is currently in early development (MVP). Use at your own risk.
 2. Click on "Integrations"
 3. Click the three dots in the top right corner
 4. Select "Custom repositories"
-5. Add `https://github.com/ton-username/thermal_learning` with category "Integration"
+5. Add `https://github.com/Hugofromfrance/thermal_learning` with category "Integration"
 6. Click "Install"
 7. Restart Home Assistant
 
