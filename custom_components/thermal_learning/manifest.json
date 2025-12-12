@@ -1,0 +1,15 @@
+{
+  "domain": "thermal_learning",
+  "name": "Thermal Learning",
+  "codeowners": [
+    "@ton-github-username"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/ton-username/thermal_learning",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/ton-username/thermal_learning/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
