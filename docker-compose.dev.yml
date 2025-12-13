@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  homeassistant:
+    container_name: ha-thermal-dev
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - ./config:/config
+      - ./custom_components/thermal_learning:/config/custom_components/thermal_learning
+    environment:
+      - TZ=Europe/Paris
+    ports:
+      - "8124:8123"
+    restart: unless-stopped
+    stdin_open: true
+    tty: true

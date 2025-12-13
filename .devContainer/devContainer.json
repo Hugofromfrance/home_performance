@@ -1,9 +1,17 @@
 {
   "name": "Thermal Learning Dev",
-  "image": "ghcr.io/home-assistant/core:dev",
+  "image": "ghcr.io/home-assistant/home-assistant:stable",
   "forwardPorts": [
-    8123
+    8124
   ],
+  "containerEnv": {
+    "TZ": "Europe/Paris"
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/config,target=/config,type=bind",
+    "source=${localWorkspaceFolder}/custom_components/thermal_learning,target=/config/custom_components/thermal_learning,type=bind"
+  ],
+  "postStartCommand": "hass -c /config",
   "customizations": {
     "vscode": {
       "extensions": [

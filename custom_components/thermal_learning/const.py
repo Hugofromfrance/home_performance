@@ -16,6 +16,12 @@ DEFAULT_SCAN_INTERVAL = 60  # seconds
 MIN_LEARNING_DAYS = 7
 MIN_SAMPLES_FOR_CONFIDENCE = 100
 
+# Cycle detection thresholds (lowered for dev/testing)
+MIN_HEATING_CYCLE_MINUTES = 1  # Minimum duration for a heating cycle
+MIN_HEATING_CYCLE_TEMP_RISE = 0.3  # Minimum temp rise in °C
+MIN_COOLING_CYCLE_MINUTES = 2  # Minimum duration for a cooling cycle
+MIN_COOLING_CYCLE_TEMP_DROP = 0.2  # Minimum temp drop in °C
+
 # Sensor types
 SENSOR_THERMAL_LOSS = "thermal_loss_coefficient"
 SENSOR_THERMAL_INERTIA = "thermal_inertia"

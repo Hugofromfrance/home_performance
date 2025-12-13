@@ -1,0 +1,6 @@
+homeassistant
+pytest
+pytest-homeassistant-custom-component
+ruff
+black
+mypy
