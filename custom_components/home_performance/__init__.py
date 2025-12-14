@@ -1,4 +1,8 @@
-"""Thermal Learning integration for Home Assistant."""
+"""Home Performance integration for Home Assistant.
+
+Analyze and monitor your home's thermal performance, energy efficiency,
+and comfort metrics.
+"""
 from __future__ import annotations
 
 import logging
@@ -9,7 +13,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .coordinator import ThermalLearningCoordinator
+from .coordinator import HomePerformanceCoordinator
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -20,10 +24,10 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Thermal Learning from a config entry."""
-    _LOGGER.debug("Setting up Thermal Learning integration")
+    """Set up Home Performance from a config entry."""
+    _LOGGER.debug("Setting up Home Performance integration")
 
-    coordinator = ThermalLearningCoordinator(hass, entry)
+    coordinator = HomePerformanceCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
@@ -36,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    _LOGGER.debug("Unloading Thermal Learning integration")
+    _LOGGER.debug("Unloading Home Performance integration")
 
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)

@@ -1,0 +1,96 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurer la zone",
+        "description": "Configurez une zone d'analyse de performance thermique. Vous aurez besoin de capteurs de température, d'une entité de chauffage et de la puissance déclarée du radiateur.",
+        "data": {
+          "zone_name": "Nom de la zone",
+          "indoor_temp_sensor": "Capteur de température intérieure",
+          "outdoor_temp_sensor": "Capteur de température extérieure",
+          "heating_entity": "Entité de chauffage (climate, switch ou input_boolean)",
+          "heater_power": "Puissance du radiateur (W)"
+        },
+        "data_description": {
+          "zone_name": "Un nom convivial pour cette zone (ex: Salon, Chambre)",
+          "indoor_temp_sensor": "Capteur de température à l'intérieur de la zone",
+          "outdoor_temp_sensor": "Capteur de température extérieure (peut être partagé entre zones)",
+          "heating_entity": "L'entité qui contrôle le chauffage dans cette zone",
+          "heater_power": "Puissance déclarée du radiateur en Watts"
+        }
+      },
+      "dimensions": {
+        "title": "Dimensions de la pièce",
+        "description": "Optionnel : Ajoutez les dimensions pour obtenir des valeurs K normalisées (K/m² et K/m³) permettant de comparer les pièces.",
+        "data": {
+          "surface": "Surface (m²)",
+          "volume": "Volume (m³)"
+        },
+        "data_description": {
+          "surface": "Surface au sol de la zone",
+          "volume": "Volume de la zone (surface × hauteur sous plafond)"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "Entité non trouvée ou indisponible",
+      "invalid_temperature": "Capteur de température invalide",
+      "invalid_power": "Puissance du radiateur invalide",
+      "already_configured": "Cette zone est déjà configurée"
+    },
+    "abort": {
+      "already_configured": "Cette zone est déjà configurée"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options Home Performance",
+        "data": {
+          "heater_power": "Puissance du radiateur (W)",
+          "surface": "Surface (m²)",
+          "volume": "Volume (m³)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "k_coefficient": {
+        "name": "Coefficient K"
+      },
+      "k_per_m2": {
+        "name": "K par m²"
+      },
+      "k_per_m3": {
+        "name": "K par m³"
+      },
+      "daily_energy": {
+        "name": "Énergie journalière"
+      },
+      "heating_time": {
+        "name": "Temps de chauffe (24h)"
+      },
+      "heating_ratio": {
+        "name": "Ratio de chauffe"
+      },
+      "avg_delta_t": {
+        "name": "ΔT moyen (24h)"
+      },
+      "data_hours": {
+        "name": "Heures de données"
+      },
+      "insulation_rating": {
+        "name": "Note d'isolation"
+      }
+    },
+    "binary_sensor": {
+      "window_open": {
+        "name": "Fenêtre ouverte détectée"
+      },
+      "data_ready": {
+        "name": "Données prêtes"
+      }
+    }
+  }
+}

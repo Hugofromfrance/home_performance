@@ -1,4 +1,4 @@
-"""Binary sensor platform for Thermal Learning."""
+"""Binary sensor platform for Home Performance."""
 from __future__ import annotations
 
 import logging
@@ -13,8 +13,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, CONF_ZONE_NAME
-from .coordinator import ThermalLearningCoordinator
+from .const import DOMAIN, CONF_ZONE_NAME, MIN_DATA_HOURS
+from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,28 +24,28 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Thermal Learning binary sensors."""
-    coordinator: ThermalLearningCoordinator = hass.data[DOMAIN][entry.entry_id]
+    """Set up Home Performance binary sensors."""
+    coordinator: HomePerformanceCoordinator = hass.data[DOMAIN][entry.entry_id]
     zone_name = entry.data[CONF_ZONE_NAME]
 
     entities = [
         WindowOpenSensor(coordinator, zone_name),
-        LearningCompleteSensor(coordinator, zone_name),
+        DataReadySensor(coordinator, zone_name),
     ]
 
     async_add_entities(entities)
 
 
-class ThermalLearningBaseBinarySensor(
-    CoordinatorEntity[ThermalLearningCoordinator], BinarySensorEntity
+class HomePerformanceBaseBinarySensor(
+    CoordinatorEntity[HomePerformanceCoordinator], BinarySensorEntity
 ):
-    """Base class for Thermal Learning binary sensors."""
+    """Base class for Home Performance binary sensors."""
 
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        coordinator: ThermalLearningCoordinator,
+        coordinator: HomePerformanceCoordinator,
         zone_name: str,
         sensor_type: str,
     ) -> None:
@@ -53,30 +53,32 @@ class ThermalLearningBaseBinarySensor(
         super().__init__(coordinator)
         self._zone_name = zone_name
         self._sensor_type = sensor_type
-        self._attr_unique_id = f"thermal_learning_{zone_name}_{sensor_type}".lower().replace(" ", "_")
+        self._attr_unique_id = (
+            f"home_performance_{zone_name}_{sensor_type}".lower().replace(" ", "_")
+        )
 
     @property
     def device_info(self) -> dict[str, Any]:
         """Return device info."""
         return {
             "identifiers": {(DOMAIN, self._zone_name)},
-            "name": f"Thermal Learning - {self._zone_name}",
-            "manufacturer": "Thermal Learning",
+            "name": f"Home Performance - {self._zone_name}",
+            "manufacturer": "Home Performance",
             "model": "Thermal Analyzer",
-            "sw_version": "0.1.0",
+            "sw_version": "1.0.0",
         }
 
 
-class WindowOpenSensor(ThermalLearningBaseBinarySensor):
+class WindowOpenSensor(HomePerformanceBaseBinarySensor):
     """Binary sensor for window open detection."""
 
     _attr_device_class = BinarySensorDeviceClass.WINDOW
     _attr_icon = "mdi:window-open-variant"
 
-    def __init__(self, coordinator: ThermalLearningCoordinator, zone_name: str) -> None:
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "window_open")
-        self._attr_name = "Window Open Detected"
+        self._attr_name = "Fenêtre ouverte"
 
     @property
     def is_on(self) -> bool:
@@ -90,43 +92,43 @@ class WindowOpenSensor(ThermalLearningBaseBinarySensor):
         """Return extra state attributes."""
         return {
             "detection_method": "rapid_temperature_drop",
-            "description": "Detected via rapid temperature drop analysis",
+            "description": "Détecté via une chute rapide de température",
         }
 
 
-class LearningCompleteSensor(ThermalLearningBaseBinarySensor):
-    """Binary sensor for learning completion status."""
+class DataReadySensor(HomePerformanceBaseBinarySensor):
+    """Binary sensor indicating if enough data has been collected."""
 
-    _attr_icon = "mdi:school-outline"
+    _attr_icon = "mdi:database-check"
 
-    def __init__(self, coordinator: ThermalLearningCoordinator, zone_name: str) -> None:
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, zone_name, "learning_complete")
-        self._attr_name = "Learning Complete"
+        super().__init__(coordinator, zone_name, "data_ready")
+        self._attr_name = "Données prêtes"
 
     @property
     def is_on(self) -> bool:
-        """Return true if learning is complete."""
+        """Return true if enough data has been collected."""
         if self.coordinator.data:
-            return self.coordinator.data.get("learning_complete", False)
+            return self.coordinator.data.get("data_ready", False)
         return False
 
     @property
     def icon(self) -> str:
         """Return icon based on state."""
         if self.is_on:
-            return "mdi:school"
-        return "mdi:school-outline"
+            return "mdi:database-check"
+        return "mdi:database-clock"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         if self.coordinator.data:
+            data_hours = self.coordinator.data.get("data_hours", 0)
             return {
-                "learning_progress": self.coordinator.data.get("learning_progress", 0),
-                "confidence": self.coordinator.data.get("confidence", 0),
+                "data_hours": round(data_hours, 1) if data_hours else 0,
+                "min_hours_required": MIN_DATA_HOURS,
                 "samples_count": self.coordinator.data.get("samples_count", 0),
-                "min_days_required": 7,
-                "min_confidence_required": 50,
+                "description": f"Nécessite au moins {MIN_DATA_HOURS}h de données",
             }
         return {}

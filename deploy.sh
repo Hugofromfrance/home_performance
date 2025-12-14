@@ -5,18 +5,18 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_DIR="$SCRIPT_DIR/custom_components/thermal_learning"
+SOURCE_DIR="$SCRIPT_DIR/custom_components/home_performance"
 
-echo "🚀 Déploiement de Thermal Learning vers Home Assistant..."
+echo "🚀 Déploiement de Home Performance vers Home Assistant..."
 
 # Créer les dossiers si nécessaire
-ssh ha "mkdir -p /config/custom_components/thermal_learning/translations"
+ssh ha "mkdir -p /config/custom_components/home_performance/translations"
 
 # Copier les fichiers Python et JSON
 echo "📦 Copie des fichiers..."
-scp "$SOURCE_DIR"/*.py ha:/config/custom_components/thermal_learning/
-scp "$SOURCE_DIR"/*.json ha:/config/custom_components/thermal_learning/
-scp "$SOURCE_DIR"/translations/*.json ha:/config/custom_components/thermal_learning/translations/
+scp "$SOURCE_DIR"/*.py ha:/config/custom_components/home_performance/
+scp "$SOURCE_DIR"/*.json ha:/config/custom_components/home_performance/
+scp "$SOURCE_DIR"/translations/*.json ha:/config/custom_components/home_performance/translations/
 
 echo "✅ Fichiers synchronisés avec succès !"
 
@@ -29,5 +29,5 @@ fi
 
 echo ""
 echo "📋 Commandes utiles :"
-echo "   ssh ha 'ha core logs | grep thermal_learning'  # Voir les logs"
+echo "   ssh ha 'ha core logs | grep home_performance'  # Voir les logs"
 echo "   ssh ha 'ha core restart'                       # Redémarrer HA"

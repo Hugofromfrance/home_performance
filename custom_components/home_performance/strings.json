@@ -1,0 +1,96 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Zone",
+        "description": "Set up a thermal performance analysis zone. You'll need temperature sensors, a heating entity, and the heater's declared power.",
+        "data": {
+          "zone_name": "Zone Name",
+          "indoor_temp_sensor": "Indoor Temperature Sensor",
+          "outdoor_temp_sensor": "Outdoor Temperature Sensor",
+          "heating_entity": "Heating Entity (climate, switch, or input_boolean)",
+          "heater_power": "Heater Power (W)"
+        },
+        "data_description": {
+          "zone_name": "A friendly name for this zone (e.g., Living Room, Bedroom)",
+          "indoor_temp_sensor": "Temperature sensor inside the zone",
+          "outdoor_temp_sensor": "Temperature sensor outside (can be shared across zones)",
+          "heating_entity": "The entity that controls heating in this zone",
+          "heater_power": "Declared power of the heater in Watts"
+        }
+      },
+      "dimensions": {
+        "title": "Room Dimensions",
+        "description": "Optional: Add room dimensions to get normalized K values (K/m² and K/m³) for comparison between rooms.",
+        "data": {
+          "surface": "Surface Area (m²)",
+          "volume": "Volume (m³)"
+        },
+        "data_description": {
+          "surface": "Floor surface area of the zone",
+          "volume": "Volume of the zone (surface × ceiling height)"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "Entity not found or unavailable",
+      "invalid_temperature": "Invalid temperature sensor",
+      "invalid_power": "Invalid heater power",
+      "already_configured": "This zone is already configured"
+    },
+    "abort": {
+      "already_configured": "This zone is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Home Performance Options",
+        "data": {
+          "heater_power": "Heater Power (W)",
+          "surface": "Surface Area (m²)",
+          "volume": "Volume (m³)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "k_coefficient": {
+        "name": "Coefficient K"
+      },
+      "k_per_m2": {
+        "name": "K per m²"
+      },
+      "k_per_m3": {
+        "name": "K per m³"
+      },
+      "daily_energy": {
+        "name": "Daily Energy"
+      },
+      "heating_time": {
+        "name": "Heating Time (24h)"
+      },
+      "heating_ratio": {
+        "name": "Heating Ratio"
+      },
+      "avg_delta_t": {
+        "name": "Average ΔT (24h)"
+      },
+      "data_hours": {
+        "name": "Data Hours"
+      },
+      "insulation_rating": {
+        "name": "Insulation Rating"
+      }
+    },
+    "binary_sensor": {
+      "window_open": {
+        "name": "Window Open Detected"
+      },
+      "data_ready": {
+        "name": "Data Ready"
+      }
+    }
+  }
+}

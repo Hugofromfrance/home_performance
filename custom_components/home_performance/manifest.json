@@ -1,0 +1,15 @@
+{
+  "domain": "home_performance",
+  "name": "Home Performance",
+  "codeowners": [
+    "@hugohardier"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/hugohardier/home_performance",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/hugohardier/home_performance/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}
