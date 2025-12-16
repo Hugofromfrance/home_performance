@@ -41,11 +41,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Reload when options change
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
     return True
 
 
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update - reload the integration."""
+    _LOGGER.info("Options updated for %s, reloading integration", entry.title)
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def _async_register_frontend(hass: HomeAssistant) -> None:
-    """Register the frontend static path for the card."""
+    """Register the frontend static path and Lovelace resource for the card."""
     import os
     
     www_path = os.path.join(os.path.dirname(__file__), "www")
@@ -62,8 +71,54 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
             _LOGGER.info(
                 "Home Performance card registered at /home_performance/home-performance-card.js"
             )
+            
+            # Auto-register Lovelace resource (storage mode only)
+            await _async_register_lovelace_resource(hass)
+            
         except Exception as err:
             _LOGGER.warning("Could not register frontend path: %s", err)
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
+    """Register the card as a Lovelace resource (storage mode only).
+    
+    This automatically adds the JS resource to Lovelace so users don't have
+    to manually add it. Only works with storage mode dashboards (HA default).
+    For YAML mode dashboards, users must add the resource manually.
+    """
+    url = "/home_performance/home-performance-card.js"
+    
+    try:
+        # Get lovelace resources (only available in storage mode)
+        lovelace_data = hass.data.get("lovelace")
+        if lovelace_data is None:
+            _LOGGER.debug("Lovelace not loaded yet, skipping auto-registration")
+            return
+        
+        resources = lovelace_data.get("resources")
+        if resources is None:
+            _LOGGER.debug(
+                "Lovelace resources not available (YAML mode?). "
+                "Add resource manually: %s", url
+            )
+            return
+        
+        # Check if already registered
+        existing = await resources.async_get_resources()
+        for resource in existing:
+            if resource.get("url") == url:
+                _LOGGER.debug("Lovelace resource already registered: %s", url)
+                return
+        
+        # Add resource
+        await resources.async_create_resource(url, "module")
+        _LOGGER.info("Lovelace resource auto-registered: %s", url)
+        
+    except Exception as err:
+        _LOGGER.debug(
+            "Could not auto-register Lovelace resource (manual step may be needed): %s",
+            err
+        )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

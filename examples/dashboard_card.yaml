@@ -42,13 +42,12 @@
 # ==================================================
 # L'intégration inclut une carte Lovelace custom prête à l'emploi !
 #
-# 1. Ajouter la ressource dans Lovelace:
-#    Paramètres → Tableaux de bord → ⋮ (3 points) → Ressources
-#    URL: /home_performance/home-performance-card.js
-#    Type: Module JavaScript
+# La ressource Lovelace est AUTOMATIQUEMENT ENREGISTRÉE lors du setup.
+# Ajoutez simplement la carte dans votre dashboard:
 #
-# 2. Utiliser la carte:
-#    Dans votre dashboard, ajoutez une carte manuelle avec:
+# (Mode YAML uniquement: si la ressource n'est pas auto-détectée,
+#  ajoutez-la manuellement: Paramètres → Tableaux de bord → ⋮ → Ressources
+#  URL: /home_performance/home-performance-card.js | Type: Module JavaScript)
 
 # type: custom:home-performance-card
 # zone: Chambre Flavien          # Nom exact de votre zone

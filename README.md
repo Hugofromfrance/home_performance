@@ -65,6 +65,8 @@ L'attribut `source` indique l'origine des données : `external` (compteur HA) ou
 | **Ratio de chauffe** | % du temps où le chauffage est actif |
 | **ΔT moyen (24h)** | Écart moyen intérieur/extérieur |
 
+L'attribut `source` sur Temps/Ratio indique : `measured` (via power sensor > 50W) ou `estimated` (via état switch).
+
 ### Statut
 
 | Capteur | Description |
@@ -81,18 +83,25 @@ L'intégration inclut une **carte custom moderne** prête à l'emploi !
 
 ### Installation de la carte
 
-1. Ajouter la ressource Lovelace :
-   - **Paramètres → Tableaux de bord → ⋮ → Ressources**
-   - URL : `/home_performance/home-performance-card.js`
-   - Type : `Module JavaScript`
+**La ressource Lovelace est automatiquement enregistrée** lors de l'installation de l'intégration (mode storage par défaut de HA).
 
-2. Ajouter la carte dans votre dashboard :
+Ajoutez simplement la carte dans votre dashboard :
 
 ```yaml
 type: custom:home-performance-card
 zone: Salon
 title: Performance Thermique
 ```
+
+<details>
+<summary>📝 Mode YAML (si la ressource n'est pas auto-détectée)</summary>
+
+Si vous utilisez un dashboard en mode YAML, ajoutez manuellement la ressource :
+- **Paramètres → Tableaux de bord → ⋮ → Ressources**
+- URL : `/home_performance/home-performance-card.js`
+- Type : `Module JavaScript`
+
+</details>
 
 ### Options de la carte
 
@@ -135,10 +144,13 @@ title: Performance Thermique
 |-----------|-------------|
 | Surface | m² (pour K/m²) |
 | Volume | m³ (pour K/m³ et note d'isolation) |
-| Capteur de puissance | sensor.xxx_power en Watts (pour calcul énergie intégré) |
+| Capteur de puissance | sensor.xxx_power en Watts (pour énergie + détection chauffe précise) |
 | Compteur d'énergie externe | sensor.xxx_energy (votre propre Utility Meter HA) |
 
-> **Note** : Si vous fournissez un compteur d'énergie externe ET un capteur de puissance, le compteur externe est utilisé en priorité.
+> **Notes** :
+> - Si vous fournissez un compteur d'énergie externe ET un capteur de puissance, le compteur externe est utilisé en priorité pour l'énergie.
+> - Le capteur de puissance permet aussi une **détection précise de la chauffe** (power > 50W), idéal pour les radiateurs avec thermostat interne ou fil pilote.
+> - Les options sont **modifiables après coup** et l'intégration se recharge automatiquement.
 
 ## 💾 Persistance des données
 
@@ -219,12 +231,14 @@ Seuils basés sur la puissance du radiateur :
 - [x] Normalisation K/m² et K/m³
 - [x] Énergie journalière (estimée et mesurée)
 - [x] Support compteur d'énergie externe HA
+- [x] Détection chauffe précise via power sensor
 - [x] Détection fenêtre ouverte
 - [x] Note d'isolation
-- [x] Carte Lovelace intégrée
+- [x] Carte Lovelace intégrée (auto-enregistrée)
 - [x] Persistance des données
 - [x] Performance énergétique vs moyenne nationale
 - [x] Compteur Utility Meter (reset minuit)
+- [x] Options modifiables avec rechargement auto
 
 ### 🔜 Prochaines fonctionnalités
 
