@@ -1,5 +1,5 @@
 /**
- * Home Performance Card v0.1.0
+ * Home Performance Card v1.0.0
  * Modern dashboard card for Home Performance integration
  */
 
@@ -718,7 +718,7 @@ window.customCards.push({
 });
 
 console.info(
-  `%c HOME-PERFORMANCE %c v0.1.0 `,
+  `%c HOME-PERFORMANCE %c v1.0.0 `,
   "color: white; background: #6366f1; font-weight: bold; border-radius: 4px 0 0 4px; padding: 2px 6px;",
   "color: #6366f1; background: #1a1a2e; font-weight: bold; border-radius: 0 4px 4px 0; padding: 2px 6px;"
 );

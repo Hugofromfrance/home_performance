@@ -35,27 +35,33 @@ SAVE_INTERVAL_SECONDS = 300  # Save every 5 minutes
 
 
 class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Coordinator to manage home performance data."""
+    """Coordinator to manage home performance data for a single zone."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        """Initialize the coordinator."""
+    def __init__(
+        self, 
+        hass: HomeAssistant, 
+        entry: ConfigEntry, 
+        zone_id: str,
+        zone_data: dict[str, Any]
+    ) -> None:
+        """Initialize the coordinator for a specific zone."""
         self.entry = entry
-        # Merge data and options (options override data)
-        config = {**entry.data, **entry.options}
+        self.zone_id = zone_id
         
-        self.zone_name: str = config[CONF_ZONE_NAME]
-        self.indoor_temp_sensor: str = config[CONF_INDOOR_TEMP_SENSOR]
-        self.outdoor_temp_sensor: str = config[CONF_OUTDOOR_TEMP_SENSOR]
-        self.heating_entity: str = config[CONF_HEATING_ENTITY]
-        self.heater_power: float = config[CONF_HEATER_POWER]
-        self.surface: float | None = config.get(CONF_SURFACE)
-        self.volume: float | None = config.get(CONF_VOLUME)
-        self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
-        self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
+        # Zone configuration
+        self.zone_name: str = zone_data[CONF_ZONE_NAME]
+        self.indoor_temp_sensor: str = zone_data[CONF_INDOOR_TEMP_SENSOR]
+        self.outdoor_temp_sensor: str = zone_data[CONF_OUTDOOR_TEMP_SENSOR]
+        self.heating_entity: str = zone_data[CONF_HEATING_ENTITY]
+        self.heater_power: float = zone_data[CONF_HEATER_POWER]
+        self.surface: float | None = zone_data.get(CONF_SURFACE)
+        self.volume: float | None = zone_data.get(CONF_VOLUME)
+        self.power_sensor: str | None = zone_data.get(CONF_POWER_SENSOR)
+        self.energy_sensor: str | None = zone_data.get(CONF_ENERGY_SENSOR)
 
         _LOGGER.info(
-            "HomePerformance coordinator initialized for %s: power_sensor=%s, energy_sensor=%s",
-            self.zone_name, self.power_sensor, self.energy_sensor
+            "HomePerformance coordinator initialized for %s (id=%s): power_sensor=%s",
+            self.zone_name, self.zone_id, self.power_sensor
         )
 
         # Thermal model

@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configurer la zone",
-        "description": "Configurez une zone d'analyse de performance thermique. Vous aurez besoin de capteurs de température, d'une entité de chauffage et de la puissance déclarée du radiateur.",
+        "title": "Configurer la première zone",
+        "description": "Configurez votre première zone d'analyse de performance thermique.",
         "data": {
           "zone_name": "Nom de la zone",
           "indoor_temp_sensor": "Capteur de température intérieure",
@@ -21,7 +21,7 @@
       },
       "dimensions": {
         "title": "Dimensions et compteur d'énergie",
-        "description": "Optionnel : Ajoutez les dimensions pour les valeurs K normalisées, et/ou un capteur de puissance pour créer un compteur d'énergie journalier automatique.",
+        "description": "Optionnel : Ajoutez les dimensions pour les valeurs K normalisées, et/ou un capteur de puissance.",
         "data": {
           "surface": "Surface (m²)",
           "volume": "Volume (m³)",
@@ -31,8 +31,29 @@
         "data_description": {
           "surface": "Surface au sol de la zone",
           "volume": "Volume de la zone (surface × hauteur sous plafond)",
-          "power_sensor": "Capteur en Watts - créera automatiquement un compteur kWh journalier avec reset à minuit",
-          "energy_sensor": "Votre propre compteur d'énergie journalier (ex: Utility Meter) - sera utilisé à la place du calcul intégré"
+          "power_sensor": "Capteur en Watts - pour compteur kWh et détection chauffe précise",
+          "energy_sensor": "Votre propre compteur d'énergie journalier (ex: Utility Meter)"
+        }
+      },
+      "add_device": {
+        "title": "Ajouter une zone",
+        "description": "Configurez une nouvelle zone d'analyse thermique.",
+        "data": {
+          "zone_name": "Nom de la zone",
+          "indoor_temp_sensor": "Capteur de température intérieure",
+          "outdoor_temp_sensor": "Capteur de température extérieure",
+          "heating_entity": "Entité de chauffage",
+          "heater_power": "Puissance du radiateur (W)"
+        }
+      },
+      "add_device_dimensions": {
+        "title": "Dimensions de la zone",
+        "description": "Optionnel : Ajoutez les dimensions et capteurs.",
+        "data": {
+          "surface": "Surface (m²)",
+          "volume": "Volume (m³)",
+          "power_sensor": "Capteur de puissance (optionnel)",
+          "energy_sensor": "Compteur d'énergie externe (optionnel)"
         }
       }
     },
@@ -40,22 +61,42 @@
       "entity_not_found": "Entité non trouvée ou indisponible",
       "invalid_temperature": "Capteur de température invalide",
       "invalid_power": "Puissance du radiateur invalide",
-      "already_configured": "Cette zone est déjà configurée"
+      "already_configured": "Cette zone existe déjà"
     },
     "abort": {
-      "already_configured": "Cette zone est déjà configurée"
+      "already_configured": "Home Performance est déjà configuré",
+      "device_added": "Zone ajoutée avec succès !",
+      "zone_deleted": "Zone supprimée avec succès",
+      "cannot_delete_last_zone": "Impossible de supprimer la dernière zone",
+      "no_zones": "Aucune zone configurée",
+      "unknown_error": "Une erreur inattendue s'est produite"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Options Home Performance",
+        "title": "Gérer les zones ({count} zones)",
+        "description": "Sélectionnez une zone à configurer.",
+        "data": {
+          "zone_select": "Zone"
+        }
+      },
+      "configure_zone": {
+        "title": "Configuration de {zone_name}",
+        "description": "Modifiez les paramètres de cette zone.",
         "data": {
           "heater_power": "Puissance du radiateur (W)",
           "surface": "Surface (m²)",
           "volume": "Volume (m³)",
           "power_sensor": "Capteur de puissance instantanée",
           "energy_sensor": "Compteur d'énergie HA externe"
+        }
+      },
+      "delete_zone": {
+        "title": "Supprimer une zone",
+        "description": "Sélectionnez la zone à supprimer. Cette action est irréversible.",
+        "data": {
+          "zone_to_delete": "Zone à supprimer"
         }
       }
     }

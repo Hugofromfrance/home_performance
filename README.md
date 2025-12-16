@@ -1,12 +1,13 @@
 # Home Performance
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/hugohardier/home_performance.svg)](https://github.com/hugohardier/home_performance/releases)
+[![GitHub Release](https://img.shields.io/github/release/Hugofromfrance/home_performance.svg)](https://github.com/Hugofromfrance/home_performance/releases)
 
 Une intégration Home Assistant pour analyser et surveiller les performances thermiques de votre logement.
 
 ## ✨ Fonctionnalités principales
 
+- 🏠 **Multi-zones** - Gérez toutes vos pièces depuis une seule intégration
 - 🎴 **Carte Lovelace intégrée** - Design moderne, prête à l'emploi
 - 📊 **Compteur d'énergie mesuré** - Intégration de capteur de puissance (Utility Meter)
 - 💾 **Persistance des données** - Conservation après redémarrage
@@ -29,7 +30,7 @@ K (W/°C) = Énergie fournie / (ΔT × durée)
 
 → Cette pièce perd 18W par degré d'écart avec l'extérieur.
 
-## 📊 Capteurs créés
+## 📊 Capteurs créés (par zone)
 
 ### Coefficients thermiques
 
@@ -77,6 +78,24 @@ L'attribut `source` sur Temps/Ratio indique : `measured` (via power sensor > 50W
 | **Données prêtes** | Binary sensor indiquant si l'analyse est disponible |
 | **Fenêtre ouverte** | Détection par chute rapide de température |
 
+## 🏠 Multi-zones
+
+Gérez toutes vos pièces depuis **une seule intégration** !
+
+### Ajouter des zones
+
+1. **Première installation** : configurez votre première zone
+2. **Zones supplémentaires** : cliquez sur **"Ajouter un appareil"** dans la page de l'intégration
+
+### Gérer les zones
+
+Dans **Options** (⚙️) de l'intégration :
+- Sélectionner une zone à configurer
+- Modifier les paramètres (puissance, surface, capteurs...)
+- Supprimer une zone
+
+Chaque zone crée un **appareil indépendant** avec ses propres capteurs et sa propre carte Lovelace.
+
 ## 🎴 Carte Lovelace Intégrée
 
 L'intégration inclut une **carte custom moderne** prête à l'emploi !
@@ -85,12 +104,18 @@ L'intégration inclut une **carte custom moderne** prête à l'emploi !
 
 **La ressource Lovelace est automatiquement enregistrée** lors de l'installation de l'intégration (mode storage par défaut de HA).
 
-Ajoutez simplement la carte dans votre dashboard :
+Ajoutez simplement une carte par zone dans votre dashboard :
 
 ```yaml
 type: custom:home-performance-card
 zone: Salon
-title: Performance Thermique
+title: Performance Salon
+```
+
+```yaml
+type: custom:home-performance-card
+zone: Chambre
+title: Performance Chambre
 ```
 
 <details>
@@ -122,13 +147,13 @@ Si vous utilisez un dashboard en mode YAML, ajoutez manuellement la ressource :
 ## 📋 Prérequis
 
 - Home Assistant 2024.1.0 ou plus récent
-- Capteur de température intérieure
-- Capteur de température extérieure
-- Entité climate OU switch contrôlant le chauffage
+- Capteur de température intérieure (par zone)
+- Capteur de température extérieure (partageable entre zones)
+- Entité climate OU switch contrôlant le chauffage (par zone)
 
 ## ⚙️ Configuration
 
-### Paramètres obligatoires
+### Paramètres obligatoires (par zone)
 
 | Paramètre | Description |
 |-----------|-------------|
@@ -172,7 +197,7 @@ Les données sont **automatiquement sauvegardées** et restaurées après un red
 1. Ouvrir HACS
 2. Cliquer sur "Intégrations"
 3. Menu ⋮ → "Dépôts personnalisés"
-4. Ajouter `https://github.com/hugohardier/home_performance` (catégorie: Integration)
+4. Ajouter `https://github.com/Hugofromfrance/home_performance` (catégorie: Integration)
 5. Installer "Home Performance"
 6. Redémarrer Home Assistant
 
@@ -183,10 +208,18 @@ Les données sont **automatiquement sauvegardées** et restaurées après un red
 
 ## 🚀 Utilisation
 
+### Première configuration
+
 1. Aller dans **Paramètres → Appareils et services**
 2. Cliquer sur **"Ajouter une intégration"**
 3. Chercher **"Home Performance"**
-4. Suivre les étapes de configuration
+4. Configurer votre première zone
+
+### Ajouter des pièces
+
+1. Aller dans **Paramètres → Appareils et services → Home Performance**
+2. Cliquer sur **"Ajouter un appareil"**
+3. Configurer la nouvelle zone
 
 **Note** : Les calculs commencent après **12h** de données collectées et nécessitent un ΔT minimum de 5°C pour être fiables.
 
@@ -225,7 +258,7 @@ Seuils basés sur la puissance du radiateur :
 
 ## 🗺️ Roadmap
 
-### ✅ Réalisé (v0.1.0)
+### ✅ Réalisé (v1.0.0)
 
 - [x] Coefficient K (W/°C)
 - [x] Normalisation K/m² et K/m³
@@ -239,6 +272,7 @@ Seuils basés sur la puissance du radiateur :
 - [x] Performance énergétique vs moyenne nationale
 - [x] Compteur Utility Meter (reset minuit)
 - [x] Options modifiables avec rechargement auto
+- [x] **Multi-zones** (ajouter/supprimer des pièces)
 
 ### 🔜 Prochaines fonctionnalités
 
@@ -247,7 +281,7 @@ Seuils basés sur la puissance du radiateur :
 - [ ] Module humidité (HR, risque moisissure)
 - [ ] Module qualité d'air (CO2)
 - [ ] Module confort (PMV/PPD)
-- [ ] Comparaison multi-zones
+- [ ] Comparaison multi-zones (tableau récapitulatif)
 - [ ] Export des données
 
 ## 🤝 Contribuer

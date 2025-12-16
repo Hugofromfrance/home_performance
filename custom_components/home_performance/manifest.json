@@ -2,14 +2,15 @@
   "domain": "home_performance",
   "name": "Home Performance",
   "codeowners": [
-    "@hugohardier"
+    "@Hugofromfrance"
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/hugohardier/home_performance",
-  "integration_type": "service",
+  "documentation": "https://github.com/Hugofromfrance/home_performance",
+  "integration_type": "hub",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/hugohardier/home_performance/issues",
+  "issue_tracker": "https://github.com/Hugofromfrance/home_performance/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "single_config_entry": true,
+  "version": "1.0.0"
 }

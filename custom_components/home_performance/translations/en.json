@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure Zone",
-        "description": "Set up a thermal performance analysis zone. You'll need temperature sensors, a heating entity, and the heater's declared power.",
+        "title": "Configure First Zone",
+        "description": "Set up your first thermal performance analysis zone.",
         "data": {
           "zone_name": "Zone Name",
           "indoor_temp_sensor": "Indoor Temperature Sensor",
@@ -21,7 +21,7 @@
       },
       "dimensions": {
         "title": "Dimensions and Energy Meter",
-        "description": "Optional: Add room dimensions for normalized K values, and/or a power sensor to create an automatic daily energy meter.",
+        "description": "Optional: Add room dimensions for normalized K values, and/or a power sensor.",
         "data": {
           "surface": "Surface Area (m²)",
           "volume": "Volume (m³)",
@@ -31,8 +31,29 @@
         "data_description": {
           "surface": "Floor surface area of the zone",
           "volume": "Volume of the zone (surface × ceiling height)",
-          "power_sensor": "Sensor in Watts - will automatically create a daily kWh meter with midnight reset",
-          "energy_sensor": "Your own daily energy meter (e.g., Utility Meter) - will be used instead of the integrated calculation"
+          "power_sensor": "Sensor in Watts - for kWh meter and precise heating detection",
+          "energy_sensor": "Your own daily energy meter (e.g., Utility Meter)"
+        }
+      },
+      "add_device": {
+        "title": "Add a Zone",
+        "description": "Configure a new thermal analysis zone.",
+        "data": {
+          "zone_name": "Zone Name",
+          "indoor_temp_sensor": "Indoor Temperature Sensor",
+          "outdoor_temp_sensor": "Outdoor Temperature Sensor",
+          "heating_entity": "Heating Entity",
+          "heater_power": "Heater Power (W)"
+        }
+      },
+      "add_device_dimensions": {
+        "title": "Zone Dimensions",
+        "description": "Optional: Add dimensions and sensors.",
+        "data": {
+          "surface": "Surface Area (m²)",
+          "volume": "Volume (m³)",
+          "power_sensor": "Power Sensor (optional)",
+          "energy_sensor": "External Energy Meter (optional)"
         }
       }
     },
@@ -40,22 +61,42 @@
       "entity_not_found": "Entity not found or unavailable",
       "invalid_temperature": "Invalid temperature sensor",
       "invalid_power": "Invalid heater power",
-      "already_configured": "This zone is already configured"
+      "already_configured": "This zone already exists"
     },
     "abort": {
-      "already_configured": "This zone is already configured"
+      "already_configured": "Home Performance is already configured",
+      "device_added": "Zone added successfully!",
+      "zone_deleted": "Zone deleted successfully",
+      "cannot_delete_last_zone": "Cannot delete the last zone",
+      "no_zones": "No zones configured",
+      "unknown_error": "An unexpected error occurred"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Home Performance Options",
+        "title": "Manage Zones ({count} zones)",
+        "description": "Select a zone to configure.",
+        "data": {
+          "zone_select": "Zone"
+        }
+      },
+      "configure_zone": {
+        "title": "Configure {zone_name}",
+        "description": "Modify this zone's settings.",
         "data": {
           "heater_power": "Heater Power (W)",
           "surface": "Surface Area (m²)",
           "volume": "Volume (m³)",
           "power_sensor": "Instant Power Sensor",
           "energy_sensor": "External HA Energy Meter"
+        }
+      },
+      "delete_zone": {
+        "title": "Delete a Zone",
+        "description": "Select the zone to delete. This action is irreversible.",
+        "data": {
+          "zone_to_delete": "Zone to delete"
         }
       }
     }

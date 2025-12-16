@@ -94,38 +94,44 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Home Performance sensors."""
-    coordinator: HomePerformanceCoordinator = hass.data[DOMAIN][entry.entry_id]
-    zone_name = entry.data[CONF_ZONE_NAME]
-
-    entities = [
-        # Main coefficient
-        ThermalLossCoefficientSensor(coordinator, zone_name),
-        # Normalized coefficients (only if surface/volume configured)
-        KPerM2Sensor(coordinator, zone_name),
-        KPerM3Sensor(coordinator, zone_name),
-        # Energy and usage (estimated from heater power)
-        TotalEnergySensor(coordinator, zone_name),  # Cumulative - Energy Dashboard compatible
-        DailyEnergySensor(coordinator, zone_name),
-        HeatingTimeSensor(coordinator, zone_name),
-        HeatingRatioSensor(coordinator, zone_name),
-        # Performance
-        EnergyPerformanceSensor(coordinator, zone_name),
-        # Temperature
-        DeltaTSensor(coordinator, zone_name),
-        # Status
-        DataHoursSensor(coordinator, zone_name),
-        AnalysisTimeRemainingSensor(coordinator, zone_name),
-        AnalysisProgressSensor(coordinator, zone_name),
-        InsulationRatingSensor(coordinator, zone_name),
-    ]
-
-    # Add measured energy sensors if power sensor is configured
-    if coordinator.power_sensor:
+    """Set up Home Performance sensors for all zones."""
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    zones = entry_data.get("zones", {})
+    
+    entities = []
+    
+    for zone_id, coordinator in zones.items():
+        zone_name = coordinator.zone_name
+        _LOGGER.debug("Setting up sensors for zone: %s", zone_name)
+        
         entities.extend([
-            MeasuredEnergyDailySensor(coordinator, zone_name),
-            MeasuredEnergyTotalSensor(coordinator, zone_name),
+            # Main coefficient
+            ThermalLossCoefficientSensor(coordinator, zone_name),
+            # Normalized coefficients (only if surface/volume configured)
+            KPerM2Sensor(coordinator, zone_name),
+            KPerM3Sensor(coordinator, zone_name),
+            # Energy and usage (estimated from heater power)
+            TotalEnergySensor(coordinator, zone_name),  # Cumulative - Energy Dashboard compatible
+            DailyEnergySensor(coordinator, zone_name),
+            HeatingTimeSensor(coordinator, zone_name),
+            HeatingRatioSensor(coordinator, zone_name),
+            # Performance
+            EnergyPerformanceSensor(coordinator, zone_name),
+            # Temperature
+            DeltaTSensor(coordinator, zone_name),
+            # Status
+            DataHoursSensor(coordinator, zone_name),
+            AnalysisTimeRemainingSensor(coordinator, zone_name),
+            AnalysisProgressSensor(coordinator, zone_name),
+            InsulationRatingSensor(coordinator, zone_name),
         ])
+
+        # Add measured energy sensors if power sensor or energy sensor is configured
+        if coordinator.power_sensor or coordinator.energy_sensor:
+            entities.extend([
+                MeasuredEnergyDailySensor(coordinator, zone_name),
+                MeasuredEnergyTotalSensor(coordinator, zone_name),
+            ])
 
     async_add_entities(entities)
 
