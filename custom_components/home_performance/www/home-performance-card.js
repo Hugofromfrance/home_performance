@@ -187,16 +187,16 @@ class HomePerformanceCard extends LitElement {
   _renderData() {
     const demo = this.config.demo ? this._getDemoData() : null;
 
-    // Get values
+    // Get values - use French slugified names matching _attr_name
     const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
     const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
-    const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_disolation"));
+    const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
     const performance = demo ? demo.performance : this._getState(this._getEntityId("performance_energetique"));
 
-    let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_jour_mesuree"));
+    let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_mesuree_jour"));
     let energyType = "mesurée";
     if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown")) {
-      dailyEnergy = this._getState(this._getEntityId("energie_24h_estimee"));
+      dailyEnergy = this._getState(this._getEntityId("energie_journaliere"));
       energyType = "estimée";
     }
     // Format energy to 3 decimals
@@ -215,7 +215,7 @@ class HomePerformanceCard extends LitElement {
     const perfData = this._getPerformanceData(performance);
 
     return html`
-      <!-- Main Score -->
+      <!-- Main Score - 3 columns -->
       <div class="score-section">
         <div class="score-card" style="--accent: ${insulationData.color}">
           <div class="score-icon">
@@ -238,20 +238,24 @@ class HomePerformanceCard extends LitElement {
             <div class="score-badge">${perfData.badge} vs moyenne</div>
           </div>
         </div>
-      </div>
 
-      <!-- Temperature Bar -->
-      <div class="temp-bar">
-        <div class="temp-item">
-          <ha-icon icon="mdi:home-thermometer"></ha-icon>
-          <span class="temp-label">Intérieur</span>
-          <span class="temp-value">${indoorTemp ?? "--"}°C</span>
-        </div>
-        <div class="temp-divider"></div>
-        <div class="temp-item">
-          <ha-icon icon="mdi:thermometer"></ha-icon>
-          <span class="temp-label">Extérieur</span>
-          <span class="temp-value">${outdoorTemp ?? "--"}°C</span>
+        <div class="score-card temp-card" style="--accent: #6366f1">
+          <div class="score-icon">
+            <ha-icon icon="mdi:thermometer"></ha-icon>
+          </div>
+          <div class="score-content">
+            <div class="score-label">Températures</div>
+            <div class="temp-values">
+              <div class="temp-row">
+                <ha-icon icon="mdi:home"></ha-icon>
+                <span class="temp-value">${indoorTemp ?? "--"}°C</span>
+              </div>
+              <div class="temp-row">
+                <ha-icon icon="mdi:tree"></ha-icon>
+                <span class="temp-value">${outdoorTemp ?? "--"}°C</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -450,10 +454,10 @@ class HomePerformanceCard extends LitElement {
         text-align: left;
       }
 
-      /* Score Section - Compact */
+      /* Score Section - 3 columns */
       .score-section {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 6px;
         margin-bottom: 8px;
       }
@@ -482,7 +486,7 @@ class HomePerformanceCard extends LitElement {
       }
 
       .score-label {
-        font-size: 0.68em;
+        font-size: 0.75em;
         color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.04em;
@@ -490,56 +494,40 @@ class HomePerformanceCard extends LitElement {
       }
 
       .score-value {
-        font-size: 1.05em;
+        font-size: 1.1em;
         font-weight: 700;
         color: var(--accent);
       }
 
       .score-desc, .score-badge {
-        font-size: 0.7em;
+        font-size: 0.85em;
         color: var(--text-secondary);
         margin-top: 2px;
       }
 
-      /* Temperature Bar - Compact */
-      .temp-bar {
+      /* Temperature Card */
+      .temp-card .temp-values {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        padding: 6px 10px;
-        margin-bottom: 8px;
-        background: var(--bg-secondary);
-        border-radius: 6px;
+        flex-direction: column;
+        gap: 2px;
       }
 
-      .temp-item {
+      .temp-card .temp-row {
         display: flex;
         align-items: center;
         gap: 4px;
       }
 
-      .temp-item ha-icon {
-        --mdc-icon-size: 11px;
+      .temp-card .temp-row ha-icon {
+        --mdc-icon-size: 12px;
         color: var(--text-secondary);
         opacity: 0.7;
       }
 
-      .temp-label {
-        font-size: 0.68em;
-        color: var(--text-secondary);
-      }
-
-      .temp-value {
-        font-size: 0.8em;
+      .temp-card .temp-value {
+        font-size: 0.95em;
         font-weight: 600;
         color: var(--text-primary);
-      }
-
-      .temp-divider {
-        width: 1px;
-        height: 14px;
-        background: var(--border-color);
       }
 
       /* Metrics Section - Compact */
@@ -550,7 +538,7 @@ class HomePerformanceCard extends LitElement {
       }
 
       .section-title {
-        font-size: 0.7em;
+        font-size: 0.78em;
         color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.06em;
@@ -561,8 +549,8 @@ class HomePerformanceCard extends LitElement {
 
       .metrics-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 4px 8px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
       }
 
       .metric {
@@ -577,7 +565,7 @@ class HomePerformanceCard extends LitElement {
         gap: 3px;
         margin-bottom: 3px;
         color: var(--text-secondary);
-        font-size: 0.7em;
+        font-size: 0.75em;
       }
 
       .metric-header ha-icon {
@@ -585,14 +573,14 @@ class HomePerformanceCard extends LitElement {
       }
 
       .metric-value {
-        font-size: 1.25em;
+        font-size: 1.1em;
         font-weight: 700;
         color: var(--text-primary);
         line-height: 1;
       }
 
       .metric-unit {
-        font-size: 0.68em;
+        font-size: 0.8em;
         color: var(--text-secondary);
         margin-top: 1px;
       }
@@ -602,24 +590,38 @@ class HomePerformanceCard extends LitElement {
       }
 
       .metric-sub {
-        font-size: 0.65em;
+        font-size: 0.78em;
         color: var(--text-secondary);
         opacity: 0.7;
         margin-top: 2px;
       }
 
       /* Responsive */
-      @media (max-width: 320px) {
+      @media (max-width: 400px) {
+        .score-section {
+          grid-template-columns: 1fr 1fr;
+        }
+        
+        .temp-card {
+          grid-column: span 2;
+        }
+        
+        .metrics-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 280px) {
         .score-section {
           grid-template-columns: 1fr;
         }
         
-        .metrics-grid {
-          gap: 2px 4px;
+        .temp-card {
+          grid-column: span 1;
         }
-
-        .metric-value {
-          font-size: 1em;
+        
+        .metrics-grid {
+          grid-template-columns: 1fr;
         }
       }
     `;

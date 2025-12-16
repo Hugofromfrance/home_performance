@@ -275,7 +275,24 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
 
     def _get_heating_state(self) -> bool:
-        """Get heating state from climate/switch entity."""
+        """Get heating state from power sensor (preferred) or climate/switch entity.
+        
+        If a power sensor is configured, use it to detect actual heating:
+        - Power > 50W = heating is active
+        This is more accurate than switch state for radiators with internal thermostats.
+        """
+        # If power sensor is configured, use it for heating detection
+        if self.power_sensor:
+            power_state = self.hass.states.get(self.power_sensor)
+            if power_state and power_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                try:
+                    power_w = float(power_state.state)
+                    # Consider heating active if power > 50W (accounts for standby consumption)
+                    return power_w > 50
+                except (ValueError, TypeError):
+                    pass  # Fall back to switch/climate state
+        
+        # Fallback: use climate/switch entity state
         state = self.hass.states.get(self.heating_entity)
         if state is None:
             return False
