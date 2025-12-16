@@ -21,6 +21,74 @@ from .coordinator import HomePerformanceCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 
+def format_duration(hours: float | None) -> str | None:
+    """Convert decimal hours to human readable format (Xh Ymin)."""
+    if hours is None:
+        return None
+    total_minutes = int(round(hours * 60))
+    h = total_minutes // 60
+    m = total_minutes % 60
+    if h == 0:
+        return f"{m}min"
+    if m == 0:
+        return f"{h}h"
+    return f"{h}h {m}min"
+
+
+def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> dict[str, Any]:
+    """
+    Evaluate energy performance based on French national statistics.
+    
+    Thresholds based on heater power:
+    - Excellent: < (power/1000) * 4 kWh/day (-40% vs national average)
+    - Standard: between excellent and (power/1000) * 6 kWh/day
+    - To optimize: > (power/1000) * 6 kWh/day
+    """
+    if daily_kwh is None or heater_power_w <= 0:
+        return {
+            "level": None,
+            "icon": "mdi:help-circle",
+            "message": "En attente de données",
+            "saving_percent": None,
+            "excellent_threshold": None,
+            "standard_threshold": None,
+        }
+    
+    # Thresholds based on heater power
+    excellent_threshold = (heater_power_w / 1000) * 4
+    standard_threshold = (heater_power_w / 1000) * 6
+    
+    if daily_kwh < excellent_threshold:
+        saving = round((1 - daily_kwh / standard_threshold) * 100)
+        return {
+            "level": "excellent",
+            "icon": "mdi:leaf",
+            "message": f"Performance excellente (-{saving}% vs. moyenne)",
+            "saving_percent": saving,
+            "excellent_threshold": excellent_threshold,
+            "standard_threshold": standard_threshold,
+        }
+    elif daily_kwh < standard_threshold:
+        return {
+            "level": "standard",
+            "icon": "mdi:check-circle",
+            "message": "Performance standard",
+            "saving_percent": 0,
+            "excellent_threshold": excellent_threshold,
+            "standard_threshold": standard_threshold,
+        }
+    else:
+        excess = round((daily_kwh / standard_threshold - 1) * 100)
+        return {
+            "level": "to_optimize",
+            "icon": "mdi:alert-circle",
+            "message": f"Marge d'optimisation (+{excess}% vs. moyenne)",
+            "saving_percent": -excess,
+            "excellent_threshold": excellent_threshold,
+            "standard_threshold": standard_threshold,
+        }
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -36,16 +104,28 @@ async def async_setup_entry(
         # Normalized coefficients (only if surface/volume configured)
         KPerM2Sensor(coordinator, zone_name),
         KPerM3Sensor(coordinator, zone_name),
-        # Energy and usage
+        # Energy and usage (estimated from heater power)
+        TotalEnergySensor(coordinator, zone_name),  # Cumulative - Energy Dashboard compatible
         DailyEnergySensor(coordinator, zone_name),
         HeatingTimeSensor(coordinator, zone_name),
         HeatingRatioSensor(coordinator, zone_name),
+        # Performance
+        EnergyPerformanceSensor(coordinator, zone_name),
         # Temperature
         DeltaTSensor(coordinator, zone_name),
         # Status
         DataHoursSensor(coordinator, zone_name),
+        AnalysisTimeRemainingSensor(coordinator, zone_name),
+        AnalysisProgressSensor(coordinator, zone_name),
         InsulationRatingSensor(coordinator, zone_name),
     ]
+
+    # Add measured energy sensors if power sensor is configured
+    if coordinator.power_sensor:
+        entities.extend([
+            MeasuredEnergyDailySensor(coordinator, zone_name),
+            MeasuredEnergyTotalSensor(coordinator, zone_name),
+        ])
 
     async_add_entities(entities)
 
@@ -178,18 +258,52 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
         }
 
 
+class TotalEnergySensor(HomePerformanceBaseSensor):
+    """Sensor for total cumulative energy (estimated from declared power)."""
+
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:lightning-bolt-outline"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "total_energy")
+        self._attr_name = "Énergie totale (estimée)"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return total cumulative energy in kWh."""
+        if self.coordinator.data:
+            value = self.coordinator.data.get("total_energy_kwh")
+            if value is not None:
+                return round(value, 3)
+        return 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        return {
+            "description": "Énergie estimée (puissance déclarée × temps ON)",
+            "heater_power_w": data.get("heater_power"),
+            "calculation": "estimation",
+            "note": "Pour une mesure précise, configurez un capteur de puissance",
+        }
+
+
 class DailyEnergySensor(HomePerformanceBaseSensor):
-    """Sensor for daily energy consumption."""
+    """Sensor for daily energy consumption (rolling 24h window, estimated)."""
 
     _attr_native_unit_of_measurement = "kWh"
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_icon = "mdi:lightning-bolt"
+    _attr_icon = "mdi:lightning-bolt-outline"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "daily_energy")
-        self._attr_name = "Énergie journalière"
+        self._attr_name = "Énergie 24h (estimée)"
 
     @property
     def native_value(self) -> float | None:
@@ -205,8 +319,10 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         return {
-            "description": "Énergie consommée sur les dernières 24h",
+            "description": "Énergie estimée sur les dernières 24h glissantes",
             "heater_power_w": data.get("heater_power"),
+            "calculation": "estimation",
+            "window": "24h glissantes",
             "heating_hours": (
                 round(data.get("heating_hours"), 1)
                 if data.get("heating_hours") is not None
@@ -218,8 +334,7 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
 class HeatingTimeSensor(HomePerformanceBaseSensor):
     """Sensor for heating time over 24h."""
 
-    _attr_native_unit_of_measurement = UnitOfTime.HOURS
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Text format, no state class
     _attr_icon = "mdi:clock-outline"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
@@ -228,13 +343,22 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         self._attr_name = "Temps de chauffe (24h)"
 
     @property
-    def native_value(self) -> float | None:
-        """Return heating time in hours."""
+    def native_value(self) -> str | None:
+        """Return heating time in human readable format."""
         if self.coordinator.data:
             value = self.coordinator.data.get("heating_hours")
-            if value is not None:
-                return round(value, 1)
+            return format_duration(value)
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        hours = data.get("heating_hours")
+        return {
+            "hours_decimal": round(hours, 2) if hours is not None else None,
+            "description": "Temps cumulé de chauffe sur les dernières 24h",
+        }
 
 
 class HeatingRatioSensor(HomePerformanceBaseSensor):
@@ -263,6 +387,73 @@ class HeatingRatioSensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         return {
             "description": "Pourcentage du temps où le chauffage est actif sur 24h",
+        }
+
+
+class EnergyPerformanceSensor(HomePerformanceBaseSensor):
+    """Sensor for energy performance evaluation based on French national statistics."""
+
+    _attr_icon = "mdi:leaf"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "energy_performance")
+        self._attr_name = "Performance énergétique"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return energy performance level."""
+        if self.coordinator.data:
+            daily_kwh = self.coordinator.data.get("daily_energy_kwh")
+            heater_power = self.coordinator.data.get("heater_power", 0)
+            perf = get_energy_performance(daily_kwh, heater_power)
+            return perf.get("level")
+        return None
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on performance level."""
+        if self.coordinator.data:
+            daily_kwh = self.coordinator.data.get("daily_energy_kwh")
+            heater_power = self.coordinator.data.get("heater_power", 0)
+            perf = get_energy_performance(daily_kwh, heater_power)
+            return perf.get("icon", "mdi:help-circle")
+        return "mdi:help-circle"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        daily_kwh = data.get("daily_energy_kwh")
+        heater_power = data.get("heater_power", 0)
+        perf = get_energy_performance(daily_kwh, heater_power)
+
+        level_descriptions = {
+            "excellent": "🟢 Excellente",
+            "standard": "🟡 Standard",
+            "to_optimize": "🟠 À optimiser",
+        }
+
+        return {
+            "message": perf.get("message"),
+            "level_display": level_descriptions.get(perf.get("level"), "En attente"),
+            "saving_percent": perf.get("saving_percent"),
+            "excellent_threshold_kwh": (
+                round(perf.get("excellent_threshold"), 1)
+                if perf.get("excellent_threshold") is not None
+                else None
+            ),
+            "standard_threshold_kwh": (
+                round(perf.get("standard_threshold"), 1)
+                if perf.get("standard_threshold") is not None
+                else None
+            ),
+            "daily_energy_kwh": round(daily_kwh, 2) if daily_kwh is not None else None,
+            "heater_power_w": heater_power,
+            "description": (
+                "Évaluation basée sur les statistiques nationales françaises. "
+                "Seuils calculés selon la puissance du radiateur."
+            ),
         }
 
 
@@ -298,14 +489,23 @@ class DeltaTSensor(HomePerformanceBaseSensor):
                 if data.get("delta_t") is not None
                 else None
             ),
+            "indoor_temp": (
+                round(data.get("indoor_temp"), 1)
+                if data.get("indoor_temp") is not None
+                else None
+            ),
+            "outdoor_temp": (
+                round(data.get("outdoor_temp"), 1)
+                if data.get("outdoor_temp") is not None
+                else None
+            ),
         }
 
 
 class DataHoursSensor(HomePerformanceBaseSensor):
     """Sensor for hours of data collected."""
 
-    _attr_native_unit_of_measurement = UnitOfTime.HOURS
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Text format, no state class
     _attr_icon = "mdi:database-clock"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
@@ -314,22 +514,133 @@ class DataHoursSensor(HomePerformanceBaseSensor):
         self._attr_name = "Heures de données"
 
     @property
-    def native_value(self) -> float | None:
-        """Return hours of data."""
+    def native_value(self) -> str | None:
+        """Return hours of data in human readable format."""
         if self.coordinator.data:
             value = self.coordinator.data.get("data_hours")
-            if value is not None:
-                return round(value, 1)
+            return format_duration(value)
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         data = self.coordinator.data or {}
+        hours = data.get("data_hours")
         return {
+            "hours_decimal": round(hours, 2) if hours is not None else None,
             "samples_count": data.get("samples_count"),
             "data_ready": data.get("data_ready"),
             "min_hours_required": 12,
+        }
+
+
+class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
+    """Sensor for remaining time before data is ready."""
+
+    _attr_state_class = None  # Text format, no state class
+    _attr_icon = "mdi:timer-sand"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "analysis_remaining")
+        self._attr_name = "Temps restant analyse"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return remaining time in human readable format."""
+        if self.coordinator.data:
+            data_hours = self.coordinator.data.get("data_hours", 0) or 0
+            data_ready = self.coordinator.data.get("data_ready", False)
+            
+            if data_ready:
+                return "Prêt"
+            
+            remaining = max(0, 12 - data_hours)
+            return format_duration(remaining)
+        return None
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on status."""
+        if self.coordinator.data and self.coordinator.data.get("data_ready"):
+            return "mdi:check-circle"
+        return "mdi:timer-sand"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        data_hours = data.get("data_hours", 0) or 0
+        data_ready = data.get("data_ready", False)
+        remaining = max(0, 12 - data_hours)
+        progress_pct = min(100, round((data_hours / 12) * 100))
+        
+        return {
+            "remaining_hours": round(remaining, 2) if not data_ready else 0,
+            "remaining_minutes": round(remaining * 60) if not data_ready else 0,
+            "progress_percent": 100 if data_ready else progress_pct,
+            "data_ready": data_ready,
+            "hours_collected": round(data_hours, 2),
+            "hours_required": 12,
+        }
+
+
+class AnalysisProgressSensor(HomePerformanceBaseSensor):
+    """Sensor for analysis progress percentage (0-100)."""
+
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:progress-clock"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "analysis_progress")
+        self._attr_name = "Progression analyse"
+
+    @property
+    def native_value(self) -> int:
+        """Return analysis progress as percentage (0-100)."""
+        if self.coordinator.data:
+            data_hours = self.coordinator.data.get("data_hours", 0) or 0
+            data_ready = self.coordinator.data.get("data_ready", False)
+            
+            if data_ready:
+                return 100
+            
+            return min(100, round((data_hours / 12) * 100))
+        return 0
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on progress."""
+        if self.coordinator.data:
+            data_ready = self.coordinator.data.get("data_ready", False)
+            if data_ready:
+                return "mdi:check-circle"
+            
+            progress = self.native_value
+            if progress < 25:
+                return "mdi:circle-outline"
+            elif progress < 50:
+                return "mdi:circle-slice-2"
+            elif progress < 75:
+                return "mdi:circle-slice-4"
+            else:
+                return "mdi:circle-slice-6"
+        return "mdi:circle-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        data_hours = data.get("data_hours", 0) or 0
+        data_ready = data.get("data_ready", False)
+        
+        return {
+            "hours_collected": round(data_hours, 2),
+            "hours_required": 12,
+            "data_ready": data_ready,
+            "description": "Progression de la collecte de données (0-100%)",
         }
 
 
@@ -372,4 +683,89 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
                 else None
             ),
             "note": "Basé sur K/m³ - nécessite le volume configuré",
+        }
+
+
+class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
+    """Sensor for daily measured energy from power sensor (resets at midnight).
+    
+    This sensor behaves like a Utility Meter (Compteur de services publics):
+    - state_class: TOTAL (not TOTAL_INCREASING)
+    - last_reset: datetime of last midnight reset
+    """
+
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL
+    _attr_icon = "mdi:counter"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "measured_energy_daily")
+        self._attr_name = "Énergie jour (mesurée)"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return daily measured energy in kWh."""
+        if self.coordinator.data:
+            value = self.coordinator.data.get("measured_energy_daily_kwh")
+            if value is not None:
+                return round(value, 3)
+        return 0.0
+
+    @property
+    def last_reset(self):
+        """Return the time when the sensor was last reset (midnight).
+        
+        This is required for Utility Meter compatibility.
+        """
+        if self.coordinator.data:
+            return self.coordinator.data.get("daily_reset_datetime")
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        reset_dt = data.get("daily_reset_datetime")
+        return {
+            "description": "Compteur d'énergie journalier (reset à minuit)",
+            "power_sensor": self.coordinator.power_sensor,
+            "current_power_w": data.get("measured_power_w"),
+            "status": "utility_meter",
+        }
+
+
+class MeasuredEnergyTotalSensor(HomePerformanceBaseSensor):
+    """Sensor for total measured energy - compatible with Energy Dashboard."""
+
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:counter"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "measured_energy_total")
+        self._attr_name = "Énergie totale (mesurée)"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return total measured energy in kWh."""
+        if self.coordinator.data:
+            value = self.coordinator.data.get("measured_energy_total_kwh")
+            if value is not None:
+                return round(value, 3)
+        return 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        return {
+            "description": "Énergie cumulée mesurée (compatible Dashboard Énergie)",
+            "power_sensor": self.coordinator.power_sensor,
+            "current_power_w": data.get("measured_power_w"),
+            "calculation": "mesure_reelle",
+            "note": "Utilisable dans Paramètres → Tableaux de bord → Énergie",
         }

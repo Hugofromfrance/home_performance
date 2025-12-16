@@ -65,6 +65,9 @@
       "k_per_m3": {
         "name": "K per m³"
       },
+      "total_energy": {
+        "name": "Total Energy"
+      },
       "daily_energy": {
         "name": "Daily Energy"
       },

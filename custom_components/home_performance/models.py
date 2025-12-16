@@ -124,6 +124,9 @@ class ThermalLossModel:
         self._k_coefficient: float | None = None  # W/°C
         self._last_aggregation: AggregatedPeriod | None = None
 
+        # Energy tracking (cumulative)
+        self._total_energy_kwh: float = 0.0  # Cumulative energy in kWh
+
         # Tracking
         self._last_point: ThermalDataPoint | None = None
 
@@ -160,8 +163,21 @@ class ThermalLossModel:
             return None
         return self._k_coefficient / self.volume
 
+    @property
+    def total_energy_kwh(self) -> float:
+        """Get total cumulative energy in kWh."""
+        return self._total_energy_kwh
+
     def add_data_point(self, point: ThermalDataPoint) -> None:
         """Add a new data point and update calculations."""
+        # Calculate energy consumed since last point
+        if self._last_point is not None and self._last_point.heating_on:
+            time_delta_hours = (point.timestamp - self._last_point.timestamp) / SECONDS_PER_HOUR
+            if time_delta_hours > 0:
+                # Energy = Power × time (convert W to kW)
+                energy_kwh = (self.heater_power / 1000) * time_delta_hours
+                self._total_energy_kwh += energy_kwh
+
         self.data_points.append(point)
         self._last_point = point
 
@@ -274,6 +290,8 @@ class ThermalLossModel:
             "daily_energy_kwh": (
                 (self.heater_power * agg.heating_hours / 1000) if agg else None
             ),
+            # Cumulative energy (for Energy Dashboard)
+            "total_energy_kwh": self._total_energy_kwh,
             # Status
             "data_hours": self.data_hours,
             "samples_count": self.samples_count,
@@ -305,3 +323,70 @@ class ThermalLossModel:
             return "poor"  # Poor insulation
         else:
             return "very_poor"  # Very poor insulation / thermal bridge
+
+    def to_dict(self) -> dict[str, Any]:
+        """Export model state to dictionary for persistence."""
+        return {
+            "data_points": [
+                {
+                    "timestamp": p.timestamp,
+                    "indoor_temp": p.indoor_temp,
+                    "outdoor_temp": p.outdoor_temp,
+                    "heating_on": p.heating_on,
+                }
+                for p in self.data_points
+            ],
+            "k_coefficient": self._k_coefficient,
+            "total_energy_kwh": self._total_energy_kwh,
+            "last_point": {
+                "timestamp": self._last_point.timestamp,
+                "indoor_temp": self._last_point.indoor_temp,
+                "outdoor_temp": self._last_point.outdoor_temp,
+                "heating_on": self._last_point.heating_on,
+            } if self._last_point else None,
+        }
+
+    def from_dict(self, data: dict[str, Any]) -> None:
+        """Restore model state from dictionary."""
+        if not data:
+            return
+
+        # Restore data points
+        if "data_points" in data:
+            self.data_points.clear()
+            for p in data["data_points"]:
+                self.data_points.append(ThermalDataPoint(
+                    timestamp=p["timestamp"],
+                    indoor_temp=p["indoor_temp"],
+                    outdoor_temp=p["outdoor_temp"],
+                    heating_on=p["heating_on"],
+                ))
+
+        # Restore calculated values
+        if "k_coefficient" in data:
+            self._k_coefficient = data["k_coefficient"]
+
+        if "total_energy_kwh" in data:
+            self._total_energy_kwh = data["total_energy_kwh"]
+
+        # Restore last point
+        if data.get("last_point"):
+            lp = data["last_point"]
+            self._last_point = ThermalDataPoint(
+                timestamp=lp["timestamp"],
+                indoor_temp=lp["indoor_temp"],
+                outdoor_temp=lp["outdoor_temp"],
+                heating_on=lp["heating_on"],
+            )
+
+        # Recalculate aggregation if we have data
+        if self.data_hours >= MIN_DATA_HOURS:
+            self._calculate_k()
+
+        _LOGGER.info(
+            "Restored %d data points for %s (%.1fh of data, K=%.1f W/°C)",
+            len(self.data_points),
+            self.zone_name,
+            self.data_hours,
+            self._k_coefficient or 0,
+        )

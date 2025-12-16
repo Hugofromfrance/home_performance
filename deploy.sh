@@ -11,12 +11,17 @@ echo "🚀 Déploiement de Home Performance vers Home Assistant..."
 
 # Créer les dossiers si nécessaire
 ssh ha "mkdir -p /config/custom_components/home_performance/translations"
+ssh ha "mkdir -p /config/custom_components/home_performance/www"
 
 # Copier les fichiers Python et JSON
 echo "📦 Copie des fichiers..."
 scp "$SOURCE_DIR"/*.py ha:/config/custom_components/home_performance/
 scp "$SOURCE_DIR"/*.json ha:/config/custom_components/home_performance/
 scp "$SOURCE_DIR"/translations/*.json ha:/config/custom_components/home_performance/translations/
+
+# Copier la carte Lovelace custom
+echo "🎨 Copie de la carte Lovelace..."
+scp "$SOURCE_DIR"/www/*.js ha:/config/custom_components/home_performance/www/
 
 echo "✅ Fichiers synchronisés avec succès !"
 

@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -17,6 +18,7 @@ from .const import (
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_HEATING_ENTITY,
     CONF_HEATER_POWER,
+    CONF_POWER_SENSOR,
     CONF_ZONE_NAME,
     CONF_SURFACE,
     CONF_VOLUME,
@@ -25,6 +27,10 @@ from .const import (
 from .models import ThermalLossModel, ThermalDataPoint
 
 _LOGGER = logging.getLogger(__name__)
+
+# Storage version and save interval
+STORAGE_VERSION = 1
+SAVE_INTERVAL_SECONDS = 300  # Save every 5 minutes
 
 
 class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -40,6 +46,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.heater_power: float = entry.data[CONF_HEATER_POWER]
         self.surface: float | None = entry.data.get(CONF_SURFACE)
         self.volume: float | None = entry.data.get(CONF_VOLUME)
+        self.power_sensor: str | None = entry.data.get(CONF_POWER_SENSOR)
 
         # Thermal model
         self.thermal_model = ThermalLossModel(
@@ -54,12 +61,100 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_heating_state: bool | None = None
         self._last_update: float | None = None
 
+        # Energy integration from power sensor
+        self._last_power_update: float | None = None
+        self._last_power_value: float | None = None
+        self._measured_energy_total_kwh: float = 0.0
+        self._measured_energy_daily_kwh: float = 0.0
+        self._last_daily_reset_date: str | None = None
+        self._daily_reset_datetime: Any = None  # datetime for utility meter compatibility
+
+        # Persistence
+        self._store = Store(
+            hass,
+            STORAGE_VERSION,
+            f"{DOMAIN}.{self.zone_name.lower().replace(' ', '_')}",
+        )
+        self._last_save_time: float = 0
+        self._data_loaded: bool = False
+
         super().__init__(
             hass,
             _LOGGER,
             name=f"{DOMAIN}_{self.zone_name}",
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
+
+    async def async_config_entry_first_refresh(self) -> None:
+        """Load persisted data before first refresh."""
+        await self._async_load_data()
+        await super().async_config_entry_first_refresh()
+
+    async def _async_load_data(self) -> None:
+        """Load persisted data from storage."""
+        try:
+            data = await self._store.async_load()
+            if data:
+                _LOGGER.info("Loading persisted data for zone %s", self.zone_name)
+                
+                # Restore thermal model
+                if "thermal_model" in data:
+                    self.thermal_model.from_dict(data["thermal_model"])
+                
+                # Restore energy counters
+                if "measured_energy_total_kwh" in data:
+                    self._measured_energy_total_kwh = data["measured_energy_total_kwh"]
+                if "measured_energy_daily_kwh" in data:
+                    self._measured_energy_daily_kwh = data["measured_energy_daily_kwh"]
+                if "last_daily_reset_date" in data:
+                    self._last_daily_reset_date = data["last_daily_reset_date"]
+                if "daily_reset_datetime" in data:
+                    # Restore as string, will be converted on next update
+                    pass
+                
+                # Restore tracking values
+                if "last_indoor_temp" in data:
+                    self._last_indoor_temp = data["last_indoor_temp"]
+                if "last_heating_state" in data:
+                    self._last_heating_state = data["last_heating_state"]
+                if "last_power_value" in data:
+                    self._last_power_value = data["last_power_value"]
+                
+                self._data_loaded = True
+                _LOGGER.info(
+                    "Restored data for %s: %.1fh of thermal data, %.3f kWh total energy",
+                    self.zone_name,
+                    self.thermal_model.data_hours,
+                    self._measured_energy_total_kwh,
+                )
+            else:
+                _LOGGER.info("No persisted data found for zone %s", self.zone_name)
+        except Exception as err:
+            _LOGGER.error("Error loading persisted data: %s", err)
+
+    async def async_save_data(self) -> None:
+        """Save data to persistent storage."""
+        try:
+            data = {
+                "thermal_model": self.thermal_model.to_dict(),
+                "measured_energy_total_kwh": self._measured_energy_total_kwh,
+                "measured_energy_daily_kwh": self._measured_energy_daily_kwh,
+                "last_daily_reset_date": self._last_daily_reset_date,
+                "last_indoor_temp": self._last_indoor_temp,
+                "last_heating_state": self._last_heating_state,
+                "last_power_value": self._last_power_value,
+            }
+            await self._store.async_save(data)
+            self._last_save_time = dt_util.utcnow().timestamp()
+            _LOGGER.debug("Saved data for zone %s", self.zone_name)
+        except Exception as err:
+            _LOGGER.error("Error saving data: %s", err)
+
+    async def _async_maybe_save(self) -> None:
+        """Save data if enough time has passed since last save."""
+        now = dt_util.utcnow().timestamp()
+        if now - self._last_save_time >= SAVE_INTERVAL_SECONDS:
+            await self.async_save_data()
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from sensors and update thermal model."""
@@ -98,6 +193,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Get analysis from model
             analysis = self.thermal_model.get_analysis()
 
+            # Update measured energy from power sensor (if configured)
+            measured_power = self._update_measured_energy(now)
+
+            # Periodically save data to persistent storage
+            await self._async_maybe_save()
+
             return {
                 # Current values
                 "indoor_temp": indoor_temp,
@@ -114,6 +215,14 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_ratio": analysis.get("heating_ratio"),
                 "avg_delta_t": analysis.get("avg_delta_t"),
                 "daily_energy_kwh": analysis.get("daily_energy_kwh"),
+                # Cumulative energy (for Energy Dashboard)
+                "total_energy_kwh": analysis.get("total_energy_kwh"),
+                # Measured energy (from power sensor)
+                "measured_power_w": measured_power,
+                "measured_energy_daily_kwh": self._measured_energy_daily_kwh,
+                "measured_energy_total_kwh": self._measured_energy_total_kwh,
+                "daily_reset_datetime": self._daily_reset_datetime,
+                "power_sensor_configured": self.power_sensor is not None,
                 # Status
                 "data_hours": analysis.get("data_hours"),
                 "samples_count": analysis.get("samples_count"),
@@ -145,6 +254,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heating_ratio": None,
             "avg_delta_t": None,
             "daily_energy_kwh": None,
+            "total_energy_kwh": 0.0,
             "data_hours": 0,
             "samples_count": 0,
             "data_ready": False,
@@ -201,3 +311,57 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return True
 
         return False
+
+    def _update_measured_energy(self, now: float) -> float | None:
+        """
+        Update measured energy by integrating power over time.
+        
+        Uses trapezoidal integration for better accuracy.
+        Automatically resets daily counter at midnight.
+        """
+        if self.power_sensor is None:
+            return None
+
+        # Check for daily reset (midnight)
+        now_dt = dt_util.now()
+        today = now_dt.strftime("%Y-%m-%d")
+        if self._last_daily_reset_date != today:
+            _LOGGER.debug(
+                "Resetting daily energy counter for %s (new day: %s)",
+                self.zone_name,
+                today,
+            )
+            self._measured_energy_daily_kwh = 0.0
+            self._last_daily_reset_date = today
+            # Store the reset datetime for utility meter compatibility
+            self._daily_reset_datetime = now_dt.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+
+        # Get current power value
+        power_state = self.hass.states.get(self.power_sensor)
+        if power_state is None or power_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+
+        try:
+            current_power = float(power_state.state)
+        except (ValueError, TypeError):
+            return None
+
+        # If we have a previous reading, integrate
+        if self._last_power_update is not None and self._last_power_value is not None:
+            time_delta_hours = (now - self._last_power_update) / 3600  # Convert to hours
+            
+            # Trapezoidal integration: average of last and current power
+            avg_power_w = (self._last_power_value + current_power) / 2
+            energy_kwh = (avg_power_w * time_delta_hours) / 1000  # W*h to kWh
+            
+            # Add to counters
+            self._measured_energy_daily_kwh += energy_kwh
+            self._measured_energy_total_kwh += energy_kwh
+
+        # Update tracking values
+        self._last_power_update = now
+        self._last_power_value = current_power
+
+        return current_power

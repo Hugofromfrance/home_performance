@@ -20,15 +20,17 @@
         }
       },
       "dimensions": {
-        "title": "Dimensions de la pièce",
-        "description": "Optionnel : Ajoutez les dimensions pour obtenir des valeurs K normalisées (K/m² et K/m³) permettant de comparer les pièces.",
+        "title": "Dimensions et compteur d'énergie",
+        "description": "Optionnel : Ajoutez les dimensions pour les valeurs K normalisées, et/ou un capteur de puissance pour créer un compteur d'énergie journalier automatique.",
         "data": {
           "surface": "Surface (m²)",
-          "volume": "Volume (m³)"
+          "volume": "Volume (m³)",
+          "power_sensor": "Capteur de puissance instantanée (optionnel)"
         },
         "data_description": {
           "surface": "Surface au sol de la zone",
-          "volume": "Volume de la zone (surface × hauteur sous plafond)"
+          "volume": "Volume de la zone (surface × hauteur sous plafond)",
+          "power_sensor": "Capteur en Watts - créera automatiquement un compteur kWh journalier avec reset à minuit"
         }
       }
     },
@@ -65,8 +67,11 @@
       "k_per_m3": {
         "name": "K par m³"
       },
+      "total_energy": {
+        "name": "Énergie totale (estimée)"
+      },
       "daily_energy": {
-        "name": "Énergie journalière"
+        "name": "Énergie 24h (estimée)"
       },
       "heating_time": {
         "name": "Temps de chauffe (24h)"
@@ -74,14 +79,29 @@
       "heating_ratio": {
         "name": "Ratio de chauffe"
       },
+      "energy_performance": {
+        "name": "Performance énergétique"
+      },
       "avg_delta_t": {
         "name": "ΔT moyen (24h)"
       },
       "data_hours": {
         "name": "Heures de données"
       },
+      "analysis_remaining": {
+        "name": "Temps restant analyse"
+      },
+      "analysis_progress": {
+        "name": "Progression analyse"
+      },
       "insulation_rating": {
         "name": "Note d'isolation"
+      },
+      "measured_energy_daily": {
+        "name": "Énergie jour (mesurée)"
+      },
+      "measured_energy_total": {
+        "name": "Énergie totale (mesurée)"
       }
     },
     "binary_sensor": {

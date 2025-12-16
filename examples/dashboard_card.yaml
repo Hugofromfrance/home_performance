@@ -1,0 +1,590 @@
+# ============================================================================
+# Home Performance - Exemple de carte Dashboard
+# ============================================================================
+#
+# Ce fichier contient plusieurs exemples de cartes pour afficher les données
+# Home Performance dans votre dashboard Home Assistant.
+#
+# ⭐ NOUVEAU: Carte Custom intégrée (recommandé)
+# Option 1: Cartes natives HA (fonctionne sans rien installer)
+# Option 2: Avec Mushroom Cards (installer via HACS pour un look moderne)
+# Option 3: Carte tout-en-un avec custom:stack-in-card + Mushroom
+#
+# ============================================================================
+# IMPORTANT: Noms des entités
+# ============================================================================
+# Les entity_id sont générés à partir du nom de zone + nom du capteur.
+# Format: sensor.home_performance_[ZONE]_[nom_capteur_slug]
+#
+# Exemple pour zone "ZONE" (remplacer par votre zone: salon, etc.):
+#   - sensor.home_performance_ZONE_coefficient_k
+#   - sensor.home_performance_ZONE_k_par_m2
+#   - sensor.home_performance_ZONE_k_par_m3
+#   - sensor.home_performance_ZONE_energie_totale
+#   - sensor.home_performance_ZONE_energie_journaliere
+#   - sensor.home_performance_ZONE_performance_energetique  ← NOUVEAU
+#   - sensor.home_performance_ZONE_temps_de_chauffe_24h
+#   - sensor.home_performance_ZONE_ratio_de_chauffe
+#   - sensor.home_performance_ZONE_dt_moyen_24h
+#   - sensor.home_performance_ZONE_heures_de_donnees
+#   - sensor.home_performance_ZONE_temps_restant_analyse
+#   - sensor.home_performance_ZONE_progression_analyse  ← NOUVEAU (0-100%)
+#   - sensor.home_performance_ZONE_note_d_isolation
+#   - binary_sensor.home_performance_ZONE_donnees_pretes
+#   - binary_sensor.home_performance_ZONE_fenetre_ouverte
+#
+# 💡 Astuce: Dans HA, allez dans Paramètres → Appareils → Home Performance
+#            pour voir les entity_id exacts de vos capteurs.
+# ============================================================================
+
+# ==================================================
+# ⭐ CARTE CUSTOM INTÉGRÉE (Recommandé)
+# ==================================================
+# L'intégration inclut une carte Lovelace custom prête à l'emploi !
+#
+# 1. Ajouter la ressource dans Lovelace:
+#    Paramètres → Tableaux de bord → ⋮ (3 points) → Ressources
+#    URL: /home_performance/home-performance-card.js
+#    Type: Module JavaScript
+#
+# 2. Utiliser la carte:
+#    Dans votre dashboard, ajoutez une carte manuelle avec:
+
+# type: custom:home-performance-card
+# zone: Chambre Flavien          # Nom exact de votre zone
+# title: Performance Thermique   # Titre personnalisé (optionnel)
+# show_progress: true            # Afficher la barre de progression
+# show_energy: true              # Afficher les stats énergie
+# show_coefficient: true         # Afficher le coefficient K
+
+# La carte affiche automatiquement:
+# - Badge de statut (Analyse/Prêt)
+# - Barre de progression pendant la collecte de données
+# - Coefficient K et K/m³
+# - Énergie journalière (mesurée si disponible, sinon estimée)
+# - Note d'isolation avec couleur
+# - Performance énergétique avec emoji
+#
+# ==================================================
+
+# ==================================================
+# OPTION 1: Cartes natives Home Assistant
+# ==================================================
+# Copier-coller directement dans votre dashboard
+# Remplacez ZONE par votre zone
+
+type: vertical-stack
+cards:
+  # En-tête avec la note d'isolation
+  - type: markdown
+    content: |
+      # 🏠 Performance Thermique
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}
+      ### {{ states('sensor.home_performance_ZONE_note_d_isolation') | replace('excellent', '🌟 Excellent') | replace('good', '✅ Bien isolé') | replace('average', '⚡ Moyen') | replace('poor', '⚠️ Mal isolé') | replace('very_poor', '🔴 Très mal isolé') | replace('unknown', '⏳ Calcul...') }}
+      {% else %}
+      ### ⏳ Analyse en cours...
+      **{{ states('sensor.home_performance_ZONE_heures_de_donnees') }}** collectées sur 12h requises
+
+      ⏱️ Encore ~**{{ states('sensor.home_performance_ZONE_temps_restant_analyse') }}** avant les premiers résultats
+      {% endif %}
+    style: |
+      ha-card {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 16px;
+      }
+
+  # Progression de l'analyse (visible seulement pendant l'analyse)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "off"
+    card:
+      type: markdown
+      content: |
+        {% set pct = states('sensor.home_performance_ZONE_progression_analyse') | int(0) %}
+        <div style="text-align: center; padding: 10px;">
+          <div style="font-size: 2em; font-weight: bold; color: var(--primary-color);">{{ pct }}%</div>
+          <div style="background: var(--divider-color); border-radius: 10px; height: 10px; margin: 10px 0;">
+            <div style="background: linear-gradient(90deg, #f39c12, #27ae60); width: {{ pct }}%; height: 100%; border-radius: 10px; transition: width 0.5s;"></div>
+          </div>
+          <div style="opacity: 0.7;">{{ states('sensor.home_performance_ZONE_heures_de_donnees') }} / 12h • Reste {{ states('sensor.home_performance_ZONE_temps_restant_analyse') }}</div>
+        </div>
+
+  # Gauge pour le coefficient K (visible quand données prêtes)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: gauge
+      entity: sensor.home_performance_ZONE_coefficient_k
+      name: Coefficient K
+      unit: W/°C
+      min: 0
+      max: 100
+      severity:
+        green: 0
+        yellow: 25
+        red: 50
+      needle: true
+
+  # Stats en grille (visible quand données prêtes)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: vertical-stack
+      cards:
+        - type: horizontal-stack
+          cards:
+            - type: entity
+              entity: sensor.home_performance_ZONE_energie_journaliere
+              name: Énergie 24h
+              icon: mdi:lightning-bolt
+            - type: entity
+              entity: sensor.home_performance_ZONE_temps_de_chauffe_24h
+              name: Chauffe
+              icon: mdi:clock-outline
+        - type: horizontal-stack
+          cards:
+            - type: entity
+              entity: sensor.home_performance_ZONE_dt_moyen_24h
+              name: ΔT moyen
+              icon: mdi:thermometer
+            - type: entity
+              entity: sensor.home_performance_ZONE_ratio_de_chauffe
+              name: Ratio
+              icon: mdi:percent
+
+---
+# ==================================================
+# OPTION 2: Avec Mushroom Cards (HACS)
+# ==================================================
+# Plus moderne et élégant. Nécessite d'installer:
+# - Mushroom Cards (via HACS)
+# - card-mod (optionnel, pour le style)
+
+type: vertical-stack
+cards:
+  # Titre stylé avec statut
+  - type: custom:mushroom-title-card
+    title: Performance Thermique
+    subtitle: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}
+      {{ states('sensor.home_performance_ZONE_note_d_isolation') | replace('excellent', '🌟 Excellente isolation') | replace('good', '✅ Bonne isolation') | replace('average', '⚡ Isolation moyenne') | replace('poor', '⚠️ Mauvaise isolation') | replace('very_poor', '🔴 Très mauvaise isolation') | replace('unknown', '⏳ Calcul en cours...') }}
+      {% else %}
+      ⏳ Analyse en cours...
+      {% endif %}
+
+  # Carte d'attente (visible pendant l'analyse)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "off"
+    card:
+      type: custom:mushroom-template-card
+      primary: "Collecte des données: {{ states('sensor.home_performance_ZONE_progression_analyse') }}%"
+      secondary: "{{ states('sensor.home_performance_ZONE_heures_de_donnees') }} collectées • Encore ~{{ states('sensor.home_performance_ZONE_temps_restant_analyse') }}"
+      icon: mdi:timer-sand
+      icon_color: amber
+      card_mod:
+        style: |
+          ha-card {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.15) 0%, transparent 100%);
+            animation: pulse 2s ease-in-out infinite;
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+          }
+
+  # Coefficient K - Carte principale (visible quand données prêtes)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: custom:mushroom-template-card
+      primary: Coefficient K
+      secondary: "{{ states('sensor.home_performance_ZONE_coefficient_k') }} W/°C"
+      icon: mdi:heat-wave
+      icon_color: |
+        {% set k = states('sensor.home_performance_ZONE_coefficient_k') | float(0) %}
+        {% if k < 20 %}green
+        {% elif k < 40 %}orange
+        {% else %}red{% endif %}
+      badge_icon: |
+        {% set k = states('sensor.home_performance_ZONE_coefficient_k') | float(0) %}
+        {% if k < 20 %}mdi:check-circle
+        {% elif k < 40 %}mdi:alert-circle
+        {% else %}mdi:close-circle{% endif %}
+      badge_color: |
+        {% set k = states('sensor.home_performance_ZONE_coefficient_k') | float(0) %}
+        {% if k < 20 %}green
+        {% elif k < 40 %}orange
+        {% else %}red{% endif %}
+      card_mod:
+        style: |
+          ha-card {
+            background: linear-gradient(135deg, rgba(var(--rgb-primary-color), 0.1) 0%, transparent 100%);
+          }
+
+  # Stats en chips (visible quand données prêtes)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: custom:mushroom-chips-card
+      chips:
+        - type: template
+          icon: mdi:lightning-bolt
+          icon_color: amber
+          content: "{{ states('sensor.home_performance_ZONE_energie_journaliere') }} kWh"
+        - type: template
+          icon: mdi:clock-outline
+          icon_color: blue
+          content: "{{ states('sensor.home_performance_ZONE_temps_de_chauffe_24h') }}"
+        - type: template
+          icon: mdi:thermometer
+          icon_color: red
+          content: "ΔT {{ states('sensor.home_performance_ZONE_dt_moyen_24h') }}°C"
+        - type: template
+          icon: mdi:percent
+          icon_color: cyan
+          content: "{{ states('sensor.home_performance_ZONE_ratio_de_chauffe') }}%"
+      alignment: center
+
+  # K normalisés (visible quand données prêtes et si configuré)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: horizontal-stack
+      cards:
+        - type: custom:mushroom-entity-card
+          entity: sensor.home_performance_ZONE_k_par_m2
+          name: K/m²
+          icon: mdi:square-outline
+          layout: vertical
+        - type: custom:mushroom-entity-card
+          entity: sensor.home_performance_ZONE_k_par_m3
+          name: K/m³
+          icon: mdi:cube-outline
+          layout: vertical
+
+  # Énergie totale (toujours visible car commence à 0)
+  - type: custom:mushroom-entity-card
+    entity: sensor.home_performance_ZONE_energie_totale
+    name: Énergie cumulée
+    icon: mdi:counter
+    icon_color: deep-purple
+
+  # Performance énergétique (visible quand données prêtes)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: custom:mushroom-template-card
+      primary: |
+        {% set perf = states('sensor.home_performance_ZONE_performance_energetique') %}
+        {% if perf == 'excellent' %}🟢 Performance excellente
+        {% elif perf == 'standard' %}🟡 Performance standard
+        {% elif perf == 'to_optimize' %}🟠 À optimiser
+        {% else %}En attente{% endif %}
+      secondary: |
+        {{ state_attr('sensor.home_performance_ZONE_performance_energetique', 'message') }}
+      icon: |
+        {% set perf = states('sensor.home_performance_ZONE_performance_energetique') %}
+        {% if perf == 'excellent' %}mdi:leaf
+        {% elif perf == 'standard' %}mdi:check-circle
+        {% elif perf == 'to_optimize' %}mdi:alert-circle
+        {% else %}mdi:help-circle{% endif %}
+      icon_color: |
+        {% set perf = states('sensor.home_performance_ZONE_performance_energetique') %}
+        {% if perf == 'excellent' %}green
+        {% elif perf == 'standard' %}amber
+        {% elif perf == 'to_optimize' %}orange
+        {% else %}grey{% endif %}
+      card_mod:
+        style: |
+          ha-card {
+            background: linear-gradient(135deg, rgba(var(--rgb-primary-color), 0.05) 0%, transparent 100%);
+          }
+
+---
+# ==================================================
+# OPTION 3: Carte Complète Tout-en-Un
+# ==================================================
+# Nécessite: mushroom-cards, stack-in-card, card-mod
+
+type: custom:stack-in-card
+mode: vertical
+cards:
+  # Header avec gradient
+  - type: custom:mushroom-template-card
+    primary: "🏠 Ma Zone"
+    secondary: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}
+      {% set rating = states('sensor.home_performance_ZONE_note_d_isolation') %}
+      {% set ratings = {
+        'excellent': '🌟 Excellente isolation',
+        'good': '✅ Bonne isolation',
+        'average': '⚡ Isolation moyenne',
+        'poor': '⚠️ Isolation passable',
+        'very_poor': '🔴 Mauvaise isolation'
+      } %}
+      {{ ratings.get(rating, '⏳ Calcul en cours...') }}
+      {% else %}
+      ⏳ Analyse: {{ states('sensor.home_performance_ZONE_progression_analyse') }}% • Encore ~{{ states('sensor.home_performance_ZONE_temps_restant_analyse') }}
+      {% endif %}
+    icon: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}
+      mdi:home-thermometer
+      {% else %}
+      mdi:timer-sand
+      {% endif %}
+    icon_color: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'off') %}amber
+      {% else %}
+      {% set rating = states('sensor.home_performance_ZONE_note_d_isolation') %}
+      {% if rating == 'excellent' %}green
+      {% elif rating == 'good' %}light-green
+      {% elif rating == 'average' %}amber
+      {% elif rating == 'poor' %}orange
+      {% else %}red{% endif %}
+      {% endif %}
+    fill_container: true
+    multiline_secondary: true
+    card_mod:
+      style: |
+        ha-card {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          --primary-text-color: white;
+          --secondary-text-color: rgba(255,255,255,0.8);
+        }
+        mushroom-shape-icon {
+          --shape-color: rgba(255,255,255,0.2) !important;
+        }
+
+  # Carte d'attente avec barre de progression (visible pendant l'analyse)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "off"
+    card:
+      type: custom:mushroom-template-card
+      primary: "{{ states('sensor.home_performance_ZONE_heures_de_donnees') }} / 12h collectées"
+      secondary: |
+        Les premiers résultats seront disponibles après 12h de données.
+        Plus la période d'analyse est longue, plus les résultats sont précis.
+      icon: mdi:chart-timeline-variant
+      icon_color: amber
+      multiline_secondary: true
+      card_mod:
+        style: |
+          ha-card {
+            background: rgba(255, 193, 7, 0.1);
+          }
+
+  # Coefficient K - grande valeur centrale (visible quand données prêtes)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: vertical-stack
+      cards:
+        - type: custom:mushroom-template-card
+          primary: ""
+          secondary: ""
+          icon: mdi:heat-wave
+          icon_color: |
+            {% set k = states('sensor.home_performance_ZONE_coefficient_k') | float(0) %}
+            {% if k < 20 %}green{% elif k < 40 %}amber{% else %}red{% endif %}
+          layout: vertical
+          tap_action:
+            action: more-info
+            entity: sensor.home_performance_ZONE_coefficient_k
+          card_mod:
+            style: |
+              ha-card {
+                padding: 16px;
+              }
+              mushroom-shape-icon {
+                --icon-size: 42px;
+                --shape-color: rgba(var(--rgb-primary-color), 0.1) !important;
+              }
+        - type: markdown
+          content: |
+            <div style="text-align: center; margin: -20px 0 10px 0;">
+              <span style="font-size: 2.5em; font-weight: bold;">{{ states('sensor.home_performance_ZONE_coefficient_k') }}</span>
+              <span style="font-size: 1em; opacity: 0.7;">W/°C</span>
+              <br>
+              <span style="font-size: 0.9em; opacity: 0.6;">Coefficient de déperdition thermique</span>
+            </div>
+          card_mod:
+            style: |
+              ha-card { background: transparent; }
+
+  # Statistiques en grille 2x2 (visible quand données prêtes)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.home_performance_ZONE_donnees_pretes
+        state: "on"
+    card:
+      type: grid
+      columns: 2
+      square: false
+      cards:
+        - type: custom:mushroom-template-card
+          primary: "{{ states('sensor.home_performance_ZONE_energie_journaliere') }} kWh"
+          secondary: Énergie 24h
+          icon: mdi:lightning-bolt
+          icon_color: amber
+          layout: vertical
+          tap_action:
+            action: more-info
+            entity: sensor.home_performance_ZONE_energie_journaliere
+
+        - type: custom:mushroom-template-card
+          primary: "{{ states('sensor.home_performance_ZONE_temps_de_chauffe_24h') }}"
+          secondary: Temps de chauffe
+          icon: mdi:fire
+          icon_color: deep-orange
+          layout: vertical
+          tap_action:
+            action: more-info
+            entity: sensor.home_performance_ZONE_temps_de_chauffe_24h
+
+        - type: custom:mushroom-template-card
+          primary: "{{ states('sensor.home_performance_ZONE_dt_moyen_24h') }}°C"
+          secondary: ΔT moyen
+          icon: mdi:thermometer
+          icon_color: cyan
+          layout: vertical
+          tap_action:
+            action: more-info
+            entity: sensor.home_performance_ZONE_dt_moyen_24h
+
+        - type: custom:mushroom-template-card
+          primary: "{{ states('sensor.home_performance_ZONE_ratio_de_chauffe') }}%"
+          secondary: Ratio de chauffe
+          icon: mdi:percent-circle
+          icon_color: teal
+          layout: vertical
+          tap_action:
+            action: more-info
+            entity: sensor.home_performance_ZONE_ratio_de_chauffe
+
+  # Info données (toujours visible - affichage adaptatif)
+  - type: custom:mushroom-template-card
+    primary: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}
+      {{ states('sensor.home_performance_ZONE_heures_de_donnees') }} de données collectées
+      {% else %}
+      {{ states('sensor.home_performance_ZONE_heures_de_donnees') }} / 12h ({{ states('sensor.home_performance_ZONE_progression_analyse') }}%)
+      {% endif %}
+    secondary: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}
+      ✅ Données suffisantes pour un calcul fiable
+      {% else %}
+      ⏳ Encore ~{{ states('sensor.home_performance_ZONE_temps_restant_analyse') }} avant les premiers résultats
+      {% endif %}
+    icon: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}
+      mdi:database-check
+      {% else %}
+      mdi:database-clock
+      {% endif %}
+    icon_color: |
+      {% if is_state('binary_sensor.home_performance_ZONE_donnees_pretes', 'on') %}green
+      {% else %}amber{% endif %}
+    multiline_secondary: true
+    card_mod:
+      style: |
+        ha-card {
+          border-top: 1px solid rgba(var(--rgb-primary-color), 0.1);
+        }
+
+---
+# ==================================================
+# OPTION 4: Mini carte compacte
+# ==================================================
+# Pour un dashboard avec plusieurs zones
+
+type: custom:mushroom-template-card
+primary: Ma Zone
+secondary: |
+  K={{ states('sensor.home_performance_ZONE_coefficient_k') }}W/°C • {{ states('sensor.home_performance_ZONE_energie_journaliere') }}kWh/j
+icon: |
+  {% set rating = states('sensor.home_performance_ZONE_note_d_isolation') %}
+  {% if rating == 'excellent' %}mdi:home-thermometer
+  {% elif rating == 'good' %}mdi:home-thermometer-outline
+  {% elif rating == 'average' %}mdi:home-alert
+  {% else %}mdi:home-alert-outline{% endif %}
+icon_color: |
+  {% set rating = states('sensor.home_performance_ZONE_note_d_isolation') %}
+  {% if rating == 'excellent' %}green
+  {% elif rating == 'good' %}light-green
+  {% elif rating == 'average' %}amber
+  {% elif rating == 'poor' %}orange
+  {% else %}red{% endif %}
+badge_icon: |
+  {% set rating = states('sensor.home_performance_ZONE_note_d_isolation') %}
+  {% if rating == 'excellent' %}mdi:star
+  {% elif rating == 'good' %}mdi:check
+  {% elif rating == 'average' %}mdi:minus
+  {% else %}mdi:alert{% endif %}
+badge_color: |
+  {% set rating = states('sensor.home_performance_ZONE_note_d_isolation') %}
+  {% if rating in ['excellent', 'good'] %}green
+  {% elif rating == 'average' %}amber
+  {% else %}red{% endif %}
+tap_action:
+  action: navigate
+  navigation_path: /lovelace/home-performance
+
+---
+# ==================================================
+# BONUS: ApexCharts pour l'historique
+# ==================================================
+# Nécessite: apexcharts-card (HACS)
+
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Évolution sur 7 jours
+  show_states: true
+  colorize_states: true
+graph_span: 7d
+span:
+  end: day
+series:
+  - entity: sensor.home_performance_ZONE_coefficient_k
+    name: Coefficient K
+    color: "#667eea"
+    stroke_width: 2
+    fill_raw: last
+  - entity: sensor.home_performance_ZONE_energie_journaliere
+    name: Énergie (kWh)
+    color: "#f9ca24"
+    stroke_width: 2
+    fill_raw: last
+all_series_config:
+  stroke_width: 2
+yaxis:
+  - min: 0
+    apex_config:
+      title:
+        text: W/°C
+apex_config:
+  chart:
+    height: 250px
+  stroke:
+    curve: smooth
+  legend:
+    show: true

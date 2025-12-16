@@ -16,6 +16,7 @@ from .const import (
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_HEATING_ENTITY,
     CONF_HEATER_POWER,
+    CONF_POWER_SENSOR,
     CONF_ZONE_NAME,
     CONF_SURFACE,
     CONF_VOLUME,
@@ -54,7 +55,7 @@ def get_schema_step_zone(hass: HomeAssistant) -> vol.Schema:
 
 
 def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
-    """Return schema for room dimensions configuration step."""
+    """Return schema for room dimensions and optional power sensor configuration."""
     return vol.Schema(
         {
             vol.Optional(CONF_SURFACE): selector.NumberSelector(
@@ -73,6 +74,12 @@ def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
                     step=0.5,
                     unit_of_measurement="m³",
                     mode="box",
+                )
+            ),
+            vol.Optional(CONF_POWER_SENSOR): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="power",
                 )
             ),
         }
@@ -205,6 +212,15 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                             step=0.5,
                             unit_of_measurement="m³",
                             mode="box",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_POWER_SENSOR,
+                        default=self.config_entry.data.get(CONF_POWER_SENSOR),
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="power",
                         )
                     ),
                 }

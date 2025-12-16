@@ -20,15 +20,17 @@
         }
       },
       "dimensions": {
-        "title": "Room Dimensions",
-        "description": "Optional: Add room dimensions to get normalized K values (K/m² and K/m³) for comparison between rooms.",
+        "title": "Dimensions and Energy Meter",
+        "description": "Optional: Add room dimensions for normalized K values, and/or a power sensor to create an automatic daily energy meter.",
         "data": {
           "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)"
+          "volume": "Volume (m³)",
+          "power_sensor": "Instant Power Sensor (optional)"
         },
         "data_description": {
           "surface": "Floor surface area of the zone",
-          "volume": "Volume of the zone (surface × ceiling height)"
+          "volume": "Volume of the zone (surface × ceiling height)",
+          "power_sensor": "Sensor in Watts - will automatically create a daily kWh meter with midnight reset"
         }
       }
     },
@@ -65,8 +67,11 @@
       "k_per_m3": {
         "name": "K per m³"
       },
+      "total_energy": {
+        "name": "Total Energy (estimated)"
+      },
       "daily_energy": {
-        "name": "Daily Energy"
+        "name": "Energy 24h (estimated)"
       },
       "heating_time": {
         "name": "Heating Time (24h)"
@@ -74,14 +79,29 @@
       "heating_ratio": {
         "name": "Heating Ratio"
       },
+      "energy_performance": {
+        "name": "Energy Performance"
+      },
       "avg_delta_t": {
         "name": "Average ΔT (24h)"
       },
       "data_hours": {
         "name": "Data Hours"
       },
+      "analysis_remaining": {
+        "name": "Analysis Time Remaining"
+      },
+      "analysis_progress": {
+        "name": "Analysis Progress"
+      },
       "insulation_rating": {
         "name": "Insulation Rating"
+      },
+      "measured_energy_daily": {
+        "name": "Daily Energy (measured)"
+      },
+      "measured_energy_total": {
+        "name": "Total Energy (measured)"
       }
     },
     "binary_sensor": {
