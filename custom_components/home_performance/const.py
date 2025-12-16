@@ -8,6 +8,7 @@ CONF_OUTDOOR_TEMP_SENSOR = "outdoor_temp_sensor"
 CONF_HEATING_ENTITY = "heating_entity"
 CONF_HEATER_POWER = "heater_power"  # Puissance déclarée du radiateur en W
 CONF_POWER_SENSOR = "power_sensor"  # Capteur de puissance instantanée (optionnel)
+CONF_ENERGY_SENSOR = "energy_sensor"  # Compteur d'énergie journalier externe (optionnel)
 CONF_ZONE_NAME = "zone_name"
 CONF_SURFACE = "surface"  # m²
 CONF_VOLUME = "volume"  # m³

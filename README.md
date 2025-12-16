@@ -47,12 +47,14 @@ K (W/°C) = Énergie fournie / (ΔT × durée)
 | **Énergie totale (estimée)** | kWh cumulés basés sur puissance déclarée × temps ON |
 | **Énergie 24h (estimée)** | kWh sur fenêtre glissante 24h |
 
-### Énergie (mesurée - si capteur de puissance configuré)
+### Énergie (mesurée - si compteur externe ou capteur de puissance configuré)
 
 | Capteur | Description |
 |---------|-------------|
-| **Énergie jour (mesurée)** | Compteur kWh avec reset à minuit (Utility Meter) |
+| **Énergie jour (mesurée)** | Compteur kWh journalier (priorité : compteur externe > calcul intégré) |
 | **Énergie totale (mesurée)** | kWh cumulés (compatible Dashboard Énergie HA) |
+
+L'attribut `source` indique l'origine des données : `external` (compteur HA) ou `integrated` (calcul depuis puissance).
 
 ### Performance & Confort
 
@@ -133,7 +135,10 @@ title: Performance Thermique
 |-----------|-------------|
 | Surface | m² (pour K/m²) |
 | Volume | m³ (pour K/m³ et note d'isolation) |
-| Capteur de puissance | sensor.xxx_power en Watts (pour énergie mesurée) |
+| Capteur de puissance | sensor.xxx_power en Watts (pour calcul énergie intégré) |
+| Compteur d'énergie externe | sensor.xxx_energy (votre propre Utility Meter HA) |
+
+> **Note** : Si vous fournissez un compteur d'énergie externe ET un capteur de puissance, le compteur externe est utilisé en priorité.
 
 ## 💾 Persistance des données
 
@@ -213,6 +218,7 @@ Seuils basés sur la puissance du radiateur :
 - [x] Coefficient K (W/°C)
 - [x] Normalisation K/m² et K/m³
 - [x] Énergie journalière (estimée et mesurée)
+- [x] Support compteur d'énergie externe HA
 - [x] Détection fenêtre ouverte
 - [x] Note d'isolation
 - [x] Carte Lovelace intégrée

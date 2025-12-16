@@ -355,8 +355,12 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         hours = data.get("heating_hours")
+        # Source: power sensor (measured) or switch/climate state (estimated)
+        has_power_sensor = self.coordinator.power_sensor is not None
         return {
             "hours_decimal": round(hours, 2) if hours is not None else None,
+            "source": "measured" if has_power_sensor else "estimated",
+            "detection": f"power > 50W ({self.coordinator.power_sensor})" if has_power_sensor else f"état {self.coordinator.heating_entity}",
             "description": "Temps cumulé de chauffe sur les dernières 24h",
         }
 
@@ -385,8 +389,10 @@ class HeatingRatioSensor(HomePerformanceBaseSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
+        has_power_sensor = self.coordinator.power_sensor is not None
         return {
             "description": "Pourcentage du temps où le chauffage est actif sur 24h",
+            "source": "measured" if has_power_sensor else "estimated",
         }
 
 
@@ -687,7 +693,11 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
 
 
 class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
-    """Sensor for daily measured energy from power sensor (resets at midnight).
+    """Sensor for daily measured energy.
+    
+    Priority:
+    1. External energy sensor (if configured) - uses user's own HA energy counter
+    2. Integrated calculation from power sensor
     
     This sensor behaves like a Utility Meter (Compteur de services publics):
     - state_class: TOTAL (not TOTAL_INCREASING)
@@ -706,8 +716,17 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
 
     @property
     def native_value(self) -> float | None:
-        """Return daily measured energy in kWh."""
+        """Return daily measured energy in kWh.
+        
+        Uses external energy sensor if configured, otherwise uses internal calculation.
+        """
         if self.coordinator.data:
+            # Priority 1: External energy sensor
+            external = self.coordinator.data.get("external_energy_daily_kwh")
+            if external is not None:
+                return round(external, 3)
+            
+            # Priority 2: Internal calculation from power sensor
             value = self.coordinator.data.get("measured_energy_daily_kwh")
             if value is not None:
                 return round(value, 3)
@@ -718,7 +737,11 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
         """Return the time when the sensor was last reset (midnight).
         
         This is required for Utility Meter compatibility.
+        Only applies to internal calculation, not external sensor.
         """
+        # If using external sensor, don't report last_reset (external handles it)
+        if self.coordinator.data and self.coordinator.data.get("external_energy_daily_kwh") is not None:
+            return None
         if self.coordinator.data:
             return self.coordinator.data.get("daily_reset_datetime")
         return None
@@ -727,12 +750,13 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         data = self.coordinator.data or {}
-        reset_dt = data.get("daily_reset_datetime")
+        uses_external = data.get("external_energy_daily_kwh") is not None
         return {
-            "description": "Compteur d'énergie journalier (reset à minuit)",
-            "power_sensor": self.coordinator.power_sensor,
-            "current_power_w": data.get("measured_power_w"),
-            "status": "utility_meter",
+            "description": "Compteur d'énergie journalier",
+            "source": "external" if uses_external else "integrated",
+            "energy_sensor": self.coordinator.energy_sensor if uses_external else None,
+            "power_sensor": self.coordinator.power_sensor if not uses_external else None,
+            "current_power_w": data.get("measured_power_w") if not uses_external else None,
         }
 
 

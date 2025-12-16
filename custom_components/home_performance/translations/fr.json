@@ -25,12 +25,14 @@
         "data": {
           "surface": "Surface (m²)",
           "volume": "Volume (m³)",
-          "power_sensor": "Capteur de puissance instantanée (optionnel)"
+          "power_sensor": "Capteur de puissance instantanée (optionnel)",
+          "energy_sensor": "Compteur d'énergie HA externe (optionnel)"
         },
         "data_description": {
           "surface": "Surface au sol de la zone",
           "volume": "Volume de la zone (surface × hauteur sous plafond)",
-          "power_sensor": "Capteur en Watts - créera automatiquement un compteur kWh journalier avec reset à minuit"
+          "power_sensor": "Capteur en Watts - créera automatiquement un compteur kWh journalier avec reset à minuit",
+          "energy_sensor": "Votre propre compteur d'énergie journalier (ex: Utility Meter) - sera utilisé à la place du calcul intégré"
         }
       }
     },
@@ -51,7 +53,9 @@
         "data": {
           "heater_power": "Puissance du radiateur (W)",
           "surface": "Surface (m²)",
-          "volume": "Volume (m³)"
+          "volume": "Volume (m³)",
+          "power_sensor": "Capteur de puissance instantanée",
+          "energy_sensor": "Compteur d'énergie HA externe"
         }
       }
     }

@@ -17,6 +17,7 @@ from .const import (
     CONF_HEATING_ENTITY,
     CONF_HEATER_POWER,
     CONF_POWER_SENSOR,
+    CONF_ENERGY_SENSOR,
     CONF_ZONE_NAME,
     CONF_SURFACE,
     CONF_VOLUME,
@@ -80,6 +81,12 @@ def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
                 selector.EntitySelectorConfig(
                     domain="sensor",
                     device_class="power",
+                )
+            ),
+            vol.Optional(CONF_ENERGY_SENSOR): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="energy",
                 )
             ),
         }
@@ -221,6 +228,15 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                         selector.EntitySelectorConfig(
                             domain="sensor",
                             device_class="power",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_ENERGY_SENSOR,
+                        default=self.config_entry.data.get(CONF_ENERGY_SENSOR),
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="energy",
                         )
                     ),
                 }

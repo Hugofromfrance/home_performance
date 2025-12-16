@@ -19,6 +19,7 @@ from .const import (
     CONF_HEATING_ENTITY,
     CONF_HEATER_POWER,
     CONF_POWER_SENSOR,
+    CONF_ENERGY_SENSOR,
     CONF_ZONE_NAME,
     CONF_SURFACE,
     CONF_VOLUME,
@@ -39,14 +40,23 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
         self.entry = entry
-        self.zone_name: str = entry.data[CONF_ZONE_NAME]
-        self.indoor_temp_sensor: str = entry.data[CONF_INDOOR_TEMP_SENSOR]
-        self.outdoor_temp_sensor: str = entry.data[CONF_OUTDOOR_TEMP_SENSOR]
-        self.heating_entity: str = entry.data[CONF_HEATING_ENTITY]
-        self.heater_power: float = entry.data[CONF_HEATER_POWER]
-        self.surface: float | None = entry.data.get(CONF_SURFACE)
-        self.volume: float | None = entry.data.get(CONF_VOLUME)
-        self.power_sensor: str | None = entry.data.get(CONF_POWER_SENSOR)
+        # Merge data and options (options override data)
+        config = {**entry.data, **entry.options}
+        
+        self.zone_name: str = config[CONF_ZONE_NAME]
+        self.indoor_temp_sensor: str = config[CONF_INDOOR_TEMP_SENSOR]
+        self.outdoor_temp_sensor: str = config[CONF_OUTDOOR_TEMP_SENSOR]
+        self.heating_entity: str = config[CONF_HEATING_ENTITY]
+        self.heater_power: float = config[CONF_HEATER_POWER]
+        self.surface: float | None = config.get(CONF_SURFACE)
+        self.volume: float | None = config.get(CONF_VOLUME)
+        self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
+        self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
+
+        _LOGGER.info(
+            "HomePerformance coordinator initialized for %s: power_sensor=%s, energy_sensor=%s",
+            self.zone_name, self.power_sensor, self.energy_sensor
+        )
 
         # Thermal model
         self.thermal_model = ThermalLossModel(
@@ -196,6 +206,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Update measured energy from power sensor (if configured)
             measured_power = self._update_measured_energy(now)
 
+            # Get external energy sensor value (if configured)
+            external_energy = self._get_external_energy()
+
             # Periodically save data to persistent storage
             await self._async_maybe_save()
 
@@ -223,6 +236,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "measured_energy_total_kwh": self._measured_energy_total_kwh,
                 "daily_reset_datetime": self._daily_reset_datetime,
                 "power_sensor_configured": self.power_sensor is not None,
+                # External energy sensor (if configured, takes priority)
+                "external_energy_daily_kwh": external_energy,
+                "energy_sensor_configured": self.energy_sensor is not None,
                 # Status
                 "data_hours": analysis.get("data_hours"),
                 "samples_count": analysis.get("samples_count"),
@@ -255,6 +271,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "avg_delta_t": None,
             "daily_energy_kwh": None,
             "total_energy_kwh": 0.0,
+            "external_energy_daily_kwh": None,
+            "energy_sensor_configured": self.energy_sensor is not None,
             "data_hours": 0,
             "samples_count": 0,
             "data_ready": False,
@@ -274,25 +292,54 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (ValueError, TypeError):
             return None
 
-    def _get_heating_state(self) -> bool:
-        """Get heating state from power sensor (preferred) or climate/switch entity.
+    def _get_external_energy(self) -> float | None:
+        """Get energy value from external energy sensor (if configured)."""
+        if self.energy_sensor is None:
+            return None
         
-        If a power sensor is configured, use it to detect actual heating:
+        state = self.hass.states.get(self.energy_sensor)
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+        try:
+            return float(state.state)
+        except (ValueError, TypeError):
+            return None
+
+    def _get_heating_state(self) -> bool:
+        """Get heating state from power sensor (exclusive) or climate/switch entity.
+        
+        If a power sensor is configured, ONLY use it to detect actual heating:
         - Power > 50W = heating is active
-        This is more accurate than switch state for radiators with internal thermostats.
+        - Power unavailable = no heating (don't fallback to switch)
+        
+        This is critical for radiators with internal thermostats where
+        the switch is always ON but actual heating depends on thermostat.
         """
-        # If power sensor is configured, use it for heating detection
+        # If power sensor is configured, use it EXCLUSIVELY (no fallback)
         if self.power_sensor:
             power_state = self.hass.states.get(self.power_sensor)
             if power_state and power_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
                     power_w = float(power_state.state)
-                    # Consider heating active if power > 50W (accounts for standby consumption)
-                    return power_w > 50
-                except (ValueError, TypeError):
-                    pass  # Fall back to switch/climate state
+                    is_heating = power_w > 50
+                    _LOGGER.debug(
+                        "Heating detection via power sensor %s: %.1fW -> heating=%s",
+                        self.power_sensor, power_w, is_heating
+                    )
+                    return is_heating
+                except (ValueError, TypeError) as err:
+                    _LOGGER.warning("Could not parse power sensor value: %s", err)
+            
+            # Power sensor configured but unavailable -> assume not heating
+            # DO NOT fallback to switch (it's always ON for thermostatic radiators)
+            _LOGGER.debug(
+                "Power sensor %s unavailable, assuming not heating (no fallback to switch)",
+                self.power_sensor
+            )
+            return False
         
-        # Fallback: use climate/switch entity state
+        # No power sensor configured -> use climate/switch entity state
+        _LOGGER.debug("No power sensor configured, using heating entity state")
         state = self.hass.states.get(self.heating_entity)
         if state is None:
             return False
@@ -305,7 +352,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return state.state not in ("off", STATE_UNAVAILABLE, STATE_UNKNOWN)
 
         # Handle switch/input_boolean
-        return state.state == STATE_ON
+        is_on = state.state == STATE_ON
+        _LOGGER.debug("Heating detection via switch %s: state=%s -> heating=%s",
+                      self.heating_entity, state.state, is_on)
+        return is_on
 
     def _detect_window_open(self, current_temp: float, now: float) -> bool:
         """Detect if window is likely open based on rapid temperature drop."""

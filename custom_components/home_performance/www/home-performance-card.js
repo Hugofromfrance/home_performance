@@ -146,7 +146,7 @@ class HomePerformanceCard extends LitElement {
           </div>
           <div class="header-right">
             ${dataReady
-        ? html`<div class="status-ready"><ha-icon icon="mdi:check-circle"></ha-icon></div>`
+        ? html``
         : html`<div class="status-loading"><span class="dot"></span></div>`
       }
           </div>
@@ -335,26 +335,27 @@ class HomePerformanceCard extends LitElement {
         justify-content: space-between;
         align-items: center;
         padding: 12px 14px;
-        background: var(--accent-gradient);
+        background: #1C1C1C;
+        border-bottom: 1px solid var(--border-color);
       }
 
       .header-title {
         font-size: 1.15em;
         font-weight: 700;
-        color: white;
+        color: var(--text-primary);
         letter-spacing: -0.02em;
       }
 
       .header-subtitle {
-        font-size: 0.78em;
-        color: rgba(255,255,255,0.75);
+        font-size: 0.85em;
+        color: var(--text-secondary);
         margin-top: 1px;
       }
 
       .status-ready {
         width: 28px;
         height: 28px;
-        background: rgba(255,255,255,0.2);
+        background: rgba(16, 185, 129, 0.15);
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -363,7 +364,7 @@ class HomePerformanceCard extends LitElement {
 
       .status-ready ha-icon {
         --mdc-icon-size: 16px;
-        color: #a7f3d0;
+        color: #10b981;
       }
 
       .status-loading {
@@ -377,7 +378,7 @@ class HomePerformanceCard extends LitElement {
       .dot {
         width: 8px;
         height: 8px;
-        background: white;
+        background: #6366f1;
         border-radius: 50%;
         animation: pulse 2s ease-in-out infinite;
       }

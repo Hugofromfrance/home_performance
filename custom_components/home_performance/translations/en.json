@@ -25,12 +25,14 @@
         "data": {
           "surface": "Surface Area (m²)",
           "volume": "Volume (m³)",
-          "power_sensor": "Instant Power Sensor (optional)"
+          "power_sensor": "Instant Power Sensor (optional)",
+          "energy_sensor": "External HA Energy Meter (optional)"
         },
         "data_description": {
           "surface": "Floor surface area of the zone",
           "volume": "Volume of the zone (surface × ceiling height)",
-          "power_sensor": "Sensor in Watts - will automatically create a daily kWh meter with midnight reset"
+          "power_sensor": "Sensor in Watts - will automatically create a daily kWh meter with midnight reset",
+          "energy_sensor": "Your own daily energy meter (e.g., Utility Meter) - will be used instead of the integrated calculation"
         }
       }
     },
@@ -51,7 +53,9 @@
         "data": {
           "heater_power": "Heater Power (W)",
           "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)"
+          "volume": "Volume (m³)",
+          "power_sensor": "Instant Power Sensor",
+          "energy_sensor": "External HA Energy Meter"
         }
       }
     }
