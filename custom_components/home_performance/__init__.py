@@ -1,12 +1,12 @@
 """Home Performance integration for Home Assistant.
 
 Analyze and monitor your home's thermal performance, energy efficiency,
-and comfort metrics. Supports multiple zones/rooms.
+and comfort metrics. Supports multiple zones (one config entry per zone).
 """
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -23,72 +23,35 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
-# Key for storing zones in config entry data
-CONF_ZONES = "zones"
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Performance from a config entry."""
-    _LOGGER.debug("Setting up Home Performance integration")
+    _LOGGER.debug("Setting up Home Performance integration for %s", entry.title)
+
+    # Create coordinator for this zone
+    coordinator = HomePerformanceCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
-    
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+
     # Register frontend card (only once globally)
     if "frontend_registered" not in hass.data[DOMAIN]:
         await _async_register_frontend(hass)
         hass.data[DOMAIN]["frontend_registered"] = True
 
-    # Initialize storage for this entry
-    hass.data[DOMAIN][entry.entry_id] = {"zones": {}}
-
-    # Create a coordinator for each zone
-    zones_config = entry.data.get(CONF_ZONES, {})
-    
-    if not zones_config:
-        _LOGGER.warning("No zones configured in entry data")
-        # Migration: if old format (single zone in entry.data), convert it
-        if "zone_name" in entry.data:
-            _LOGGER.info("Migrating from single-zone to multi-zone format")
-            zones_config = await _migrate_single_to_multi(hass, entry)
-    
-    for zone_id, zone_data in zones_config.items():
-        zone_name = zone_data.get("zone_name", zone_id)
-        _LOGGER.info("Setting up zone: %s (id: %s)", zone_name, zone_id)
-        
-        try:
-            coordinator = HomePerformanceCoordinator(hass, entry, zone_id, zone_data)
-            await coordinator.async_config_entry_first_refresh()
-            hass.data[DOMAIN][entry.entry_id]["zones"][zone_id] = coordinator
-        except Exception as err:
-            _LOGGER.error("Failed to setup zone %s: %s", zone_name, err)
-            continue
-
     # Forward to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Reload when config entry is updated (options or data change)
-    entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
+    # Reload when options change
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     return True
 
 
-async def _migrate_single_to_multi(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
-    """Migrate old single-zone format to new multi-zone format."""
-    import uuid
-    
-    zone_id = str(uuid.uuid4())[:8]
-    zone_data = {k: v for k, v in entry.data.items() if k != CONF_ZONES}
-    
-    new_data = {CONF_ZONES: {zone_id: zone_data}}
-    
-    hass.config_entries.async_update_entry(entry, data=new_data)
-    
-    return new_data[CONF_ZONES]
-
-
-async def _async_entry_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle config entry update - reload the integration."""
-    _LOGGER.info("Config entry updated, reloading integration")
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update - reload the integration."""
+    _LOGGER.info("Options updated for %s, reloading", entry.title)
     await hass.config_entries.async_reload(entry.entry_id)
 
 
@@ -154,18 +117,16 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    _LOGGER.debug("Unloading Home Performance integration")
+    _LOGGER.debug("Unloading Home Performance for %s", entry.title)
 
-    # Save data for all zones before unloading
-    entry_data = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    zones = entry_data.get("zones", {})
-    
-    for zone_id, coordinator in zones.items():
+    # Save data before unloading
+    if entry.entry_id in hass.data.get(DOMAIN, {}):
+        coordinator = hass.data[DOMAIN][entry.entry_id]
         _LOGGER.info("Saving data before unload for zone %s", coordinator.zone_name)
         try:
             await coordinator.async_save_data()
         except Exception as err:
-            _LOGGER.warning("Failed to save data for zone %s: %s", zone_id, err)
+            _LOGGER.warning("Failed to save data: %s", err)
 
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id, None)

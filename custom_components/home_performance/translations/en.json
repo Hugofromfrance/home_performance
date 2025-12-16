@@ -2,159 +2,125 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure First Zone",
-        "description": "Set up your first thermal performance analysis zone.",
+        "title": "Zone Configuration",
+        "description": "Configure a zone to analyze. You can add multiple zones by adding the integration again.",
         "data": {
-          "zone_name": "Zone Name",
-          "indoor_temp_sensor": "Indoor Temperature Sensor",
-          "outdoor_temp_sensor": "Outdoor Temperature Sensor",
-          "heating_entity": "Heating Entity (climate, switch, or input_boolean)",
-          "heater_power": "Heater Power (W)"
+          "zone_name": "Zone name",
+          "indoor_temp_sensor": "Indoor temperature sensor",
+          "outdoor_temp_sensor": "Outdoor temperature sensor",
+          "heating_entity": "Heating entity",
+          "heater_power": "Heater power"
         },
         "data_description": {
-          "zone_name": "A friendly name for this zone (e.g., Living Room, Bedroom)",
-          "indoor_temp_sensor": "Temperature sensor inside the zone",
-          "outdoor_temp_sensor": "Temperature sensor outside (can be shared across zones)",
-          "heating_entity": "The entity that controls heating in this zone",
-          "heater_power": "Declared power of the heater in Watts"
+          "zone_name": "Unique name to identify this room (e.g., Bedroom, Living Room)",
+          "indoor_temp_sensor": "Sensor measuring the room temperature",
+          "outdoor_temp_sensor": "Sensor measuring the outdoor temperature",
+          "heating_entity": "Switch, thermostat or climate controlling the heating",
+          "heater_power": "Nominal heater power in watts"
         }
       },
       "dimensions": {
-        "title": "Dimensions and Energy Meter",
-        "description": "Optional: Add room dimensions for normalized K values, and/or a power sensor.",
+        "title": "Dimensions and optional sensors",
+        "description": "These parameters are optional but allow for more precise analysis.",
         "data": {
-          "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)",
-          "power_sensor": "Instant Power Sensor (optional)",
-          "energy_sensor": "External HA Energy Meter (optional)"
+          "surface": "Room surface area",
+          "volume": "Room volume",
+          "power_sensor": "Power sensor (optional)",
+          "energy_sensor": "External energy meter (optional)"
         },
         "data_description": {
-          "surface": "Floor surface area of the zone",
-          "volume": "Volume of the zone (surface × ceiling height)",
-          "power_sensor": "Sensor in Watts - for kWh meter and precise heating detection",
-          "energy_sensor": "Your own daily energy meter (e.g., Utility Meter)"
-        }
-      },
-      "add_device": {
-        "title": "Add a Zone",
-        "description": "Configure a new thermal analysis zone.",
-        "data": {
-          "zone_name": "Zone Name",
-          "indoor_temp_sensor": "Indoor Temperature Sensor",
-          "outdoor_temp_sensor": "Outdoor Temperature Sensor",
-          "heating_entity": "Heating Entity",
-          "heater_power": "Heater Power (W)"
-        }
-      },
-      "add_device_dimensions": {
-        "title": "Zone Dimensions",
-        "description": "Optional: Add dimensions and sensors.",
-        "data": {
-          "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)",
-          "power_sensor": "Power Sensor (optional)",
-          "energy_sensor": "External Energy Meter (optional)"
+          "surface": "Floor area to calculate K coefficient per m²",
+          "volume": "Volume to calculate K coefficient per m³",
+          "power_sensor": "Instantaneous power sensor to measure actual heating time and consumption",
+          "energy_sensor": "Existing Home Assistant energy meter (takes priority over integrated calculation)"
         }
       }
     },
     "error": {
-      "entity_not_found": "Entity not found or unavailable",
-      "invalid_temperature": "Invalid temperature sensor",
-      "invalid_power": "Invalid heater power",
-      "already_configured": "This zone already exists"
+      "entity_not_found": "Entity not found",
+      "invalid_power": "Invalid power",
+      "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "Home Performance is already configured",
-      "device_added": "Zone added successfully!",
-      "zone_deleted": "Zone deleted successfully",
-      "cannot_delete_last_zone": "Cannot delete the last zone",
-      "no_zones": "No zones configured",
-      "unknown_error": "An unexpected error occurred"
+      "already_configured": "This zone is already configured"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Manage Zones ({count} zones)",
-        "description": "Select a zone to configure.",
+        "title": "Zone Options",
+        "description": "Modify this zone's parameters.",
         "data": {
-          "zone_select": "Zone"
-        }
-      },
-      "configure_zone": {
-        "title": "Configure {zone_name}",
-        "description": "Modify this zone's settings.",
-        "data": {
-          "heater_power": "Heater Power (W)",
-          "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)",
-          "power_sensor": "Instant Power Sensor",
-          "energy_sensor": "External HA Energy Meter"
-        }
-      },
-      "delete_zone": {
-        "title": "Delete a Zone",
-        "description": "Select the zone to delete. This action is irreversible.",
-        "data": {
-          "zone_to_delete": "Zone to delete"
+          "heater_power": "Heater power",
+          "surface": "Room surface area",
+          "volume": "Room volume",
+          "power_sensor": "Power sensor",
+          "energy_sensor": "External energy meter"
+        },
+        "data_description": {
+          "heater_power": "Nominal heater power in watts",
+          "surface": "Floor area to calculate K coefficient per m²",
+          "volume": "Volume to calculate K coefficient per m³",
+          "power_sensor": "Instantaneous power sensor (>50W = heating)",
+          "energy_sensor": "Existing Home Assistant energy meter (takes priority)"
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "k_coefficient": {
-        "name": "Coefficient K"
+      "coefficient_k": {
+        "name": "K Coefficient"
       },
-      "k_per_m2": {
+      "k_par_m2": {
         "name": "K per m²"
       },
-      "k_per_m3": {
+      "k_par_m3": {
         "name": "K per m³"
       },
-      "total_energy": {
-        "name": "Total Energy (estimated)"
+      "energie_estimee_totale": {
+        "name": "Total estimated energy"
       },
-      "daily_energy": {
-        "name": "Energy 24h (estimated)"
+      "energie_estimee_journaliere": {
+        "name": "Daily estimated energy"
       },
-      "heating_time": {
-        "name": "Heating Time (24h)"
+      "energie_mesuree_journaliere": {
+        "name": "Daily measured energy"
       },
-      "heating_ratio": {
-        "name": "Heating Ratio"
+      "energie_mesuree_totale": {
+        "name": "Total measured energy"
       },
-      "energy_performance": {
-        "name": "Energy Performance"
+      "temps_de_chauffe_24h": {
+        "name": "Heating time / 24h"
       },
-      "avg_delta_t": {
-        "name": "Average ΔT (24h)"
+      "taux_de_chauffe_24h": {
+        "name": "Heating ratio / 24h"
       },
-      "data_hours": {
-        "name": "Data Hours"
+      "performance_energetique": {
+        "name": "Energy performance"
       },
-      "analysis_remaining": {
-        "name": "Analysis Time Remaining"
+      "dt_moyen_24h": {
+        "name": "Average ΔT 24h"
       },
-      "analysis_progress": {
-        "name": "Analysis Progress"
+      "heures_de_donnees": {
+        "name": "Data hours"
       },
-      "insulation_rating": {
-        "name": "Insulation Rating"
+      "temps_d_analyse_restant": {
+        "name": "Analysis time remaining"
       },
-      "measured_energy_daily": {
-        "name": "Daily Energy (measured)"
+      "progression_analyse": {
+        "name": "Analysis progress"
       },
-      "measured_energy_total": {
-        "name": "Total Energy (measured)"
+      "note_d_isolation": {
+        "name": "Insulation rating"
       }
     },
     "binary_sensor": {
-      "window_open": {
-        "name": "Window Open Detected"
+      "fenetre_ouverte": {
+        "name": "Window open"
       },
-      "data_ready": {
-        "name": "Data Ready"
+      "donnees_pretes": {
+        "name": "Data ready"
       }
     }
   }

@@ -2,158 +2,124 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configurer la première zone",
-        "description": "Configurez votre première zone d'analyse de performance thermique.",
-        "data": {
-          "zone_name": "Nom de la zone",
-          "indoor_temp_sensor": "Capteur de température intérieure",
-          "outdoor_temp_sensor": "Capteur de température extérieure",
-          "heating_entity": "Entité de chauffage (climate, switch ou input_boolean)",
-          "heater_power": "Puissance du radiateur (W)"
-        },
-        "data_description": {
-          "zone_name": "Un nom convivial pour cette zone (ex: Salon, Chambre)",
-          "indoor_temp_sensor": "Capteur de température à l'intérieur de la zone",
-          "outdoor_temp_sensor": "Capteur de température extérieure (peut être partagé entre zones)",
-          "heating_entity": "L'entité qui contrôle le chauffage dans cette zone",
-          "heater_power": "Puissance déclarée du radiateur en Watts"
-        }
-      },
-      "dimensions": {
-        "title": "Dimensions et compteur d'énergie",
-        "description": "Optionnel : Ajoutez les dimensions pour les valeurs K normalisées, et/ou un capteur de puissance.",
-        "data": {
-          "surface": "Surface (m²)",
-          "volume": "Volume (m³)",
-          "power_sensor": "Capteur de puissance instantanée (optionnel)",
-          "energy_sensor": "Compteur d'énergie HA externe (optionnel)"
-        },
-        "data_description": {
-          "surface": "Surface au sol de la zone",
-          "volume": "Volume de la zone (surface × hauteur sous plafond)",
-          "power_sensor": "Capteur en Watts - pour compteur kWh et détection chauffe précise",
-          "energy_sensor": "Votre propre compteur d'énergie journalier (ex: Utility Meter)"
-        }
-      },
-      "add_device": {
-        "title": "Ajouter une zone",
-        "description": "Configurez une nouvelle zone d'analyse thermique.",
+        "title": "Configuration de la zone",
+        "description": "Configurez une zone à analyser. Vous pouvez ajouter plusieurs zones en ajoutant l'intégration à nouveau.",
         "data": {
           "zone_name": "Nom de la zone",
           "indoor_temp_sensor": "Capteur de température intérieure",
           "outdoor_temp_sensor": "Capteur de température extérieure",
           "heating_entity": "Entité de chauffage",
-          "heater_power": "Puissance du radiateur (W)"
+          "heater_power": "Puissance du radiateur"
+        },
+        "data_description": {
+          "zone_name": "Nom unique pour identifier cette pièce (ex: Chambre, Salon)",
+          "indoor_temp_sensor": "Capteur mesurant la température dans la pièce",
+          "outdoor_temp_sensor": "Capteur mesurant la température extérieure",
+          "heating_entity": "Interrupteur, thermostat ou climate contrôlant le chauffage",
+          "heater_power": "Puissance nominale du radiateur en watts"
         }
       },
-      "add_device_dimensions": {
-        "title": "Dimensions de la zone",
-        "description": "Optionnel : Ajoutez les dimensions et capteurs.",
+      "dimensions": {
+        "title": "Dimensions et capteurs optionnels",
+        "description": "Ces paramètres sont optionnels mais permettent des analyses plus précises.",
         "data": {
-          "surface": "Surface (m²)",
-          "volume": "Volume (m³)",
+          "surface": "Surface de la pièce",
+          "volume": "Volume de la pièce",
           "power_sensor": "Capteur de puissance (optionnel)",
           "energy_sensor": "Compteur d'énergie externe (optionnel)"
+        },
+        "data_description": {
+          "surface": "Surface au sol pour calculer le coefficient K par m²",
+          "volume": "Volume pour calculer le coefficient K par m³",
+          "power_sensor": "Capteur de puissance instantanée pour mesurer le temps de chauffe réel et la consommation",
+          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire sur le calcul intégré)"
         }
       }
     },
     "error": {
-      "entity_not_found": "Entité non trouvée ou indisponible",
-      "invalid_temperature": "Capteur de température invalide",
-      "invalid_power": "Puissance du radiateur invalide",
-      "already_configured": "Cette zone existe déjà"
+      "entity_not_found": "Entité introuvable",
+      "invalid_power": "Puissance invalide",
+      "unknown": "Erreur inattendue"
     },
     "abort": {
-      "already_configured": "Home Performance est déjà configuré",
-      "device_added": "Zone ajoutée avec succès !",
-      "zone_deleted": "Zone supprimée avec succès",
-      "cannot_delete_last_zone": "Impossible de supprimer la dernière zone",
-      "no_zones": "Aucune zone configurée",
-      "unknown_error": "Une erreur inattendue s'est produite"
+      "already_configured": "Cette zone est déjà configurée"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Gérer les zones ({count} zones)",
-        "description": "Sélectionnez une zone à configurer.",
-        "data": {
-          "zone_select": "Zone"
-        }
-      },
-      "configure_zone": {
-        "title": "Configuration de {zone_name}",
+        "title": "Options de la zone",
         "description": "Modifiez les paramètres de cette zone.",
         "data": {
-          "heater_power": "Puissance du radiateur (W)",
-          "surface": "Surface (m²)",
-          "volume": "Volume (m³)",
-          "power_sensor": "Capteur de puissance instantanée",
-          "energy_sensor": "Compteur d'énergie HA externe"
-        }
-      },
-      "delete_zone": {
-        "title": "Supprimer une zone",
-        "description": "Sélectionnez la zone à supprimer. Cette action est irréversible.",
-        "data": {
-          "zone_to_delete": "Zone à supprimer"
+          "heater_power": "Puissance du radiateur",
+          "surface": "Surface de la pièce",
+          "volume": "Volume de la pièce",
+          "power_sensor": "Capteur de puissance",
+          "energy_sensor": "Compteur d'énergie externe"
+        },
+        "data_description": {
+          "heater_power": "Puissance nominale du radiateur en watts",
+          "surface": "Surface au sol pour calculer le coefficient K par m²",
+          "volume": "Volume pour calculer le coefficient K par m³",
+          "power_sensor": "Capteur de puissance instantanée (>50W = chauffe)",
+          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire)"
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "k_coefficient": {
+      "coefficient_k": {
         "name": "Coefficient K"
       },
-      "k_per_m2": {
+      "k_par_m2": {
         "name": "K par m²"
       },
-      "k_per_m3": {
+      "k_par_m3": {
         "name": "K par m³"
       },
-      "total_energy": {
-        "name": "Énergie totale (estimée)"
+      "energie_estimee_totale": {
+        "name": "Énergie estimée totale"
       },
-      "daily_energy": {
-        "name": "Énergie 24h (estimée)"
+      "energie_estimee_journaliere": {
+        "name": "Énergie estimée journalière"
       },
-      "heating_time": {
-        "name": "Temps de chauffe (24h)"
+      "energie_mesuree_journaliere": {
+        "name": "Énergie mesurée journalière"
       },
-      "heating_ratio": {
-        "name": "Ratio de chauffe"
+      "energie_mesuree_totale": {
+        "name": "Énergie mesurée totale"
       },
-      "energy_performance": {
+      "temps_de_chauffe_24h": {
+        "name": "Temps de chauffe / 24h"
+      },
+      "taux_de_chauffe_24h": {
+        "name": "Taux de chauffe / 24h"
+      },
+      "performance_energetique": {
         "name": "Performance énergétique"
       },
-      "avg_delta_t": {
-        "name": "ΔT moyen (24h)"
+      "dt_moyen_24h": {
+        "name": "ΔT moyen 24h"
       },
-      "data_hours": {
+      "heures_de_donnees": {
         "name": "Heures de données"
       },
-      "analysis_remaining": {
-        "name": "Temps restant analyse"
+      "temps_d_analyse_restant": {
+        "name": "Temps d'analyse restant"
       },
-      "analysis_progress": {
+      "progression_analyse": {
         "name": "Progression analyse"
       },
-      "insulation_rating": {
+      "note_d_isolation": {
         "name": "Note d'isolation"
-      },
-      "measured_energy_daily": {
-        "name": "Énergie jour (mesurée)"
-      },
-      "measured_energy_total": {
-        "name": "Énergie totale (mesurée)"
       }
     },
     "binary_sensor": {
-      "window_open": {
-        "name": "Fenêtre ouverte détectée"
+      "fenetre_ouverte": {
+        "name": "Fenêtre ouverte"
       },
-      "data_ready": {
+      "donnees_pretes": {
         "name": "Données prêtes"
       }
     }

@@ -80,21 +80,30 @@ L'attribut `source` sur Temps/Ratio indique : `measured` (via power sensor > 50W
 
 ## 🏠 Multi-zones
 
-Gérez toutes vos pièces depuis **une seule intégration** !
+Gérez toutes vos pièces facilement !
 
 ### Ajouter des zones
 
-1. **Première installation** : configurez votre première zone
-2. **Zones supplémentaires** : cliquez sur **"Ajouter un appareil"** dans la page de l'intégration
+1. **Paramètres → Appareils et services**
+2. Cliquer sur **"+ Ajouter une intégration"**
+3. Chercher **"Home Performance"**
+4. Configurer la nouvelle zone
 
-### Gérer les zones
+Chaque zone apparaît comme une entrée séparée, toutes regroupées sous "Home Performance" :
 
-Dans **Options** (⚙️) de l'intégration :
-- Sélectionner une zone à configurer
+```
+Home Performance - Chambre Flavien
+Home Performance - Salon
+Home Performance - Bureau
+```
+
+### Gérer une zone
+
+Dans la liste des intégrations, cliquez sur **Options** (⚙️) de la zone à modifier pour :
 - Modifier les paramètres (puissance, surface, capteurs...)
-- Supprimer une zone
+- Supprimer la zone
 
-Chaque zone crée un **appareil indépendant** avec ses propres capteurs et sa propre carte Lovelace.
+Chaque zone a ses **propres capteurs** et sa **propre carte Lovelace**.
 
 ## 🎴 Carte Lovelace Intégrée
 
@@ -217,9 +226,10 @@ Les données sont **automatiquement sauvegardées** et restaurées après un red
 
 ### Ajouter des pièces
 
-1. Aller dans **Paramètres → Appareils et services → Home Performance**
-2. Cliquer sur **"Ajouter un appareil"**
-3. Configurer la nouvelle zone
+1. Aller dans **Paramètres → Appareils et services**
+2. Cliquer sur **"+ Ajouter une intégration"**
+3. Chercher **"Home Performance"**
+4. Configurer la nouvelle zone
 
 **Note** : Les calculs commencent après **12h** de données collectées et nécessitent un ΔT minimum de 5°C pour être fiables.
 

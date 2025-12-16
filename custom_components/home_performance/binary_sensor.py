@@ -24,20 +24,14 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Home Performance binary sensors for all zones."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    zones = entry_data.get("zones", {})
-    
-    entities = []
-    
-    for zone_id, coordinator in zones.items():
-        zone_name = coordinator.zone_name
-        _LOGGER.debug("Setting up binary sensors for zone: %s", zone_name)
-        
-        entities.extend([
-            WindowOpenSensor(coordinator, zone_name),
-            DataReadySensor(coordinator, zone_name),
-        ])
+    """Set up Home Performance binary sensors."""
+    coordinator: HomePerformanceCoordinator = hass.data[DOMAIN][entry.entry_id]
+    zone_name = coordinator.zone_name
+
+    entities = [
+        WindowOpenSensor(coordinator, zone_name),
+        DataReadySensor(coordinator, zone_name),
+    ]
 
     async_add_entities(entities)
 
