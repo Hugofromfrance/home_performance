@@ -269,8 +269,7 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:heat-wave"></ha-icon>
               <span>Coefficient K</span>
             </div>
-            <div class="metric-value">${kCoef}</div>
-            <div class="metric-unit">W/°C</div>
+            <div class="metric-value">${kCoef} W/°C</div>
             ${kPerM3 !== "unavailable" && kPerM3 !== "unknown"
         ? html`<div class="metric-sub">${kPerM3} W/(°C·m³)</div>`
         : ""}
@@ -281,8 +280,8 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:lightning-bolt"></ha-icon>
               <span>Énergie/jour</span>
             </div>
-            <div class="metric-value">${dailyEnergy}</div>
-            <div class="metric-unit">kWh <span class="metric-type">(${energyType})</span></div>
+            <div class="metric-value">${dailyEnergy} kWh</div>
+            <div class="metric-unit"><span class="metric-type">(${energyType})</span></div>
           </div>
 
           <div class="metric">
@@ -302,8 +301,7 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:thermometer"></ha-icon>
               <span>Écart moyen</span>
             </div>
-            <div class="metric-value">${deltaT}</div>
-            <div class="metric-unit">°C</div>
+            <div class="metric-value">${deltaT}°C</div>
             <div class="metric-sub">Int. - Ext.</div>
           </div>
         </div>
