@@ -1,0 +1,17 @@
+# CODEOWNERS - Définit les propriétaires du code pour les reviews
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Propriétaire par défaut pour tout le repository
+* @Hugofromfrance
+
+# Fichiers critiques - nécessitent une review du propriétaire
+/custom_components/home_performance/*.py @Hugofromfrance
+/custom_components/home_performance/www/*.js @Hugofromfrance
+
+# Configuration
+*.json @Hugofromfrance
+*.yaml @Hugofromfrance
+
+# Documentation
+*.md @Hugofromfrance
+
