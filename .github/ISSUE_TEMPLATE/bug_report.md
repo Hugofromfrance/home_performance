@@ -1,52 +1,51 @@
 ---
 name: 🐛 Bug Report
-about: Signaler un problème avec l'intégration
+about: Report a problem with the integration
 title: '[BUG] '
 labels: bug
 assignees: Hugofromfrance
 ---
 
-## 🐛 Description du bug
+## 🐛 Bug Description
 
-<!-- Décrivez clairement le problème rencontré -->
+<!-- Clearly describe the problem encountered -->
 
-## 📋 Étapes pour reproduire
+## 📋 Steps to Reproduce
 
-1. Aller dans '...'
-2. Cliquer sur '...'
-3. Voir l'erreur
+1. Go to '...'
+2. Click on '...'
+3. See the error
 
-## ✅ Comportement attendu
+## ✅ Expected Behavior
 
-<!-- Qu'est-ce qui devrait se passer ? -->
+<!-- What should happen? -->
 
-## ❌ Comportement actuel
+## ❌ Current Behavior
 
-<!-- Qu'est-ce qui se passe actuellement ? -->
+<!-- What is currently happening? -->
 
 ## 📸 Screenshots
 
-<!-- Si applicable, ajoutez des captures d'écran -->
+<!-- If applicable, add screenshots -->
 
 ## 🔧 Configuration
 
-- **Version Home Assistant** : 
-- **Version Home Performance** : 
-- **Type de chauffage** : 
-- **Capteur de puissance** : Oui / Non
+- **Home Assistant Version**: 
+- **Home Performance Version**: 
+- **Heating Type**: 
+- **Power Sensor**: Yes / No
 
 ## 📝 Logs
 
 <details>
-<summary>Logs Home Assistant</summary>
+<summary>Home Assistant Logs</summary>
 
 ```
-Coller les logs ici
+Paste logs here
 ```
 
 </details>
 
-## ℹ️ Informations supplémentaires
+## ℹ️ Additional Information
 
-<!-- Tout autre contexte utile -->
-
+<!-- Any other useful context -->

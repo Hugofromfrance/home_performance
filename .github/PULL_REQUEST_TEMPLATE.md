@@ -1,32 +1,31 @@
 ## 📝 Description
 
-<!-- Décrivez brièvement les changements apportés -->
+<!-- Briefly describe the changes made -->
 
-## 🔗 Issue liée
+## 🔗 Related Issue
 
-<!-- Lien vers l'issue concernée (si applicable) -->
+<!-- Link to the related issue (if applicable) -->
 Fixes #
 
-## 🔄 Type de changement
+## 🔄 Type of Change
 
 - [ ] 🐛 Bug fix
-- [ ] ✨ Nouvelle fonctionnalité
+- [ ] ✨ New feature
 - [ ] 📝 Documentation
 - [ ] 🔧 Refactoring
 - [ ] ⚡ Performance
 
 ## ✅ Checklist
 
-- [ ] J'ai testé mes changements localement
-- [ ] J'ai mis à jour la documentation si nécessaire
-- [ ] Mon code suit le style du projet
-- [ ] J'ai ajouté des logs si pertinent
+- [ ] I have tested my changes locally
+- [ ] I have updated documentation if necessary
+- [ ] My code follows the project style
+- [ ] I have added logs if relevant
 
-## 📸 Screenshots (si applicable)
+## 📸 Screenshots (if applicable)
 
-<!-- Ajoutez des captures d'écran pour les changements visuels -->
+<!-- Add screenshots for visual changes -->
 
-## 📋 Notes pour le reviewer
+## 📋 Notes for Reviewer
 
-<!-- Informations supplémentaires pour faciliter la review -->
-
+<!-- Additional information to facilitate review -->

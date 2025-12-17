@@ -1,26 +1,25 @@
 ---
 name: ❓ Question
-about: Poser une question sur l'utilisation
+about: Ask a question about usage
 title: '[QUESTION] '
 labels: question
 assignees: ''
 ---
 
-## ❓ Votre question
+## ❓ Your Question
 
-<!-- Posez votre question ici -->
+<!-- Ask your question here -->
 
-## 📋 Contexte
+## 📋 Context
 
-<!-- Décrivez votre configuration et ce que vous essayez de faire -->
+<!-- Describe your configuration and what you're trying to do -->
 
-- **Version Home Assistant** : 
-- **Version Home Performance** : 
+- **Home Assistant Version**: 
+- **Home Performance Version**: 
 
-## 🔍 Recherches effectuées
+## 🔍 Research Done
 
-<!-- Avez-vous consulté le README ou les issues existantes ? -->
+<!-- Have you checked the README or existing issues? -->
 
-- [ ] J'ai lu le README
-- [ ] J'ai cherché dans les issues existantes
-
+- [ ] I have read the README
+- [ ] I have searched existing issues

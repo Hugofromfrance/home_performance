@@ -1,28 +1,27 @@
 ---
 name: 💡 Feature Request
-about: Proposer une nouvelle fonctionnalité
+about: Suggest a new feature
 title: '[FEATURE] '
 labels: enhancement
 assignees: Hugofromfrance
 ---
 
-## 💡 Description de la fonctionnalité
+## 💡 Feature Description
 
-<!-- Décrivez clairement la fonctionnalité souhaitée -->
+<!-- Clearly describe the desired feature -->
 
-## 🤔 Problème à résoudre
+## 🤔 Problem to Solve
 
-<!-- Quel problème cette fonctionnalité résoudrait-elle ? -->
+<!-- What problem would this feature solve? -->
 
-## 📝 Solution proposée
+## 📝 Proposed Solution
 
-<!-- Comment imaginez-vous cette fonctionnalité ? -->
+<!-- How do you imagine this feature? -->
 
-## 🔄 Alternatives considérées
+## 🔄 Alternatives Considered
 
-<!-- Avez-vous envisagé d'autres solutions ? -->
+<!-- Have you considered other solutions? -->
 
-## ℹ️ Contexte supplémentaire
+## ℹ️ Additional Context
 
-<!-- Tout autre contexte ou screenshots -->
-
+<!-- Any other context or screenshots -->

@@ -3,429 +3,429 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/Hugofromfrance/home_performance.svg)](https://github.com/Hugofromfrance/home_performance/releases)
 
-Une intégration Home Assistant pour analyser et surveiller les performances thermiques de votre logement.
+A Home Assistant integration to analyze and monitor the thermal performance of your home.
 
-## 🤔 Pourquoi Home Performance ?
+## 🤔 Why Home Performance?
 
-Vous chauffez à l'électrique et vous vous demandez :
-- **"Ma pièce est-elle bien isolée ?"** → Coefficient K mesuré
-- **"Combien je consomme vraiment ?"** → Énergie journalière
-- **"Ai-je oublié de fermer une fenêtre ?"** → Détection automatique
-- **"Quelle pièce coûte le plus cher ?"** → Comparaison multi-zones
+You use electric heating and wonder:
+- **"Is my room well insulated?"** → Measured K coefficient
+- **"How much do I actually consume?"** → Daily energy
+- **"Did I forget to close a window?"** → Automatic detection
+- **"Which room costs the most?"** → Multi-zone comparison
 
-**Home Performance** répond à ces questions en analysant vos données de chauffage **réelles**, sans calcul théorique.
+**Home Performance** answers these questions by analyzing your **real** heating data, without theoretical calculations.
 
-### 💡 Cas d'usage
+### 💡 Use Cases
 
-| Situation | Ce que Home Performance vous apporte |
-|-----------|--------------------------------------|
-| Achat/Location | Vérifier la performance thermique réelle (vs le DPE théorique) |
-| Travaux d'isolation | Mesurer l'amélioration avant/après |
-| Optimisation facture | Identifier les pièces énergivores |
-| Diagnostic | Détecter fenêtres ouvertes, ponts thermiques |
-| Comparaison | Comparer vos pièces entre elles (K/m²) |
+| Situation | What Home Performance provides |
+|-----------|-------------------------------|
+| Buying/Renting | Verify actual thermal performance (vs theoretical EPC) |
+| Insulation work | Measure improvement before/after |
+| Bill optimization | Identify energy-hungry rooms |
+| Diagnostics | Detect open windows, thermal bridges |
+| Comparison | Compare your rooms to each other (K/m²) |
 
-## ✨ Fonctionnalités principales
+## ✨ Main Features
 
-- 🏠 **Multi-zones** - Gérez toutes vos pièces depuis une seule intégration
-- 🎴 **Carte Lovelace intégrée** - Design moderne, prête à l'emploi
-- 📊 **Compteur d'énergie mesuré** - Intégration de capteur de puissance (Utility Meter)
-- 💾 **Persistance des données** - Conservation après redémarrage
-- 🎯 **Performance énergétique** - Comparaison à la moyenne nationale
-- ⚡ **Architecture event-driven** - Détection instantanée (chauffe, fenêtres)
-- 🪟 **Détection fenêtre ouverte** - Alerte temps réel sur chute de température
+- 🏠 **Multi-zone** - Manage all your rooms from a single integration
+- 🎴 **Built-in Lovelace card** - Modern design, ready to use
+- 📊 **Measured energy counter** - Power sensor integration (Utility Meter)
+- 💾 **Data persistence** - Saved after restart
+- 🎯 **Energy performance** - Comparison to national average
+- ⚡ **Event-driven architecture** - Instant detection (heating, windows)
+- 🪟 **Open window detection** - Real-time alert on temperature drop
 
-## 🔌 Compatibilité matérielle
+## 🔌 Hardware Compatibility
 
-**L'intégration est 100% agnostique du matériel !** Elle fonctionne avec tout ce qui expose des entités Home Assistant standard.
+**The integration is 100% hardware agnostic!** It works with anything that exposes standard Home Assistant entities.
 
-### Minimum requis
+### Minimum Requirements
 
-| Besoin | Exemples compatibles |
-|--------|---------------------|
-| Capteur T° intérieure | Aqara, Sonoff SNZB-02, Xiaomi, Netatmo, Ecobee, Shelly H&T, ESPHome... |
-| Capteur T° extérieure | Station météo locale, Météo-France, OpenWeatherMap, Netatmo Outdoor... |
-| Entité chauffage | Tout `climate.*`, `switch.*` ou `input_boolean.*` |
+| Need | Compatible examples |
+|------|---------------------|
+| Indoor temp sensor | Aqara, Sonoff SNZB-02, Xiaomi, Netatmo, Ecobee, Shelly H&T, ESPHome... |
+| Outdoor temp sensor | Local weather station, Weather services, Netatmo Outdoor... |
+| Heating entity | Any `climate.*`, `switch.*` or `input_boolean.*` |
 
-### Optionnel (recommandé)
+### Optional (recommended)
 
-| Capteur | Exemples | Avantage |
-|---------|----------|----------|
-| Puissance instantanée | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | Temps de chauffe précis |
-| Compteur d'énergie | Utility Meter HA, compteur natif | Énergie mesurée vs estimée |
+| Sensor | Examples | Benefit |
+|--------|----------|---------|
+| Instant power | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | Precise heating time |
+| Energy counter | HA Utility Meter, native counter | Measured vs estimated energy |
 
-### Types de chauffage supportés
+### Supported Heating Types
 
-| Type | Compatible ? | Notes |
-|------|--------------|-------|
-| Radiateur + prise connectée | ✅ | Idéal avec mesure de puissance |
-| Radiateur + fil pilote | ✅ | NodOn, Qubino, etc. |
-| Convecteur avec thermostat | ✅ | Via switch ou climate |
-| Pompe à chaleur / Clim | ✅ | Via climate entity |
-| Plancher chauffant électrique | ✅ | Avec capteur de puissance |
-| Chauffage central gaz/fioul | ⚠️ | Possible mais moins précis (pas de mesure puissance individuelle) |
+| Type | Compatible? | Notes |
+|------|-------------|-------|
+| Radiator + smart plug | ✅ | Ideal with power measurement |
+| Radiator + pilot wire | ✅ | NodOn, Qubino, etc. |
+| Convector with thermostat | ✅ | Via switch or climate |
+| Heat pump / AC | ✅ | Via climate entity |
+| Electric underfloor heating | ✅ | With power sensor |
+| Central gas/oil heating | ⚠️ | Possible but less precise (no individual power measurement) |
 
 ## 🎯 Concept
 
-Cette intégration calcule le **coefficient de déperdition thermique K** de chaque pièce en utilisant une approche physique simple :
+This integration calculates the **thermal loss coefficient K** of each room using a simple physical approach:
 
 ```
-K (W/°C) = Énergie fournie / (ΔT × durée)
-         = (Puissance_radiateur × temps_chauffe) / (ΔT_moyen × 24h)
+K (W/°C) = Energy supplied / (ΔT × duration)
+         = (Heater_power × heating_time) / (Avg_ΔT × 24h)
 ```
 
-**Exemple concret** : Un radiateur de 1000W qui tourne 6h sur 24h pour maintenir 19°C alors qu'il fait 5°C dehors :
-- Énergie = 1000W × 6h = 6 kWh
+**Concrete example**: A 1000W heater running 6h out of 24h to maintain 19°C when it's 5°C outside:
+- Energy = 1000W × 6h = 6 kWh
 - ΔT = 14°C
 - **K = 6000 / (14 × 24) ≈ 18 W/°C**
 
-→ Cette pièce perd 18W par degré d'écart avec l'extérieur.
+→ This room loses 18W per degree of difference with the outside.
 
-### Approche empirique vs théorique
+### Empirical vs Theoretical Approach
 
-Cette intégration utilise une **mesure empirique** des performances thermiques, contrairement aux méthodes théoriques :
+This integration uses **empirical measurement** of thermal performance, unlike theoretical methods:
 
-| | Approche théorique (DPE, RT2012...) | Approche empirique (Home Performance) |
-|--|-------------------------------------|---------------------------------------|
-| **Méthode** | Calcul basé sur les caractéristiques des matériaux (coefficients U, R) | Observation des données réelles de chauffage |
-| **Données** | Specs fabricant, normes, hypothèses | Énergie consommée, températures mesurées |
-| **Inclut** | Ce qui est documenté | **Tout** : ponts thermiques, infiltrations, défauts de pose... |
-| **Précision** | Théorique (peut différer du réel) | Reflète la performance réelle in-situ |
+| | Theoretical approach (EPC, building codes...) | Empirical approach (Home Performance) |
+|--|-----------------------------------------------|---------------------------------------|
+| **Method** | Calculation based on material characteristics (U, R coefficients) | Observation of real heating data |
+| **Data** | Manufacturer specs, standards, assumptions | Energy consumed, measured temperatures |
+| **Includes** | What is documented | **Everything**: thermal bridges, infiltrations, installation defects... |
+| **Accuracy** | Theoretical (may differ from reality) | Reflects actual in-situ performance |
 
-> **Exemple** : Une fenêtre certifiée Uw=1,1 W/(m²·K) peut en réalité avoir des performances dégradées si mal posée ou avec des joints usés. La mesure empirique capture ces imperfections.
+> **Example**: A window certified Uw=1.1 W/(m²·K) may actually have degraded performance if poorly installed or with worn seals. Empirical measurement captures these imperfections.
 
-#### Différence avec les coefficients U/Uw/Ug
+#### Difference with U/Uw/Ug Coefficients
 
-Les coefficients **U** (anciennement "K" dans la norme) mesurent la transmission thermique d'une **paroi spécifique** (fenêtre, mur) en W/(m²·K). Ils sont mesurés en laboratoire et permettent de comparer des produits.
+**U** coefficients (formerly "K" in standards) measure the thermal transmission of a **specific wall** (window, wall) in W/(m²·K). They are measured in laboratories and allow product comparison.
 
-Le **coefficient K** de Home Performance mesure les **déperditions globales** d'une pièce entière en W/°C. C'est équivalent au coefficient **G** (ou GV) utilisé en thermique du bâtiment, mais mesuré empiriquement plutôt que calculé.
+Home Performance's **K coefficient** measures the **global heat loss** of an entire room in W/°C. It's equivalent to the **G** (or GV) coefficient used in building thermal engineering, but measured empirically rather than calculated.
 
-## 📊 Capteurs créés (par zone)
+## 📊 Created Sensors (per zone)
 
-### Coefficients thermiques
+### Thermal Coefficients
 
-| Capteur | Description |
-|---------|-------------|
-| **Coefficient K** | Déperdition thermique (W/°C) - plus c'est bas, mieux c'est |
-| **K par m²** | Normalisé par surface - comparable entre pièces |
-| **K par m³** | Normalisé par volume - meilleur si hauteurs différentes |
-| **Note d'isolation** | Intelligente : calculée, déduite, ou conservée selon la saison |
+| Sensor | Description |
+|--------|-------------|
+| **K Coefficient** | Thermal loss (W/°C) - lower is better |
+| **K per m²** | Normalized by surface - comparable between rooms |
+| **K per m³** | Normalized by volume - better if different heights |
+| **Insulation Rating** | Smart: calculated, inferred, or conserved depending on season |
 
-### 🎯 Note d'isolation intelligente
+### 🎯 Smart Insulation Rating
 
-La note d'isolation s'adapte automatiquement à toutes les situations :
+The insulation rating automatically adapts to all situations:
 
-| Situation | Affichage | Description |
-|-----------|-----------|-------------|
-| K calculé | **A à G** | Note basée sur le coefficient K/m³ |
-| Peu de chauffe + T° stable | **🏆 Excellente (déduite)** | Isolation excellente déduite automatiquement |
-| Mode été (T° ext > T° int) | **☀️ Mode été** | Mesure impossible + dernier K conservé |
-| Hors saison (ΔT < 5°C) | **🌤️ Hors saison** | ΔT insuffisant + dernier K conservé |
-| Collecte en cours | **En attente** | < 12h de données |
+| Situation | Display | Description |
+|-----------|---------|-------------|
+| K calculated | **A to G** | Rating based on K/m³ coefficient |
+| Low heating + stable T° | **🏆 Excellent (inferred)** | Excellent insulation automatically inferred |
+| Summer mode (T° out > T° in) | **☀️ Summer mode** | Measurement impossible + last K conserved |
+| Off-season (ΔT < 5°C) | **🌤️ Off-season** | Insufficient ΔT + last K conserved |
+| Data collection | **Waiting** | < 12h of data |
 
-#### Isolation déduite automatiquement 🏆
+#### Automatically Inferred Insulation 🏆
 
-Si après **24h** d'observation :
-- Le ΔT est significatif (≥ 5°C)
-- Le radiateur a très peu chauffé (< 30 min)
-- La température intérieure est restée **stable** (variation < 2°C)
+If after **24h** of observation:
+- ΔT is significant (≥ 5°C)
+- The heater has run very little (< 30 min)
+- Indoor temperature remained **stable** (variation < 2°C)
 
-→ L'intégration déduit automatiquement que l'isolation est **excellente** !
+→ The integration automatically infers that insulation is **excellent**!
 
-> **Logique** : Si la pièce maintient sa température sans chauffer alors qu'il fait froid dehors, c'est que les déperditions sont très faibles.
+> **Logic**: If the room maintains its temperature without heating while it's cold outside, heat loss is very low.
 
-#### Conservation du dernier K valide
+#### Last Valid K Conservation
 
-En été ou hors saison de chauffe, l'intégration **conserve le dernier coefficient K calculé** et l'affiche avec le message de saison approprié. Vous gardez ainsi une référence utile toute l'année.
+In summer or off-season, the integration **keeps the last calculated K coefficient** and displays it with the appropriate season message. You thus keep a useful reference all year round.
 
-### Énergie journalière
+### Daily Energy
 
-| Capteur | Description |
-|---------|-------------|
-| **Énergie 24h (estimée)** | kWh sur fenêtre glissante 24h (puissance déclarée × temps ON) |
-| **Énergie jour (mesurée)** | Compteur kWh journalier réel (si capteur de puissance ou compteur externe configuré) |
+| Sensor | Description |
+|--------|-------------|
+| **Energy 24h (estimated)** | kWh on 24h sliding window (declared power × time ON) |
+| **Energy day (measured)** | Real daily kWh counter (if power sensor or external counter configured) |
 
-> **Note** : L'énergie mesurée est prioritaire sur l'estimée dans la carte. L'attribut `source` indique l'origine : `external` (compteur HA) ou `integrated` (calcul depuis capteur de puissance).
+> **Note**: Measured energy takes priority over estimated in the card. The `source` attribute indicates the origin: `external` (HA counter) or `integrated` (calculation from power sensor).
 
-### Performance & Confort
+### Performance & Comfort
 
-| Capteur | Description |
-|---------|-------------|
-| **Performance énergétique** | Comparaison à la moyenne nationale (excellent/standard/à optimiser) |
-| **Temps de chauffe (24h)** | Durée de fonctionnement (format: `Xh Ymin`) |
-| **Ratio de chauffe** | % du temps où le chauffage est actif |
-| **ΔT moyen (24h)** | Écart moyen intérieur/extérieur |
+| Sensor | Description |
+|--------|-------------|
+| **Energy performance** | Comparison to national average (excellent/standard/needs optimization) |
+| **Heating time (24h)** | Operating duration (format: `Xh Ymin`) |
+| **Heating ratio** | % of time heating is active |
+| **Avg ΔT (24h)** | Average indoor/outdoor difference |
 
-L'attribut `source` sur Temps/Ratio indique : `measured` (via power sensor > 50W) ou `estimated` (via état switch).
+The `source` attribute on Time/Ratio indicates: `measured` (via power sensor > 50W) or `estimated` (via switch state).
 
-### Statut
+### Status
 
-| Capteur | Description |
-|---------|-------------|
-| **Heures de données** | Durée de données collectées (format: `Xh Ymin`) |
-| **Temps restant analyse** | Temps avant que les données soient prêtes |
-| **Progression analyse** | Pourcentage de complétion (0-100%) |
-| **Données prêtes** | Binary sensor indiquant si l'analyse est disponible |
-| **Fenêtre ouverte** | Détection par chute rapide de température |
+| Sensor | Description |
+|--------|-------------|
+| **Data hours** | Duration of collected data (format: `Xh Ymin`) |
+| **Remaining analysis time** | Time before data is ready |
+| **Analysis progress** | Completion percentage (0-100%) |
+| **Data ready** | Binary sensor indicating if analysis is available |
+| **Open window** | Detection by rapid temperature drop |
 
 ## 🏠 Multi-zones
 
-Gérez toutes vos pièces facilement !
+Easily manage all your rooms!
 
-### Ajouter des zones
+### Adding Zones
 
-1. **Paramètres → Appareils et services**
-2. Cliquer sur **"+ Ajouter une intégration"**
-3. Chercher **"Home Performance"**
-4. Configurer la nouvelle zone
+1. **Settings → Devices & services**
+2. Click **"+ Add integration"**
+3. Search for **"Home Performance"**
+4. Configure the new zone
 
-Chaque zone apparaît comme une entrée séparée, toutes regroupées sous "Home Performance" :
+Each zone appears as a separate entry, all grouped under "Home Performance":
 
 ```
-Home Performance - Chambre Flavien
-Home Performance - Salon
-Home Performance - Bureau
+Home Performance - Flavien's Room
+Home Performance - Living Room
+Home Performance - Office
 ```
 
-### Gérer une zone
+### Managing a Zone
 
-Dans la liste des intégrations, cliquez sur **Options** (⚙️) de la zone à modifier pour :
-- Modifier les paramètres (puissance, surface, capteurs...)
-- Supprimer la zone
+In the integrations list, click **Options** (⚙️) of the zone to modify:
+- Change settings (power, surface, sensors...)
+- Delete the zone
 
-Chaque zone a ses **propres capteurs** et sa **propre carte Lovelace**.
+Each zone has its **own sensors** and **own Lovelace card**.
 
-## 🎴 Carte Lovelace Intégrée
+## 🎴 Built-in Lovelace Card
 
-L'intégration inclut une **carte custom moderne** prête à l'emploi !
+The integration includes a **ready-to-use modern custom card**!
 
-### Installation de la carte
+### Card Installation
 
-**La ressource Lovelace est automatiquement enregistrée** lors de l'installation de l'intégration (mode storage par défaut de HA).
+**The Lovelace resource is automatically registered** when installing the integration (HA default storage mode).
 
-Ajoutez simplement une carte par zone dans votre dashboard :
+Simply add one card per zone in your dashboard:
 
 ```yaml
 type: custom:home-performance-card
-zone: Salon
-title: Performance Salon
+zone: Living Room
+title: Living Room Performance
 ```
 
 ```yaml
 type: custom:home-performance-card
-zone: Chambre
-title: Performance Chambre
+zone: Bedroom
+title: Bedroom Performance
 ```
 
 <details>
-<summary>📝 Mode YAML (si la ressource n'est pas auto-détectée)</summary>
+<summary>📝 YAML mode (if resource is not auto-detected)</summary>
 
-Si vous utilisez un dashboard en mode YAML, ajoutez manuellement la ressource :
-- **Paramètres → Tableaux de bord → ⋮ → Ressources**
-- URL : `/home_performance/home-performance-card.js`
-- Type : `Module JavaScript`
+If you use a YAML mode dashboard, manually add the resource:
+- **Settings → Dashboards → ⋮ → Resources**
+- URL: `/home_performance/home-performance-card.js`
+- Type: `JavaScript Module`
 
 </details>
 
-### Options de la carte
+### Card Options
 
-| Option | Défaut | Description |
-|--------|--------|-------------|
-| `zone` | *requis* | Nom exact de votre zone |
-| `title` | "Performance Thermique" | Titre affiché |
-| `demo` | false | Mode démo avec données fictives |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `zone` | *required* | Exact name of your zone |
+| `title` | "Thermal Performance" | Displayed title |
+| `demo` | false | Demo mode with fake data |
 
-### Fonctionnalités de la carte
+### Card Features
 
-- 📊 **Scores visuels** - Isolation et Performance avec couleurs
-- 🌡️ **Températures** - Intérieur/Extérieur en temps réel
-- 📈 **Métriques détaillées** - Coefficient K, Énergie, Temps de chauffe
-- ⏳ **Progression** - Barre de progression pendant l'analyse initiale
-- 🎨 **Design adaptatif** - S'adapte au thème clair/sombre
+- 📊 **Visual scores** - Insulation and Performance with colors
+- 🌡️ **Temperatures** - Indoor/Outdoor in real-time
+- 📈 **Detailed metrics** - K coefficient, Energy, Heating time
+- ⏳ **Progress** - Progress bar during initial analysis
+- 🎨 **Adaptive design** - Adapts to light/dark theme
 
-## 📋 Prérequis
+## 📋 Prerequisites
 
-- Home Assistant 2024.1.0 ou plus récent
-- Capteur de température intérieure (par zone)
-- Capteur de température extérieure (partageable entre zones)
-- Entité climate OU switch contrôlant le chauffage (par zone)
+- Home Assistant 2024.4.0 or newer
+- Indoor temperature sensor (per zone)
+- Outdoor temperature sensor (shareable between zones)
+- Climate OR switch entity controlling heating (per zone)
 
 ## ⚙️ Configuration
 
-### Paramètres obligatoires (par zone)
+### Required Parameters (per zone)
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| Nom de zone | Nom de la pièce (ex: Salon) |
-| Capteur T° intérieure | sensor.xxx_temperature |
-| Capteur T° extérieure | sensor.xxx_outdoor (partageable entre zones) |
-| Entité chauffage | climate.xxx ou switch.xxx |
-| Puissance radiateur | Puissance déclarée en Watts |
+| Zone name | Room name (e.g.: Living Room) |
+| Indoor temp sensor | sensor.xxx_temperature |
+| Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
+| Heating entity | climate.xxx or switch.xxx |
+| Heater power | Declared power in Watts |
 
-### Paramètres optionnels
+### Optional Parameters
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| Surface | m² (pour K/m²) |
-| Volume | m³ (pour K/m³ et note d'isolation) |
-| Capteur de puissance | sensor.xxx_power en Watts (pour énergie + détection chauffe précise) |
-| Compteur d'énergie externe | sensor.xxx_energy (votre propre Utility Meter HA) |
+| Surface | m² (for K/m²) |
+| Volume | m³ (for K/m³ and insulation rating) |
+| Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
+| External energy counter | sensor.xxx_energy (your own HA Utility Meter) |
 
-> **Notes** :
-> - Si vous fournissez un compteur d'énergie externe ET un capteur de puissance, le compteur externe est utilisé en priorité pour l'énergie.
-> - Le capteur de puissance permet aussi une **détection précise de la chauffe** (power > 50W), idéal pour les radiateurs avec thermostat interne ou fil pilote.
-> - Les options sont **modifiables après coup** et l'intégration se recharge automatiquement.
+> **Notes**:
+> - If you provide an external energy counter AND a power sensor, the external counter is used as priority for energy.
+> - The power sensor also enables **precise heat detection** (power > 50W), ideal for heaters with internal thermostat or pilot wire.
+> - Options are **modifiable afterwards** and the integration reloads automatically.
 
-## 💾 Persistance des données
+## 💾 Data Persistence
 
-Les données sont **automatiquement sauvegardées** et restaurées après un redémarrage de Home Assistant :
+Data is **automatically saved** and restored after a Home Assistant restart:
 
-- ✅ Historique thermique (jusqu'à 48h)
-- ✅ Coefficient K calculé
-- ✅ Compteurs d'énergie
-- ✅ Pas besoin de réattendre 12h après chaque restart !
+- ✅ Thermal history (up to 48h)
+- ✅ Calculated K coefficient
+- ✅ Energy counters
+- ✅ No need to wait 12h again after each restart!
 
-**Stockage** : `/config/.storage/home_performance.{zone}`
+**Storage**: `/config/.storage/home_performance.{zone}`
 
-**Fréquence de sauvegarde** : Toutes les 5 minutes + à l'arrêt de HA
+**Save frequency**: Every 5 minutes + at HA shutdown
 
 ## 📦 Installation
 
-### HACS (Recommandé)
+### HACS (Recommended)
 
-1. Ouvrir HACS
-2. Cliquer sur "Intégrations"
-3. Menu ⋮ → "Dépôts personnalisés"
-4. Ajouter `https://github.com/Hugofromfrance/home_performance` (catégorie: Integration)
-5. Installer "Home Performance"
-6. Redémarrer Home Assistant
+1. Open HACS
+2. Click on "Integrations"
+3. Menu ⋮ → "Custom repositories"
+4. Add `https://github.com/Hugofromfrance/home_performance` (category: Integration)
+5. Install "Home Performance"
+6. Restart Home Assistant
 
-### Manuel
+### Manual
 
-1. Copier `custom_components/home_performance` dans votre dossier `config/custom_components/`
-2. Redémarrer Home Assistant
+1. Copy `custom_components/home_performance` to your `config/custom_components/` folder
+2. Restart Home Assistant
 
-## 🚀 Utilisation
+## 🚀 Usage
 
-### Première configuration
+### First Configuration
 
-1. Aller dans **Paramètres → Appareils et services**
-2. Cliquer sur **"Ajouter une intégration"**
-3. Chercher **"Home Performance"**
-4. Configurer votre première zone
+1. Go to **Settings → Devices & services**
+2. Click **"Add integration"**
+3. Search for **"Home Performance"**
+4. Configure your first zone
 
-### Ajouter des pièces
+### Adding Rooms
 
-1. Aller dans **Paramètres → Appareils et services**
-2. Cliquer sur **"+ Ajouter une intégration"**
-3. Chercher **"Home Performance"**
-4. Configurer la nouvelle zone
+1. Go to **Settings → Devices & services**
+2. Click **"+ Add integration"**
+3. Search for **"Home Performance"**
+4. Configure the new zone
 
-**Note** : Les calculs commencent après **12h** de données collectées et nécessitent un ΔT minimum de 5°C pour être fiables.
+**Note**: Calculations start after **12h** of collected data and require a minimum ΔT of 5°C to be reliable.
 
-## 🎨 Exemples Dashboard
+## 🎨 Dashboard Examples
 
-Des exemples supplémentaires sont disponibles dans [`examples/dashboard_card.yaml`](examples/dashboard_card.yaml) :
+Additional examples are available in [`examples/dashboard_card.yaml`](examples/dashboard_card.yaml):
 
-| Option | Dépendances | Description |
-|--------|-------------|-------------|
-| **Carte custom** | Aucune | Carte intégrée moderne ⭐ |
-| **Option 1** | Aucune | Cartes natives HA |
-| **Option 2** | Mushroom Cards | Look moderne et épuré |
-| **Bonus** | ApexCharts | Graphique historique sur 7 jours |
+| Option | Dependencies | Description |
+|--------|--------------|-------------|
+| **Custom card** | None | Modern built-in card ⭐ |
+| **Option 1** | None | Native HA cards |
+| **Option 2** | Mushroom Cards | Modern and clean look |
+| **Bonus** | ApexCharts | 7-day history graph |
 
-### Installation des dépendances (optionnel)
+### Installing Dependencies (optional)
 
-Pour les options avancées, installez via HACS :
+For advanced options, install via HACS:
 - [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom)
 - [stack-in-card](https://github.com/custom-cards/stack-in-card)
 - [ApexCharts Card](https://github.com/RomRider/apexcharts-card)
 
-## 📈 Performance Énergétique
+## 📈 Energy Performance
 
-Le capteur de performance compare votre consommation à la moyenne nationale française :
+The performance sensor compares your consumption to the French national average:
 
-| Niveau | Signification |
-|--------|--------------|
-| 🟢 **Excellent** | -40% vs moyenne nationale |
-| 🟡 **Standard** | Dans la moyenne |
-| 🟠 **À optimiser** | Au-dessus de la moyenne |
+| Level | Meaning |
+|-------|---------|
+| 🟢 **Excellent** | -40% vs national average |
+| 🟡 **Standard** | Within average |
+| 🟠 **Needs optimization** | Above average |
 
-### Formule de calcul
+### Calculation Formula
 
-Les seuils sont calculés dynamiquement selon la puissance du radiateur :
+Thresholds are dynamically calculated based on heater power:
 
 ```
-Excellent   : < (Puissance_W / 1000) × 4 kWh/jour
-Standard    : < (Puissance_W / 1000) × 6 kWh/jour
-À optimiser : au-delà
+Excellent      : < (Power_W / 1000) × 4 kWh/day
+Standard       : < (Power_W / 1000) × 6 kWh/day
+Needs optimization : beyond
 ```
 
-### Tableau des seuils par puissance
+### Thresholds by Power
 
-| Puissance | 🟢 Excellent | 🟡 Standard | 🟠 À optimiser |
-|-----------|--------------|-------------|----------------|
-| 500W      | < 2.0 kWh    | < 3.0 kWh   | > 3.0 kWh      |
-| 750W      | < 3.0 kWh    | < 4.5 kWh   | > 4.5 kWh      |
-| 1000W     | < 4.0 kWh    | < 6.0 kWh   | > 6.0 kWh      |
-| 1200W     | < 4.8 kWh    | < 7.2 kWh   | > 7.2 kWh      |
-| 1500W     | < 6.0 kWh    | < 9.0 kWh   | > 9.0 kWh      |
-| 1800W     | < 7.2 kWh    | < 10.8 kWh  | > 10.8 kWh     |
-| 2000W     | < 8.0 kWh    | < 12.0 kWh  | > 12.0 kWh     |
-| 2500W     | < 10.0 kWh   | < 15.0 kWh  | > 15.0 kWh     |
-| 3000W     | < 12.0 kWh   | < 18.0 kWh  | > 18.0 kWh     |
+| Power | 🟢 Excellent | 🟡 Standard | 🟠 Needs optimization |
+|-------|--------------|-------------|----------------------|
+| 500W  | < 2.0 kWh    | < 3.0 kWh   | > 3.0 kWh            |
+| 750W  | < 3.0 kWh    | < 4.5 kWh   | > 4.5 kWh            |
+| 1000W | < 4.0 kWh    | < 6.0 kWh   | > 6.0 kWh            |
+| 1200W | < 4.8 kWh    | < 7.2 kWh   | > 7.2 kWh            |
+| 1500W | < 6.0 kWh    | < 9.0 kWh   | > 9.0 kWh            |
+| 1800W | < 7.2 kWh    | < 10.8 kWh  | > 10.8 kWh           |
+| 2000W | < 8.0 kWh    | < 12.0 kWh  | > 12.0 kWh           |
+| 2500W | < 10.0 kWh   | < 15.0 kWh  | > 15.0 kWh           |
+| 3000W | < 12.0 kWh   | < 18.0 kWh  | > 18.0 kWh           |
 
-> **Note** : Ces seuils sont calculés automatiquement pour **toute puissance** saisie. Les valeurs ci-dessus correspondent aux puissances de radiateurs les plus courantes.
+> **Note**: These thresholds are automatically calculated for **any power** entered. The values above correspond to the most common heater powers.
 
 ## 🗺️ Roadmap
 
-### ✅ Réalisé (v1.0.0)
+### ✅ Completed (v1.0.0)
 
-- [x] Coefficient K (W/°C) - déperdition thermique empirique
-- [x] Normalisation K/m² et K/m³
-- [x] Note d'isolation intelligente (calculée, déduite, ou conservée)
-- [x] Gestion des saisons (été, hors-saison, saison de chauffe)
-- [x] Isolation excellente déduite automatiquement (peu de chauffe + T° stable)
-- [x] Conservation du dernier K valide (hors saison)
-- [x] Énergie journalière (estimée et mesurée)
-- [x] Support compteur d'énergie externe HA
-- [x] Détection chauffe précise via power sensor (event-driven)
-- [x] Détection fenêtre ouverte temps réel (event-driven)
-- [x] Carte Lovelace intégrée (auto-enregistrée)
-- [x] Persistance des données
-- [x] Performance énergétique vs moyenne nationale
-- [x] Compteur Utility Meter (reset minuit-minuit)
-- [x] Options modifiables avec rechargement auto
-- [x] Multi-zones (ajouter/supprimer des pièces)
-- [x] Architecture event-driven (réactivité instantanée)
+- [x] K Coefficient (W/°C) - empirical thermal loss
+- [x] K/m² and K/m³ normalization
+- [x] Smart insulation rating (calculated, inferred, or conserved)
+- [x] Season management (summer, off-season, heating season)
+- [x] Automatically inferred excellent insulation (low heating + stable T°)
+- [x] Last valid K conservation (off-season)
+- [x] Daily energy (estimated and measured)
+- [x] External HA energy counter support
+- [x] Precise heat detection via power sensor (event-driven)
+- [x] Real-time open window detection (event-driven)
+- [x] Built-in Lovelace card (auto-registered)
+- [x] Data persistence
+- [x] Energy performance vs national average
+- [x] Utility Meter counter (midnight-to-midnight reset)
+- [x] Modifiable options with auto-reload
+- [x] Multi-zones (add/remove rooms)
+- [x] Event-driven architecture (instant reactivity)
 
-### 🔜 v1.1 - Visualisation
+### 🔜 v1.1 - Visualization
 
-- [ ] Graphiques historiques du coefficient K (ApexCharts)
-- [ ] Comparaison multi-zones dans une seule carte
-- [ ] Évolution des performances dans le temps
+- [ ] K coefficient historical graphs (ApexCharts)
+- [ ] Multi-zone comparison in a single card
+- [ ] Performance evolution over time
 
-### 🔮 v1.2 - Alertes & Notifications
+### 🔮 v1.2 - Alerts & Notifications
 
-- [ ] Notifications fenêtre ouverte (push, TTS)
-- [ ] Alertes mauvaise isolation détectée
-- [ ] Rapport hebdomadaire de consommation
+- [ ] Open window notifications (push, TTS)
+- [ ] Poor insulation detected alerts
+- [ ] Weekly consumption report
 
-### 💡 Idées futures
+### 💡 Future Ideas
 
-- [ ] Correction météo (vent, ensoleillement)
-- [ ] Module humidité (HR, risque moisissure)
-- [ ] Module qualité d'air (CO2)
-- [ ] Module confort thermique (PMV/PPD)
-- [ ] Export des données (CSV, InfluxDB)
-- [ ] Intégration Energy Dashboard native HA
-- [ ] Détection automatique des radiateurs
-- [ ] Mode "diagnostic isolation" guidé
+- [ ] Weather correction (wind, sunlight)
+- [ ] Humidity module (RH, mold risk)
+- [ ] Air quality module (CO2)
+- [ ] Thermal comfort module (PMV/PPD)
+- [ ] Data export (CSV, InfluxDB)
+- [ ] Native HA Energy Dashboard integration
+- [ ] Automatic heater detection
+- [ ] Guided "insulation diagnostic" mode
 
-## 🤝 Contribuer
+## 🤝 Contributing
 
-Les contributions sont les bienvenues ! Ouvrez une issue pour discuter avant de soumettre une PR.
+Contributions are welcome! Open an issue to discuss before submitting a PR.
 
-## 📄 Licence
+## 📄 License
 
 [MIT](LICENSE)
