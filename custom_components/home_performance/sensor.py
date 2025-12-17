@@ -154,7 +154,7 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
             "name": f"Home Performance - {self._zone_name}",
             "manufacturer": "Home Performance",
             "model": "Thermal Analyzer",
-            "sw_version": "1.0.0",
+            "sw_version": "1.1.0",
         }
 
 
