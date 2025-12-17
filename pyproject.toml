@@ -1,6 +1,6 @@
 [project]
 name = "thermal_learning"
-version = "1.1.0"
+version = "1.1.1"
 description = "Home Assistant integration that learns thermal characteristics"
 requires-python = ">=3.12"
 
