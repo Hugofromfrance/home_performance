@@ -5,6 +5,26 @@
 
 Une intégration Home Assistant pour analyser et surveiller les performances thermiques de votre logement.
 
+## 🤔 Pourquoi Home Performance ?
+
+Vous chauffez à l'électrique et vous vous demandez :
+- **"Ma pièce est-elle bien isolée ?"** → Coefficient K mesuré
+- **"Combien je consomme vraiment ?"** → Énergie journalière
+- **"Ai-je oublié de fermer une fenêtre ?"** → Détection automatique
+- **"Quelle pièce coûte le plus cher ?"** → Comparaison multi-zones
+
+**Home Performance** répond à ces questions en analysant vos données de chauffage **réelles**, sans calcul théorique.
+
+### 💡 Cas d'usage
+
+| Situation | Ce que Home Performance vous apporte |
+|-----------|--------------------------------------|
+| Achat/Location | Vérifier la performance thermique réelle (vs le DPE théorique) |
+| Travaux d'isolation | Mesurer l'amélioration avant/après |
+| Optimisation facture | Identifier les pièces énergivores |
+| Diagnostic | Détecter fenêtres ouvertes, ponts thermiques |
+| Comparaison | Comparer vos pièces entre elles (K/m²) |
+
 ## ✨ Fonctionnalités principales
 
 - 🏠 **Multi-zones** - Gérez toutes vos pièces depuis une seule intégration
@@ -12,7 +32,38 @@ Une intégration Home Assistant pour analyser et surveiller les performances the
 - 📊 **Compteur d'énergie mesuré** - Intégration de capteur de puissance (Utility Meter)
 - 💾 **Persistance des données** - Conservation après redémarrage
 - 🎯 **Performance énergétique** - Comparaison à la moyenne nationale
-- ⏱️ **Progression d'analyse** - Suivi en temps réel de la collecte
+- ⚡ **Architecture event-driven** - Détection instantanée (chauffe, fenêtres)
+- 🪟 **Détection fenêtre ouverte** - Alerte temps réel sur chute de température
+
+## 🔌 Compatibilité matérielle
+
+**L'intégration est 100% agnostique du matériel !** Elle fonctionne avec tout ce qui expose des entités Home Assistant standard.
+
+### Minimum requis
+
+| Besoin | Exemples compatibles |
+|--------|---------------------|
+| Capteur T° intérieure | Aqara, Sonoff SNZB-02, Xiaomi, Netatmo, Ecobee, Shelly H&T, ESPHome... |
+| Capteur T° extérieure | Station météo locale, Météo-France, OpenWeatherMap, Netatmo Outdoor... |
+| Entité chauffage | Tout `climate.*`, `switch.*` ou `input_boolean.*` |
+
+### Optionnel (recommandé)
+
+| Capteur | Exemples | Avantage |
+|---------|----------|----------|
+| Puissance instantanée | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | Temps de chauffe précis |
+| Compteur d'énergie | Utility Meter HA, compteur natif | Énergie mesurée vs estimée |
+
+### Types de chauffage supportés
+
+| Type | Compatible ? | Notes |
+|------|--------------|-------|
+| Radiateur + prise connectée | ✅ | Idéal avec mesure de puissance |
+| Radiateur + fil pilote | ✅ | NodOn, Qubino, etc. |
+| Convecteur avec thermostat | ✅ | Via switch ou climate |
+| Pompe à chaleur / Clim | ✅ | Via climate entity |
+| Plancher chauffant électrique | ✅ | Avec capteur de puissance |
+| Chauffage central gaz/fioul | ⚠️ | Possible mais moins précis (pas de mesure puissance individuelle) |
 
 ## 🎯 Concept
 
@@ -58,7 +109,34 @@ Le **coefficient K** de Home Performance mesure les **déperditions globales** d
 | **Coefficient K** | Déperdition thermique (W/°C) - plus c'est bas, mieux c'est |
 | **K par m²** | Normalisé par surface - comparable entre pièces |
 | **K par m³** | Normalisé par volume - meilleur si hauteurs différentes |
-| **Note d'isolation** | Qualitative (excellent → très mal isolé) |
+| **Note d'isolation** | Intelligente : calculée, déduite, ou conservée selon la saison |
+
+### 🎯 Note d'isolation intelligente
+
+La note d'isolation s'adapte automatiquement à toutes les situations :
+
+| Situation | Affichage | Description |
+|-----------|-----------|-------------|
+| K calculé | **A à G** | Note basée sur le coefficient K/m³ |
+| Peu de chauffe + T° stable | **🏆 Excellente (déduite)** | Isolation excellente déduite automatiquement |
+| Mode été (T° ext > T° int) | **☀️ Mode été** | Mesure impossible + dernier K conservé |
+| Hors saison (ΔT < 5°C) | **🌤️ Hors saison** | ΔT insuffisant + dernier K conservé |
+| Collecte en cours | **En attente** | < 12h de données |
+
+#### Isolation déduite automatiquement 🏆
+
+Si après **24h** d'observation :
+- Le ΔT est significatif (≥ 5°C)
+- Le radiateur a très peu chauffé (< 30 min)
+- La température intérieure est restée **stable** (variation < 2°C)
+
+→ L'intégration déduit automatiquement que l'isolation est **excellente** !
+
+> **Logique** : Si la pièce maintient sa température sans chauffer alors qu'il fait froid dehors, c'est que les déperditions sont très faibles.
+
+#### Conservation du dernier K valide
+
+En été ou hors saison de chauffe, l'intégration **conserve le dernier coefficient K calculé** et l'affiche avec le message de saison approprié. Vous gardez ainsi une référence utile toute l'année.
 
 ### Énergie journalière
 
@@ -303,29 +381,46 @@ Standard    : < (Puissance_W / 1000) × 6 kWh/jour
 
 ### ✅ Réalisé (v1.0.0)
 
-- [x] Coefficient K (W/°C)
+- [x] Coefficient K (W/°C) - déperdition thermique empirique
 - [x] Normalisation K/m² et K/m³
+- [x] Note d'isolation intelligente (calculée, déduite, ou conservée)
+- [x] Gestion des saisons (été, hors-saison, saison de chauffe)
+- [x] Isolation excellente déduite automatiquement (peu de chauffe + T° stable)
+- [x] Conservation du dernier K valide (hors saison)
 - [x] Énergie journalière (estimée et mesurée)
 - [x] Support compteur d'énergie externe HA
-- [x] Détection chauffe précise via power sensor
-- [x] Détection fenêtre ouverte
-- [x] Note d'isolation
+- [x] Détection chauffe précise via power sensor (event-driven)
+- [x] Détection fenêtre ouverte temps réel (event-driven)
 - [x] Carte Lovelace intégrée (auto-enregistrée)
 - [x] Persistance des données
 - [x] Performance énergétique vs moyenne nationale
-- [x] Compteur Utility Meter (reset minuit)
+- [x] Compteur Utility Meter (reset minuit-minuit)
 - [x] Options modifiables avec rechargement auto
-- [x] **Multi-zones** (ajouter/supprimer des pièces)
+- [x] Multi-zones (ajouter/supprimer des pièces)
+- [x] Architecture event-driven (réactivité instantanée)
 
-### 🔜 Prochaines fonctionnalités
+### 🔜 v1.1 - Visualisation
 
-- [ ] Historique de K dans le temps
-- [ ] Correction vent/ensoleillement (météo)
+- [ ] Graphiques historiques du coefficient K (ApexCharts)
+- [ ] Comparaison multi-zones dans une seule carte
+- [ ] Évolution des performances dans le temps
+
+### 🔮 v1.2 - Alertes & Notifications
+
+- [ ] Notifications fenêtre ouverte (push, TTS)
+- [ ] Alertes mauvaise isolation détectée
+- [ ] Rapport hebdomadaire de consommation
+
+### 💡 Idées futures
+
+- [ ] Correction météo (vent, ensoleillement)
 - [ ] Module humidité (HR, risque moisissure)
 - [ ] Module qualité d'air (CO2)
-- [ ] Module confort (PMV/PPD)
-- [ ] Comparaison multi-zones (tableau récapitulatif)
-- [ ] Export des données
+- [ ] Module confort thermique (PMV/PPD)
+- [ ] Export des données (CSV, InfluxDB)
+- [ ] Intégration Energy Dashboard native HA
+- [ ] Détection automatique des radiateurs
+- [ ] Mode "diagnostic isolation" guidé
 
 ## 🤝 Contribuer
 

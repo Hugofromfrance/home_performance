@@ -274,7 +274,7 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
         if self.coordinator.data:
             value = self.coordinator.data.get("daily_energy_kwh")
             if value is not None:
-                return round(value, 2)
+                return round(value, 3)
         return None
 
     @property
@@ -616,7 +616,13 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
 
 
 class InsulationRatingSensor(HomePerformanceBaseSensor):
-    """Sensor for insulation rating (qualitative)."""
+    """Sensor for insulation rating (qualitative).
+    
+    Handles multiple scenarios:
+    - Calculated rating from K coefficient
+    - Inferred excellent rating (minimal heating needed)
+    - Off-season/summer mode (preserve last valid rating)
+    """
 
     _attr_icon = "mdi:home-thermometer"
 
@@ -627,8 +633,19 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
 
     @property
     def native_value(self) -> str | None:
-        """Return insulation rating."""
+        """Return insulation rating.
+        
+        Priority:
+        1. Calculated rating from K coefficient
+        2. Inferred excellent rating
+        3. Last valid rating (during off-season)
+        """
         if self.coordinator.data:
+            insulation_status = self.coordinator.data.get("insulation_status", {})
+            rating = insulation_status.get("rating")
+            if rating:
+                return rating
+            # Fallback to old method for compatibility
             return self.coordinator.data.get("insulation_rating")
         return None
 
@@ -636,24 +653,45 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         data = self.coordinator.data or {}
-        rating = data.get("insulation_rating")
+        insulation_status = data.get("insulation_status", {})
+        
+        rating = insulation_status.get("rating") or data.get("insulation_rating")
+        status = insulation_status.get("status", "waiting_data")
+        season = insulation_status.get("season", "heating_season")
+        k_source = insulation_status.get("k_source")
+        message = insulation_status.get("message")
+        k_value = insulation_status.get("k_value")
 
         rating_descriptions = {
             "excellent": "Très bien isolé",
+            "excellent_inferred": "🏆 Excellente (déduite)",
             "good": "Bien isolé",
             "average": "Isolation moyenne",
             "poor": "Mal isolé",
             "very_poor": "Très mal isolé / pont thermique",
         }
+        
+        season_descriptions = {
+            "summer": "☀️ Mode été",
+            "off_season": "🌤️ Hors saison",
+            "heating_season": "❄️ Saison de chauffe",
+        }
 
         return {
-            "description": rating_descriptions.get(rating, "En attente de données"),
+            "description": rating_descriptions.get(rating, message or "En attente de données"),
+            "status": status,
+            "season": season,
+            "season_description": season_descriptions.get(season, season),
+            "k_value": round(k_value, 1) if k_value is not None else None,
+            "k_source": k_source,
             "k_per_m3": (
                 round(data.get("k_per_m3"), 2)
                 if data.get("k_per_m3") is not None
                 else None
             ),
-            "note": "Basé sur K/m³ - nécessite le volume configuré",
+            "temp_stable": insulation_status.get("temp_stable"),
+            "message": message,
+            "note": "Basé sur K/m³ ou déduit si chauffe minimale",
         }
 
 

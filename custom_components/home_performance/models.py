@@ -37,6 +37,21 @@ _LOGGER = logging.getLogger(__name__)
 SECONDS_PER_HOUR = 3600
 MAX_DATA_POINTS = 1440 * 2  # 48h at 1 sample per minute
 
+# Season/inference constants
+TEMP_STABILITY_THRESHOLD = 2.0  # °C - max variation for "stable" temperature
+EXCELLENT_INFERENCE_MIN_HOURS = 24  # Hours needed to infer excellent isolation
+
+# Season status codes
+SEASON_SUMMER = "summer"  # T° ext > T° int (ΔT negative)
+SEASON_OFF = "off_season"  # 0 < ΔT < MIN_DELTA_T
+SEASON_HEATING = "heating_season"  # ΔT >= MIN_DELTA_T
+
+# Insulation status codes
+INSULATION_WAITING_DATA = "waiting_data"
+INSULATION_WAITING_HEAT = "waiting_heat"
+INSULATION_EXCELLENT_INFERRED = "excellent_inferred"
+INSULATION_CALCULATED = "calculated"
+
 
 @dataclass
 class ThermalDataPoint:
@@ -122,6 +137,7 @@ class ThermalLossModel:
 
         # Calculated values (updated periodically)
         self._k_coefficient: float | None = None  # W/°C
+        self._last_valid_k: float | None = None  # Last valid K (preserved during off-season)
         self._last_aggregation: AggregatedPeriod | None = None
 
         # Energy tracking (cumulative)
@@ -231,6 +247,7 @@ class ThermalLossModel:
         k = energy_wh / (aggregation.delta_t * aggregation.duration_hours)
 
         self._k_coefficient = k
+        self._last_valid_k = k  # Preserve this valid K
 
         _LOGGER.info(
             "K calculated for %s: %.1f W/°C "
@@ -324,6 +341,203 @@ class ThermalLossModel:
         else:
             return "very_poor"  # Very poor insulation / thermal bridge
 
+    def get_season_status(self) -> str:
+        """Determine current season status based on ΔT.
+        
+        Returns:
+            SEASON_SUMMER: T° ext > T° int (negative ΔT)
+            SEASON_OFF: 0 < ΔT < MIN_DELTA_T
+            SEASON_HEATING: ΔT >= MIN_DELTA_T (can calculate K)
+        """
+        if not self._last_aggregation:
+            # No data yet, assume heating season
+            return SEASON_HEATING
+        
+        delta_t = self._last_aggregation.delta_t
+        
+        if delta_t < 0:
+            return SEASON_SUMMER
+        elif delta_t < MIN_DELTA_T:
+            return SEASON_OFF
+        else:
+            return SEASON_HEATING
+
+    def get_temp_stability(self) -> dict[str, Any]:
+        """Analyze indoor temperature stability over the aggregation period.
+        
+        Returns dict with:
+            - stable: bool - True if temp variation < TEMP_STABILITY_THRESHOLD
+            - min_temp: float - Minimum indoor temp
+            - max_temp: float - Maximum indoor temp
+            - variation: float - max - min
+        """
+        if len(self.data_points) < 10:
+            return {"stable": False, "min_temp": None, "max_temp": None, "variation": None}
+        
+        now = self.data_points[-1].timestamp
+        period_start = now - (AGGREGATION_PERIOD_HOURS * SECONDS_PER_HOUR)
+        period_points = [p for p in self.data_points if p.timestamp >= period_start]
+        
+        if len(period_points) < 10:
+            return {"stable": False, "min_temp": None, "max_temp": None, "variation": None}
+        
+        indoor_temps = [p.indoor_temp for p in period_points]
+        min_temp = min(indoor_temps)
+        max_temp = max(indoor_temps)
+        variation = max_temp - min_temp
+        
+        return {
+            "stable": variation < TEMP_STABILITY_THRESHOLD,
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "variation": variation,
+        }
+
+    def is_excellent_by_inference(self) -> bool:
+        """Check if excellent isolation can be inferred.
+        
+        Conditions for inference:
+        1. At least 24h of data
+        2. ΔT >= MIN_DELTA_T (it's cold outside)
+        3. Heating time < MIN_HEATING_TIME_HOURS (radiator barely ran)
+        4. Indoor temperature is stable (room maintains temp)
+        
+        If all conditions met, the room is excellently insulated!
+        """
+        # Need enough data
+        if self.data_hours < EXCELLENT_INFERENCE_MIN_HOURS:
+            return False
+        
+        # Need aggregation data
+        if not self._last_aggregation:
+            return False
+        
+        agg = self._last_aggregation
+        
+        # Must be heating season (ΔT >= 5°C)
+        if agg.delta_t < MIN_DELTA_T:
+            return False
+        
+        # Radiator must have run very little
+        if agg.heating_hours >= MIN_HEATING_TIME_HOURS:
+            return False
+        
+        # Temperature must be stable
+        stability = self.get_temp_stability()
+        if not stability["stable"]:
+            return False
+        
+        _LOGGER.info(
+            "[%s] 🏆 Excellent isolation inferred: ΔT=%.1f°C, heating=%.1fmin, temp_variation=%.1f°C",
+            self.zone_name,
+            agg.delta_t,
+            agg.heating_hours * 60,
+            stability["variation"],
+        )
+        return True
+
+    def get_insulation_status(self) -> dict[str, Any]:
+        """Get comprehensive insulation status.
+        
+        Returns dict with:
+            - status: str - One of INSULATION_* constants
+            - rating: str | None - Insulation rating (excellent, good, etc.)
+            - k_value: float | None - K coefficient (current or last valid)
+            - k_source: str - "calculated", "inferred", "last_valid", None
+            - season: str - Current season status
+            - message: str - Human-readable status message
+        """
+        season = self.get_season_status()
+        stability = self.get_temp_stability()
+        
+        # Case 1: Not enough data yet
+        if self.data_hours < MIN_DATA_HOURS:
+            return {
+                "status": INSULATION_WAITING_DATA,
+                "rating": None,
+                "k_value": self._last_valid_k,
+                "k_source": "last_valid" if self._last_valid_k else None,
+                "season": season,
+                "message": "Collecte de données en cours",
+                "temp_stable": stability["stable"],
+            }
+        
+        # Case 2: Summer mode (T° ext > T° int)
+        if season == SEASON_SUMMER:
+            return {
+                "status": INSULATION_WAITING_DATA,
+                "rating": self.get_insulation_rating() if self._last_valid_k else None,
+                "k_value": self._last_valid_k,
+                "k_source": "last_valid" if self._last_valid_k else None,
+                "season": season,
+                "message": "Mode été - mesure impossible",
+                "temp_stable": stability["stable"],
+            }
+        
+        # Case 3: Off-season (ΔT too low)
+        if season == SEASON_OFF:
+            return {
+                "status": INSULATION_WAITING_DATA,
+                "rating": self.get_insulation_rating() if self._last_valid_k else None,
+                "k_value": self._last_valid_k,
+                "k_source": "last_valid" if self._last_valid_k else None,
+                "season": season,
+                "message": "Hors saison - ΔT insuffisant",
+                "temp_stable": stability["stable"],
+            }
+        
+        # Case 4: K is calculated
+        if self._k_coefficient is not None:
+            return {
+                "status": INSULATION_CALCULATED,
+                "rating": self.get_insulation_rating(),
+                "k_value": self._k_coefficient,
+                "k_source": "calculated",
+                "season": season,
+                "message": None,
+                "temp_stable": stability["stable"],
+            }
+        
+        # Case 5: Excellent by inference
+        if self.is_excellent_by_inference():
+            return {
+                "status": INSULATION_EXCELLENT_INFERRED,
+                "rating": "excellent_inferred",
+                "k_value": None,  # Can't calculate, but we know it's very low
+                "k_source": "inferred",
+                "season": season,
+                "message": "Excellente - chauffe minimale nécessaire",
+                "temp_stable": True,
+            }
+        
+        # Case 6: Waiting for heating
+        agg = self._last_aggregation
+        if agg and not stability["stable"]:
+            return {
+                "status": INSULATION_WAITING_HEAT,
+                "rating": None,
+                "k_value": self._last_valid_k,
+                "k_source": "last_valid" if self._last_valid_k else None,
+                "season": season,
+                "message": "Chauffage insuffisant - température instable",
+                "temp_stable": False,
+            }
+        
+        return {
+            "status": INSULATION_WAITING_HEAT,
+            "rating": None,
+            "k_value": self._last_valid_k,
+            "k_source": "last_valid" if self._last_valid_k else None,
+            "season": season,
+            "message": "En attente de chauffe",
+            "temp_stable": stability["stable"],
+        }
+
+    @property
+    def last_valid_k(self) -> float | None:
+        """Get last valid K coefficient (preserved during off-season)."""
+        return self._last_valid_k
+
     def to_dict(self) -> dict[str, Any]:
         """Export model state to dictionary for persistence."""
         return {
@@ -337,6 +551,7 @@ class ThermalLossModel:
                 for p in self.data_points
             ],
             "k_coefficient": self._k_coefficient,
+            "last_valid_k": self._last_valid_k,
             "total_energy_kwh": self._total_energy_kwh,
             "last_point": {
                 "timestamp": self._last_point.timestamp,
@@ -365,6 +580,12 @@ class ThermalLossModel:
         # Restore calculated values
         if "k_coefficient" in data:
             self._k_coefficient = data["k_coefficient"]
+
+        if "last_valid_k" in data:
+            self._last_valid_k = data["last_valid_k"]
+        elif self._k_coefficient is not None:
+            # Backward compatibility: use k_coefficient as last_valid_k
+            self._last_valid_k = self._k_coefficient
 
         if "total_energy_kwh" in data:
             self._total_energy_kwh = data["total_energy_kwh"]

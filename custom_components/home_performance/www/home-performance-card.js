@@ -64,6 +64,17 @@ class HomePerformanceCard extends LitElement {
     return state?.attributes?.[attr];
   }
 
+  _entityExists(entityId) {
+    return this.hass?.states[entityId] !== undefined;
+  }
+
+  _isIntegrationReady() {
+    if (this.config.demo) return true;
+    // Check if the main sensor exists in HA
+    const entityId = this._getBinaryEntityId("donnees_pretes");
+    return this._entityExists(entityId);
+  }
+
   _isDataReady() {
     if (this.config.demo) return true;
     const entityId = this._getBinaryEntityId("donnees_pretes");
@@ -90,18 +101,69 @@ class HomePerformanceCard extends LitElement {
     return this._getState(entityId);
   }
 
-  _getInsulationData(rating) {
+  _getInsulationData(rating, insulationAttrs = {}) {
     const data = {
+      // Calculated ratings
       excellent: { label: "Excellent", color: "#10b981", icon: "mdi:shield-check", desc: "Très bien isolé" },
       good: { label: "Bon", color: "#22c55e", icon: "mdi:shield-half-full", desc: "Bien isolé" },
       average: { label: "Moyen", color: "#eab308", icon: "mdi:shield-outline", desc: "Isolation standard" },
       poor: { label: "Faible", color: "#f97316", icon: "mdi:shield-alert", desc: "À améliorer" },
       very_poor: { label: "Critique", color: "#ef4444", icon: "mdi:shield-off", desc: "Isolation insuffisante" },
+      // Inferred excellent
+      excellent_inferred: { label: "🏆 Excellente", color: "#059669", icon: "mdi:trophy", desc: "Chauffe minimale nécessaire" },
     };
-    // Handle unknown/unavailable states
+
+    // Get season and status from attributes
+    const season = insulationAttrs.season;
+    const status = insulationAttrs.status;
+    const message = insulationAttrs.message;
+    const kValue = insulationAttrs.k_value;
+    const kSource = insulationAttrs.k_source;
+
+    // Handle season-specific messages
+    if (season === "summer") {
+      const lastK = kValue ? `(K=${kValue} W/°C)` : "";
+      return {
+        label: "☀️ Mode été",
+        color: "#f59e0b",
+        icon: "mdi:weather-sunny",
+        desc: kValue ? `Dernière mesure ${lastK}` : "Mesure impossible"
+      };
+    }
+
+    if (season === "off_season") {
+      const lastK = kValue ? `(K=${kValue} W/°C)` : "";
+      return {
+        label: "🌤️ Hors saison",
+        color: "#8b5cf6",
+        icon: "mdi:weather-partly-cloudy",
+        desc: kValue ? `Dernière mesure ${lastK}` : "ΔT insuffisant"
+      };
+    }
+
+    // Handle excellent inferred
+    if (rating === "excellent_inferred" || status === "excellent_inferred") {
+      return data.excellent_inferred;
+    }
+
+    // Handle waiting states
     if (!rating || rating === "unknown" || rating === "unavailable") {
+      // Check if we have a last valid K to show
+      if (kValue && kSource === "last_valid") {
+        return {
+          label: "En attente",
+          color: "#6b7280",
+          icon: "mdi:shield-outline",
+          desc: `Dernier K: ${kValue} W/°C`
+        };
+      }
+      // Show specific message from status
+      if (message) {
+        return { label: "En attente", color: "#6b7280", icon: "mdi:shield-outline", desc: message };
+      }
       return { label: "En attente", color: "#6b7280", icon: "mdi:shield-outline", desc: "Chauffe nécessaire" };
     }
+
     return data[rating] || { label: rating, color: "#6b7280", icon: "mdi:shield-outline", desc: "" };
   }
 
@@ -149,7 +211,7 @@ class HomePerformanceCard extends LitElement {
       return html`<ha-card>Chargement...</ha-card>`;
     }
 
-    const storageLoaded = this._isStorageLoaded();
+    const integrationReady = this._isIntegrationReady();
     const dataReady = this._isDataReady();
     const progress = this._getProgress();
 
@@ -171,7 +233,7 @@ class HomePerformanceCard extends LitElement {
 
         <!-- Content -->
         <div class="content">
-          ${!storageLoaded
+          ${!integrationReady
         ? this._renderLoading()
         : (!dataReady ? this._renderAnalyzing(progress) : this._renderData())}
         </div>
@@ -183,11 +245,11 @@ class HomePerformanceCard extends LitElement {
     return html`
       <div class="analyzing">
         <div class="loading-spinner">
-          <ha-icon icon="mdi:database-sync"></ha-icon>
+          <ha-icon icon="mdi:home-thermometer"></ha-icon>
         </div>
-        <div class="analyzing-title" style="margin-top: 12px;">Chargement des données...</div>
+        <div class="analyzing-title" style="margin-top: 12px;">Chargement de l'intégration...</div>
         <div class="analyzing-info" style="margin-top: 8px;">
-          Restauration des données depuis le stockage persistant.
+          Home Performance démarre. Les données seront disponibles dans quelques secondes.
         </div>
       </div>
     `;
@@ -226,8 +288,24 @@ class HomePerformanceCard extends LitElement {
     const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
     const performance = demo ? demo.performance : this._getState(this._getEntityId("performance_energetique"));
 
+    // Get insulation attributes for season/inference support
+    const insulationEntityId = this._getEntityId("note_d_isolation");
+    const insulationAttrs = demo ? {} : {
+      status: this._getAttribute(insulationEntityId, "status"),
+      season: this._getAttribute(insulationEntityId, "season"),
+      message: this._getAttribute(insulationEntityId, "message"),
+      k_value: this._getAttribute(insulationEntityId, "k_value"),
+      k_source: this._getAttribute(insulationEntityId, "k_source"),
+      temp_stable: this._getAttribute(insulationEntityId, "temp_stable"),
+    };
+
     // Priority: measured energy (if available) > estimated energy
-    let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_jour_mesuree"));
+    // Try both possible entity_id formats (HA slugification varies)
+    let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_mesuree_jour"));
+    if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown" || dailyEnergy === null)) {
+      // Fallback to alternative slugification
+      dailyEnergy = this._getState(this._getEntityId("energie_jour_mesuree"));
+    }
     let energyType = "mesurée";
     if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown" || dailyEnergy === null)) {
       dailyEnergy = this._getState(this._getEntityId("energie_24h_estimee"));
@@ -245,7 +323,7 @@ class HomePerformanceCard extends LitElement {
     const indoorTemp = demo ? demo.indoor_temp : this._getAttribute(deltaTEntityId, "indoor_temp");
     const outdoorTemp = demo ? demo.outdoor_temp : this._getAttribute(deltaTEntityId, "outdoor_temp");
 
-    const insulationData = this._getInsulationData(insulation);
+    const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const perfData = this._getPerformanceData(performance);
 
     return html`

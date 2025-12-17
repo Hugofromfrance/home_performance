@@ -7,10 +7,12 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback, Event
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+import time
 
 from .const import (
     DOMAIN,
@@ -81,13 +83,30 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_heating_state: bool | None = None
         self._last_update: float | None = None
 
-        # Energy integration from power sensor
+        # Energy integration from power sensor (measured)
         self._last_power_update: float | None = None
         self._last_power_value: float | None = None
         self._measured_energy_total_kwh: float = 0.0
         self._measured_energy_daily_kwh: float = 0.0
+        
+        # Daily counters (reset at midnight) - for minuit-minuit consistency
         self._last_daily_reset_date: str | None = None
         self._daily_reset_datetime: Any = None  # datetime for utility meter compatibility
+        self._estimated_energy_daily_kwh: float = 0.0  # Estimated energy since midnight
+        self._heating_seconds_daily: float = 0.0  # Heating time since midnight
+        self._delta_t_sum_daily: float = 0.0  # Sum of ΔT for daily average
+        self._delta_t_count_daily: int = 0  # Count of samples for daily average
+
+        # Real-time heating tracking (event-driven for precision)
+        self._heating_start_time: float | None = None  # Timestamp when heating started
+        self._is_heating_realtime: bool = False  # Current real-time heating state
+        self._power_listener_unsub: Any = None  # Listener unsubscribe callback
+
+        # Real-time window detection (event-driven for fast response)
+        self._temp_listener_unsub: Any = None  # Temperature listener unsubscribe
+        self._last_temp_value: float | None = None  # Last temperature value
+        self._last_temp_time: float | None = None  # Last temperature timestamp
+        self._window_open_realtime: bool = False  # Real-time window open state
 
         # Persistence
         self._store = Store(
@@ -108,7 +127,160 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_config_entry_first_refresh(self) -> None:
         """Load persisted data before first refresh."""
         await self._async_load_data()
+        self._setup_power_listener()
+        self._setup_temperature_listener()
         await super().async_config_entry_first_refresh()
+
+    def _setup_power_listener(self) -> None:
+        """Set up real-time listener for power sensor changes."""
+        if not self.power_sensor:
+            _LOGGER.debug("[%s] No power sensor configured, skipping real-time listener", self.zone_name)
+            return
+        
+        @callback
+        def _async_power_state_changed(event: Event) -> None:
+            """Handle power sensor state changes in real-time."""
+            new_state = event.data.get("new_state")
+            old_state = event.data.get("old_state")
+            
+            if new_state is None:
+                return
+            
+            # Parse power values
+            try:
+                new_power = float(new_state.state) if new_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN) else 0.0
+            except (ValueError, TypeError):
+                new_power = 0.0
+            
+            try:
+                old_power = float(old_state.state) if old_state and old_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN) else 0.0
+            except (ValueError, TypeError):
+                old_power = 0.0
+            
+            now = time.time()
+            is_heating_now = new_power > 50
+            was_heating = old_power > 50
+            
+            _LOGGER.debug(
+                "[%s] Power sensor changed: %.1fW -> %.1fW (heating: %s -> %s)",
+                self.zone_name, old_power, new_power, was_heating, is_heating_now
+            )
+            
+            # Heating started
+            if is_heating_now and not self._is_heating_realtime:
+                self._heating_start_time = now
+                self._is_heating_realtime = True
+                _LOGGER.info("[%s] 🔥 Heating started (real-time detection)", self.zone_name)
+            
+            # Heating stopped
+            elif not is_heating_now and self._is_heating_realtime:
+                if self._heating_start_time is not None:
+                    duration = now - self._heating_start_time
+                    self._heating_seconds_daily += duration
+                    # Also update estimated energy
+                    energy_kwh = (self.heater_power / 1000) * (duration / 3600)
+                    self._estimated_energy_daily_kwh += energy_kwh
+                    _LOGGER.info(
+                        "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min), Energy: %.4f kWh",
+                        self.zone_name, duration, duration / 60, energy_kwh
+                    )
+                self._heating_start_time = None
+                self._is_heating_realtime = False
+        
+        # Subscribe to power sensor state changes
+        self._power_listener_unsub = async_track_state_change_event(
+            self.hass,
+            [self.power_sensor],
+            _async_power_state_changed,
+        )
+        _LOGGER.info("[%s] ✅ Real-time power listener set up for %s", self.zone_name, self.power_sensor)
+
+    def _setup_temperature_listener(self) -> None:
+        """Set up real-time listener for indoor temperature changes (window detection)."""
+        
+        @callback
+        def _async_temp_state_changed(event: Event) -> None:
+            """Handle indoor temperature changes in real-time for window detection."""
+            new_state = event.data.get("new_state")
+            
+            if new_state is None or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                return
+            
+            try:
+                new_temp = float(new_state.state)
+            except (ValueError, TypeError):
+                return
+            
+            now = time.time()
+            
+            # Check for rapid temperature drop (window open detection)
+            if self._last_temp_value is not None and self._last_temp_time is not None:
+                time_delta = now - self._last_temp_time
+                if time_delta > 0:
+                    temp_change = new_temp - self._last_temp_value
+                    rate_per_minute = (temp_change / time_delta) * 60
+                    
+                    # Window open: rapid temperature drop
+                    # - More than 0.5°C/min drop while heating
+                    # - More than 1°C/min drop regardless of heating
+                    was_window_open = self._window_open_realtime
+                    
+                    if self._is_heating_realtime and rate_per_minute < -0.5:
+                        self._window_open_realtime = True
+                        if not was_window_open:
+                            _LOGGER.warning(
+                                "[%s] 🪟 Window OPEN detected (real-time)! Temp drop: %.2f°C/min while heating",
+                                self.zone_name, abs(rate_per_minute)
+                            )
+                    elif rate_per_minute < -1.0:
+                        self._window_open_realtime = True
+                        if not was_window_open:
+                            _LOGGER.warning(
+                                "[%s] 🪟 Window OPEN detected (real-time)! Rapid temp drop: %.2f°C/min",
+                                self.zone_name, abs(rate_per_minute)
+                            )
+                    elif rate_per_minute > 0.1:
+                        # Temperature rising = window likely closed
+                        if was_window_open:
+                            _LOGGER.info("[%s] 🪟 Window CLOSED (temperature rising)", self.zone_name)
+                        self._window_open_realtime = False
+            
+            # Update tracking values
+            self._last_temp_value = new_temp
+            self._last_temp_time = now
+        
+        # Subscribe to indoor temperature sensor changes
+        self._temp_listener_unsub = async_track_state_change_event(
+            self.hass,
+            [self.indoor_temp_sensor],
+            _async_temp_state_changed,
+        )
+        _LOGGER.info("[%s] ✅ Real-time temperature listener set up for %s", self.zone_name, self.indoor_temp_sensor)
+
+    async def async_shutdown(self) -> None:
+        """Clean up when coordinator is shut down."""
+        # Unsubscribe from power sensor listener
+        if self._power_listener_unsub:
+            self._power_listener_unsub()
+            self._power_listener_unsub = None
+            _LOGGER.debug("[%s] Power listener unsubscribed", self.zone_name)
+        
+        # Unsubscribe from temperature sensor listener
+        if self._temp_listener_unsub:
+            self._temp_listener_unsub()
+            self._temp_listener_unsub = None
+            _LOGGER.debug("[%s] Temperature listener unsubscribed", self.zone_name)
+        
+        # Finalize any ongoing heating session
+        if self._is_heating_realtime and self._heating_start_time is not None:
+            duration = time.time() - self._heating_start_time
+            self._heating_seconds_daily += duration
+            energy_kwh = (self.heater_power / 1000) * (duration / 3600)
+            self._estimated_energy_daily_kwh += energy_kwh
+            _LOGGER.info("[%s] Finalized heating session on shutdown: %.1fs", self.zone_name, duration)
+        
+        # Save data before shutdown
+        await self.async_save_data(force=True)
 
     async def _async_load_data(self) -> None:
         """Load persisted data from storage."""
@@ -140,6 +312,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if "last_power_value" in data:
                     self._last_power_value = data["last_power_value"]
                 
+                # Restore daily counters (minuit-minuit)
+                if "estimated_energy_daily_kwh" in data:
+                    self._estimated_energy_daily_kwh = data["estimated_energy_daily_kwh"]
+                if "heating_seconds_daily" in data:
+                    self._heating_seconds_daily = data["heating_seconds_daily"]
+                if "delta_t_sum_daily" in data:
+                    self._delta_t_sum_daily = data["delta_t_sum_daily"]
+                if "delta_t_count_daily" in data:
+                    self._delta_t_count_daily = data["delta_t_count_daily"]
+                
                 self._data_loaded = True
                 _LOGGER.info(
                     "Restored data for %s: %.1fh of thermal data, %.3f kWh total energy",
@@ -163,6 +345,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "last_indoor_temp": self._last_indoor_temp,
                 "last_heating_state": self._last_heating_state,
                 "last_power_value": self._last_power_value,
+                # Daily counters (minuit-minuit)
+                "estimated_energy_daily_kwh": self._estimated_energy_daily_kwh,
+                "heating_seconds_daily": self._heating_seconds_daily,
+                "delta_t_sum_daily": self._delta_t_sum_daily,
+                "delta_t_count_daily": self._delta_t_count_daily,
             }
             await self._store.async_save(data)
             self._last_save_time = dt_util.utcnow().timestamp()
@@ -184,16 +371,21 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             outdoor_temp = self._get_temperature(self.outdoor_temp_sensor)
             heating_on = self._get_heating_state()
 
-            # If sensors not available yet, return empty data
+            # If sensors not available yet, return restored data (not empty!)
             if indoor_temp is None or outdoor_temp is None:
-                _LOGGER.warning(
-                    "Temperature sensors not available yet, skipping update"
+                _LOGGER.debug(
+                    "[%s] Temperature sensors not available yet, returning restored data",
+                    self.zone_name
                 )
-                return self._get_empty_data()
+                return self._get_restored_data()
 
             now = dt_util.utcnow().timestamp()
+            now_dt = dt_util.now()
 
-            # Create data point and add to model
+            # Check for daily reset (midnight)
+            self._check_daily_reset(now_dt)
+
+            # Create data point and add to model (for K coefficient - still uses rolling 24h)
             data_point = ThermalDataPoint(
                 timestamp=now,
                 indoor_temp=indoor_temp,
@@ -202,15 +394,19 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self.thermal_model.add_data_point(data_point)
 
-            # Detect window open (rapid temperature drop)
-            window_open = self._detect_window_open(indoor_temp, now)
+            # Detect window open (combine real-time detection with polling fallback)
+            window_open = self._window_open_realtime or self._detect_window_open(indoor_temp, now)
+
+            # Update daily counters (minuit-minuit)
+            delta_t = indoor_temp - outdoor_temp
+            self._update_daily_counters(now, heating_on, delta_t)
 
             # Update tracking values
             self._last_indoor_temp = indoor_temp
             self._last_heating_state = heating_on
             self._last_update = now
 
-            # Get analysis from model
+            # Get analysis from model (for K coefficient - rolling 24h)
             analysis = self.thermal_model.get_analysis()
 
             # Update measured energy from power sensor (if configured)
@@ -218,6 +414,18 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Get external energy sensor value (if configured)
             external_energy = self._get_external_energy()
+
+            # Calculate daily values (minuit-minuit)
+            # Include ongoing heating session in the total
+            heating_seconds = self._heating_seconds_daily
+            if self._is_heating_realtime and self._heating_start_time is not None:
+                # Add time from current ongoing heating session
+                heating_seconds += (now - self._heating_start_time)
+            heating_hours_daily = heating_seconds / 3600
+            avg_delta_t_daily = (
+                self._delta_t_sum_daily / self._delta_t_count_daily 
+                if self._delta_t_count_daily > 0 else delta_t
+            )
 
             # Periodically save data to persistent storage
             await self._async_maybe_save()
@@ -227,17 +435,17 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "indoor_temp": indoor_temp,
                 "outdoor_temp": outdoor_temp,
                 "heating_on": heating_on,
-                "delta_t": indoor_temp - outdoor_temp,
+                "delta_t": delta_t,
                 "window_open": window_open,
-                # Calculated coefficients
+                # Calculated coefficients (rolling 24h for accuracy)
                 "k_coefficient": analysis.get("k_coefficient"),
                 "k_per_m2": analysis.get("k_per_m2"),
                 "k_per_m3": analysis.get("k_per_m3"),
-                # Period data
-                "heating_hours": analysis.get("heating_hours"),
-                "heating_ratio": analysis.get("heating_ratio"),
-                "avg_delta_t": analysis.get("avg_delta_t"),
-                "daily_energy_kwh": analysis.get("daily_energy_kwh"),
+                # Daily data (minuit-minuit)
+                "heating_hours": heating_hours_daily,
+                "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
+                "avg_delta_t": avg_delta_t_daily,
+                "daily_energy_kwh": self._estimated_energy_daily_kwh,
                 # Cumulative energy (for Energy Dashboard)
                 "total_energy_kwh": analysis.get("total_energy_kwh"),
                 # Measured energy (from power sensor)
@@ -258,8 +466,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heater_power": self.heater_power,
                 "surface": self.surface,
                 "volume": self.volume,
-                # Insulation rating
+                # Insulation rating (with season/inference support)
                 "insulation_rating": self.thermal_model.get_insulation_rating(),
+                "insulation_status": self.thermal_model.get_insulation_status(),
+                "last_valid_k": self.thermal_model.last_valid_k,
             }
 
         except Exception as err:
@@ -271,9 +481,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return {
             "indoor_temp": None,
             "outdoor_temp": None,
-            "heating_on": False,
+            "heating_on": self._is_heating_realtime,
             "delta_t": None,
-            "window_open": False,
+            "window_open": self._window_open_realtime,
             "k_coefficient": None,
             "k_per_m2": None,
             "k_per_m3": None,
@@ -292,7 +502,110 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "surface": self.surface,
             "volume": self.volume,
             "insulation_rating": None,
+            "insulation_status": {
+                "status": "waiting_data",
+                "rating": None,
+                "k_value": None,
+                "k_source": None,
+                "season": "heating_season",
+                "message": "Collecte de données en cours",
+                "temp_stable": None,
+            },
+            "last_valid_k": None,
         }
+
+    def _get_restored_data(self) -> dict[str, Any]:
+        """Return data from restored thermal model (when sensors not yet available)."""
+        analysis = self.thermal_model.get_analysis()
+        
+        # Calculate restored daily values (minuit-minuit)
+        # Include ongoing heating session in the total
+        heating_seconds = self._heating_seconds_daily
+        if self._is_heating_realtime and self._heating_start_time is not None:
+            heating_seconds += (time.time() - self._heating_start_time)
+        heating_hours_daily = heating_seconds / 3600
+        avg_delta_t_daily = (
+            self._delta_t_sum_daily / self._delta_t_count_daily 
+            if self._delta_t_count_daily > 0 else None
+        )
+        
+        return {
+            # Current values - not available yet
+            "indoor_temp": None,
+            "outdoor_temp": None,
+            "heating_on": self._is_heating_realtime,
+            "delta_t": None,
+            "window_open": self._window_open_realtime,
+            # Restored coefficients from model (rolling 24h)
+            "k_coefficient": analysis.get("k_coefficient"),
+            "k_per_m2": analysis.get("k_per_m2"),
+            "k_per_m3": analysis.get("k_per_m3"),
+            # Restored daily data (minuit-minuit)
+            "heating_hours": heating_hours_daily,
+            "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
+            "avg_delta_t": avg_delta_t_daily,
+            "daily_energy_kwh": self._estimated_energy_daily_kwh,
+            "total_energy_kwh": analysis.get("total_energy_kwh"),
+            # Measured energy
+            "measured_power_w": None,
+            "measured_energy_daily_kwh": self._measured_energy_daily_kwh,
+            "measured_energy_total_kwh": self._measured_energy_total_kwh,
+            "daily_reset_datetime": self._daily_reset_datetime,
+            "power_sensor_configured": self.power_sensor is not None,
+            "external_energy_daily_kwh": None,
+            "energy_sensor_configured": self.energy_sensor is not None,
+            # Restored status
+            "data_hours": analysis.get("data_hours"),
+            "samples_count": analysis.get("samples_count"),
+            "data_ready": analysis.get("data_ready"),
+            "storage_loaded": self._data_loaded,
+            # Configuration
+            "heater_power": self.heater_power,
+            "surface": self.surface,
+            "volume": self.volume,
+            # Restored insulation rating (with season/inference support)
+            "insulation_rating": self.thermal_model.get_insulation_rating(),
+            "insulation_status": self.thermal_model.get_insulation_status(),
+            "last_valid_k": self.thermal_model.last_valid_k,
+        }
+
+    def _check_daily_reset(self, now_dt) -> None:
+        """Check and perform daily reset at midnight."""
+        today = now_dt.strftime("%Y-%m-%d")
+        if self._last_daily_reset_date != today:
+            _LOGGER.debug(
+                "[%s] Daily reset (new day: %s)",
+                self.zone_name, today
+            )
+            # Reset all daily counters
+            self._measured_energy_daily_kwh = 0.0
+            self._estimated_energy_daily_kwh = 0.0
+            self._heating_seconds_daily = 0.0
+            self._delta_t_sum_daily = 0.0
+            self._delta_t_count_daily = 0
+            self._last_daily_reset_date = today
+            self._daily_reset_datetime = now_dt.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+
+    def _update_daily_counters(self, now: float, heating_on: bool, delta_t: float) -> None:
+        """Update daily counters (minuit-minuit)."""
+        if self._last_update is not None:
+            time_delta_seconds = now - self._last_update
+            time_delta_hours = time_delta_seconds / 3600
+            
+            # Update heating time and energy ONLY if no power_sensor (no real-time listener)
+            # When power_sensor is configured, the real-time listener handles this more precisely
+            if not self.power_sensor:
+                if self._last_heating_state:
+                    self._heating_seconds_daily += time_delta_seconds
+                    # Update estimated energy (power * time)
+                    energy_kwh = (self.heater_power / 1000) * time_delta_hours
+                    self._estimated_energy_daily_kwh += energy_kwh
+        
+        # Update ΔT average (always done via polling)
+        self._delta_t_sum_daily += delta_t
+        self._delta_t_count_daily += 1
 
     def _get_temperature(self, entity_id: str) -> float | None:
         """Get temperature from sensor entity."""

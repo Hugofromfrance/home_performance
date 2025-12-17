@@ -27,8 +27,23 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_schema_step_zone(hass: HomeAssistant) -> vol.Schema:
+def get_last_outdoor_temp_sensor(hass: HomeAssistant) -> str | None:
+    """Get outdoor temp sensor from existing zones (for pre-filling)."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        outdoor_sensor = entry.data.get(CONF_OUTDOOR_TEMP_SENSOR)
+        if outdoor_sensor:
+            return outdoor_sensor
+    return None
+
+
+def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None) -> vol.Schema:
     """Return schema for zone configuration step."""
+    # Build outdoor temp field with or without default
+    if default_outdoor:
+        outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR, default=default_outdoor)
+    else:
+        outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR)
+    
     return vol.Schema(
         {
             vol.Required(CONF_ZONE_NAME): selector.TextSelector(
@@ -37,7 +52,7 @@ def get_schema_step_zone(hass: HomeAssistant) -> vol.Schema:
             vol.Required(CONF_INDOOR_TEMP_SENSOR): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
-            vol.Required(CONF_OUTDOOR_TEMP_SENSOR): selector.EntitySelector(
+            outdoor_field: selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
             vol.Required(CONF_HEATING_ENTITY): selector.EntitySelector(
@@ -141,9 +156,12 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data.update(user_input)
                 return await self.async_step_dimensions()
 
+        # Get outdoor temp sensor from existing zones (for pre-filling)
+        default_outdoor = get_last_outdoor_temp_sensor(self.hass)
+
         return self.async_show_form(
             step_id="user",
-            data_schema=get_schema_step_zone(self.hass),
+            data_schema=get_schema_step_zone(self.hass, default_outdoor),
             errors=errors,
             description_placeholders={"name": "Home Performance"},
         )
