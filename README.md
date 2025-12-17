@@ -30,6 +30,25 @@ K (W/°C) = Énergie fournie / (ΔT × durée)
 
 → Cette pièce perd 18W par degré d'écart avec l'extérieur.
 
+### Approche empirique vs théorique
+
+Cette intégration utilise une **mesure empirique** des performances thermiques, contrairement aux méthodes théoriques :
+
+| | Approche théorique (DPE, RT2012...) | Approche empirique (Home Performance) |
+|--|-------------------------------------|---------------------------------------|
+| **Méthode** | Calcul basé sur les caractéristiques des matériaux (coefficients U, R) | Observation des données réelles de chauffage |
+| **Données** | Specs fabricant, normes, hypothèses | Énergie consommée, températures mesurées |
+| **Inclut** | Ce qui est documenté | **Tout** : ponts thermiques, infiltrations, défauts de pose... |
+| **Précision** | Théorique (peut différer du réel) | Reflète la performance réelle in-situ |
+
+> **Exemple** : Une fenêtre certifiée Uw=1,1 W/(m²·K) peut en réalité avoir des performances dégradées si mal posée ou avec des joints usés. La mesure empirique capture ces imperfections.
+
+#### Différence avec les coefficients U/Uw/Ug
+
+Les coefficients **U** (anciennement "K" dans la norme) mesurent la transmission thermique d'une **paroi spécifique** (fenêtre, mur) en W/(m²·K). Ils sont mesurés en laboratoire et permettent de comparer des produits.
+
+Le **coefficient K** de Home Performance mesure les **déperditions globales** d'une pièce entière en W/°C. C'est équivalent au coefficient **G** (ou GV) utilisé en thermique du bâtiment, mais mesuré empiriquement plutôt que calculé.
+
 ## 📊 Capteurs créés (par zone)
 
 ### Coefficients thermiques
@@ -41,21 +60,14 @@ K (W/°C) = Énergie fournie / (ΔT × durée)
 | **K par m³** | Normalisé par volume - meilleur si hauteurs différentes |
 | **Note d'isolation** | Qualitative (excellent → très mal isolé) |
 
-### Énergie (estimée - toujours disponible)
+### Énergie journalière
 
 | Capteur | Description |
 |---------|-------------|
-| **Énergie totale (estimée)** | kWh cumulés basés sur puissance déclarée × temps ON |
-| **Énergie 24h (estimée)** | kWh sur fenêtre glissante 24h |
+| **Énergie 24h (estimée)** | kWh sur fenêtre glissante 24h (puissance déclarée × temps ON) |
+| **Énergie jour (mesurée)** | Compteur kWh journalier réel (si capteur de puissance ou compteur externe configuré) |
 
-### Énergie (mesurée - si compteur externe ou capteur de puissance configuré)
-
-| Capteur | Description |
-|---------|-------------|
-| **Énergie jour (mesurée)** | Compteur kWh journalier (priorité : compteur externe > calcul intégré) |
-| **Énergie totale (mesurée)** | kWh cumulés (compatible Dashboard Énergie HA) |
-
-L'attribut `source` indique l'origine des données : `external` (compteur HA) ou `integrated` (calcul depuis puissance).
+> **Note** : L'énergie mesurée est prioritaire sur l'estimée dans la carte. L'attribut `source` indique l'origine : `external` (compteur HA) ou `integrated` (calcul depuis capteur de puissance).
 
 ### Performance & Confort
 
@@ -261,10 +273,31 @@ Le capteur de performance compare votre consommation à la moyenne nationale fra
 | 🟡 **Standard** | Dans la moyenne |
 | 🟠 **À optimiser** | Au-dessus de la moyenne |
 
-Seuils basés sur la puissance du radiateur :
-- 1000W → Excellent < 4 kWh/jour, Standard < 6 kWh/jour
-- 1500W → Excellent < 6 kWh/jour, Standard < 9 kWh/jour
-- 2000W → Excellent < 8 kWh/jour, Standard < 12 kWh/jour
+### Formule de calcul
+
+Les seuils sont calculés dynamiquement selon la puissance du radiateur :
+
+```
+Excellent   : < (Puissance_W / 1000) × 4 kWh/jour
+Standard    : < (Puissance_W / 1000) × 6 kWh/jour
+À optimiser : au-delà
+```
+
+### Tableau des seuils par puissance
+
+| Puissance | 🟢 Excellent | 🟡 Standard | 🟠 À optimiser |
+|-----------|--------------|-------------|----------------|
+| 500W      | < 2.0 kWh    | < 3.0 kWh   | > 3.0 kWh      |
+| 750W      | < 3.0 kWh    | < 4.5 kWh   | > 4.5 kWh      |
+| 1000W     | < 4.0 kWh    | < 6.0 kWh   | > 6.0 kWh      |
+| 1200W     | < 4.8 kWh    | < 7.2 kWh   | > 7.2 kWh      |
+| 1500W     | < 6.0 kWh    | < 9.0 kWh   | > 9.0 kWh      |
+| 1800W     | < 7.2 kWh    | < 10.8 kWh  | > 10.8 kWh     |
+| 2000W     | < 8.0 kWh    | < 12.0 kWh  | > 12.0 kWh     |
+| 2500W     | < 10.0 kWh   | < 15.0 kWh  | > 15.0 kWh     |
+| 3000W     | < 12.0 kWh   | < 18.0 kWh  | > 18.0 kWh     |
+
+> **Note** : Ces seuils sont calculés automatiquement pour **toute puissance** saisie. Les valeurs ci-dessus correspondent aux puissances de radiateurs les plus courantes.
 
 ## 🗺️ Roadmap
 

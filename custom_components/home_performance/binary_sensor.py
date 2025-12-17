@@ -125,10 +125,19 @@ class DataReadySensor(HomePerformanceBaseBinarySensor):
         """Return extra state attributes."""
         if self.coordinator.data:
             data_hours = self.coordinator.data.get("data_hours", 0)
+            storage_loaded = self.coordinator.data.get("storage_loaded", False)
             return {
                 "data_hours": round(data_hours, 1) if data_hours else 0,
                 "min_hours_required": MIN_DATA_HOURS,
                 "samples_count": self.coordinator.data.get("samples_count", 0),
+                "storage_loaded": storage_loaded,
                 "description": f"Nécessite au moins {MIN_DATA_HOURS}h de données",
             }
-        return {}
+        # Storage not yet loaded - return loading state
+        return {
+            "data_hours": 0,
+            "min_hours_required": MIN_DATA_HOURS,
+            "samples_count": 0,
+            "storage_loaded": False,
+            "description": "Chargement des données...",
+        }

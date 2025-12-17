@@ -104,9 +104,9 @@ async def async_setup_entry(
         # Normalized coefficients (only if surface/volume configured)
         KPerM2Sensor(coordinator, zone_name),
         KPerM3Sensor(coordinator, zone_name),
-        # Energy and usage (estimated from heater power)
-        TotalEnergySensor(coordinator, zone_name),  # Cumulative - Energy Dashboard compatible
+        # Energy (estimated from heater power)
         DailyEnergySensor(coordinator, zone_name),
+        # Usage
         HeatingTimeSensor(coordinator, zone_name),
         HeatingRatioSensor(coordinator, zone_name),
         # Performance
@@ -120,12 +120,9 @@ async def async_setup_entry(
         InsulationRatingSensor(coordinator, zone_name),
     ]
 
-    # Add measured energy sensors if power sensor or energy sensor is configured
+    # Add measured daily energy sensor if power sensor or energy sensor is configured
     if coordinator.power_sensor or coordinator.energy_sensor:
-        entities.extend([
-            MeasuredEnergyDailySensor(coordinator, zone_name),
-            MeasuredEnergyTotalSensor(coordinator, zone_name),
-        ])
+        entities.append(MeasuredEnergyDailySensor(coordinator, zone_name))
 
     async_add_entities(entities)
 
@@ -255,40 +252,6 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
         return {
             "description": "K normalisé par volume - meilleur pour comparer des pièces de hauteurs différentes",
             "volume_m3": data.get("volume"),
-        }
-
-
-class TotalEnergySensor(HomePerformanceBaseSensor):
-    """Sensor for total cumulative energy (estimated from declared power)."""
-
-    _attr_native_unit_of_measurement = "kWh"
-    _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_icon = "mdi:lightning-bolt-outline"
-
-    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, zone_name, "total_energy")
-        self._attr_name = "Énergie totale (estimée)"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return total cumulative energy in kWh."""
-        if self.coordinator.data:
-            value = self.coordinator.data.get("total_energy_kwh")
-            if value is not None:
-                return round(value, 3)
-        return 0.0
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
-        data = self.coordinator.data or {}
-        return {
-            "description": "Énergie estimée (puissance déclarée × temps ON)",
-            "heater_power_w": data.get("heater_power"),
-            "calculation": "estimation",
-            "note": "Pour une mesure précise, configurez un capteur de puissance",
         }
 
 
@@ -762,36 +725,3 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
         }
 
 
-class MeasuredEnergyTotalSensor(HomePerformanceBaseSensor):
-    """Sensor for total measured energy - compatible with Energy Dashboard."""
-
-    _attr_native_unit_of_measurement = "kWh"
-    _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_icon = "mdi:counter"
-
-    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, zone_name, "measured_energy_total")
-        self._attr_name = "Énergie totale (mesurée)"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return total measured energy in kWh."""
-        if self.coordinator.data:
-            value = self.coordinator.data.get("measured_energy_total_kwh")
-            if value is not None:
-                return round(value, 3)
-        return 0.0
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
-        data = self.coordinator.data or {}
-        return {
-            "description": "Énergie cumulée mesurée (compatible Dashboard Énergie)",
-            "power_sensor": self.coordinator.power_sensor,
-            "current_power_w": data.get("measured_power_w"),
-            "calculation": "mesure_reelle",
-            "note": "Utilisable dans Paramètres → Tableaux de bord → Énergie",
-        }

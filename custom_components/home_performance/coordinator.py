@@ -56,8 +56,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
 
         _LOGGER.info(
-            "HomePerformance coordinator initialized for %s: power_sensor=%s, energy_sensor=%s",
-            self.zone_name, self.power_sensor, self.energy_sensor
+            "HomePerformance coordinator initialized for zone '%s': "
+            "indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
+            "power_sensor=%s, energy_sensor=%s, heater_power=%sW",
+            self.zone_name, 
+            self.indoor_temp_sensor,
+            self.outdoor_temp_sensor,
+            self.heating_entity,
+            self.power_sensor, 
+            self.energy_sensor,
+            self.heater_power
         )
 
         # Thermal model
@@ -245,6 +253,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "data_hours": analysis.get("data_hours"),
                 "samples_count": analysis.get("samples_count"),
                 "data_ready": analysis.get("data_ready"),
+                "storage_loaded": self._data_loaded,
                 # Configuration
                 "heater_power": self.heater_power,
                 "surface": self.surface,
@@ -278,6 +287,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "data_hours": 0,
             "samples_count": 0,
             "data_ready": False,
+            "storage_loaded": self._data_loaded,
             "heater_power": self.heater_power,
             "surface": self.surface,
             "volume": self.volume,
@@ -325,38 +335,49 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     power_w = float(power_state.state)
                     is_heating = power_w > 50
                     _LOGGER.debug(
-                        "Heating detection via power sensor %s: %.1fW -> heating=%s",
-                        self.power_sensor, power_w, is_heating
+                        "[%s] Heating detection via power sensor %s: %.1fW -> heating=%s",
+                        self.zone_name, self.power_sensor, power_w, is_heating
                     )
                     return is_heating
                 except (ValueError, TypeError) as err:
-                    _LOGGER.warning("Could not parse power sensor value: %s", err)
+                    _LOGGER.warning("[%s] Could not parse power sensor value: %s", self.zone_name, err)
             
             # Power sensor configured but unavailable -> assume not heating
             # DO NOT fallback to switch (it's always ON for thermostatic radiators)
             _LOGGER.debug(
-                "Power sensor %s unavailable, assuming not heating (no fallback to switch)",
-                self.power_sensor
+                "[%s] Power sensor %s unavailable (state=%s), assuming not heating",
+                self.zone_name, self.power_sensor, power_state.state if power_state else "None"
             )
             return False
         
         # No power sensor configured -> use climate/switch entity state
-        _LOGGER.debug("No power sensor configured, using heating entity state")
+        _LOGGER.debug("[%s] No power sensor, using heating entity state", self.zone_name)
         state = self.hass.states.get(self.heating_entity)
         if state is None:
+            _LOGGER.warning("[%s] Heating entity %s not found", self.zone_name, self.heating_entity)
             return False
 
+        # Get domain from entity_id
+        domain = self.heating_entity.split(".")[0]
+
         # Handle climate entities
-        if state.domain == "climate":
+        if domain == "climate":
             hvac_action = state.attributes.get("hvac_action")
+            hvac_mode = state.state  # heat, cool, heat_cool, off, etc.
+            _LOGGER.debug(
+                "[%s] Heating via climate %s: hvac_mode=%s, hvac_action=%s",
+                self.zone_name, self.heating_entity, hvac_mode, hvac_action
+            )
+            # Check hvac_action first (most reliable - indicates actual heating activity)
             if hvac_action:
-                return hvac_action == "heating"
-            return state.state not in ("off", STATE_UNAVAILABLE, STATE_UNKNOWN)
+                return hvac_action in ("heating", "heat")
+            # Fallback to hvac_mode (less reliable - only indicates mode, not activity)
+            return hvac_mode in ("heat", "heat_cool") and hvac_mode not in ("off", STATE_UNAVAILABLE, STATE_UNKNOWN)
 
         # Handle switch/input_boolean
         is_on = state.state == STATE_ON
-        _LOGGER.debug("Heating detection via switch %s: state=%s -> heating=%s",
-                      self.heating_entity, state.state, is_on)
+        _LOGGER.debug("[%s] Heating via switch %s: state=%s -> heating=%s",
+                      self.zone_name, self.heating_entity, state.state, is_on)
         return is_on
 
     def _detect_window_open(self, current_temp: float, now: float) -> bool:

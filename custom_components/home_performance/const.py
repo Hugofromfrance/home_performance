@@ -19,7 +19,7 @@ AGGREGATION_PERIOD_HOURS = 24  # Période d'agrégation pour le calcul de K
 
 # Thresholds
 MIN_DELTA_T = 5.0  # ΔT minimum pour calcul fiable (°C)
-MIN_HEATING_TIME_HOURS = 1.0  # Temps de chauffe minimum sur la période
+MIN_HEATING_TIME_HOURS = 0.5  # Temps de chauffe minimum sur la période (30 min)
 MIN_DATA_HOURS = 12  # Heures minimum de données pour premier calcul
 
 # Sensor types - Thermal

@@ -70,6 +70,13 @@ class HomePerformanceCard extends LitElement {
     return this._getState(entityId) === "on";
   }
 
+  _isStorageLoaded() {
+    if (this.config.demo) return true;
+    const entityId = this._getBinaryEntityId("donnees_pretes");
+    const storageLoaded = this._getAttribute(entityId, "storage_loaded");
+    return storageLoaded === true;
+  }
+
   _getProgress() {
     if (this.config.demo) return 100;
     const entityId = this._getEntityId("progression_analyse");
@@ -91,6 +98,10 @@ class HomePerformanceCard extends LitElement {
       poor: { label: "Faible", color: "#f97316", icon: "mdi:shield-alert", desc: "À améliorer" },
       very_poor: { label: "Critique", color: "#ef4444", icon: "mdi:shield-off", desc: "Isolation insuffisante" },
     };
+    // Handle unknown/unavailable states
+    if (!rating || rating === "unknown" || rating === "unavailable") {
+      return { label: "En attente", color: "#6b7280", icon: "mdi:shield-outline", desc: "Chauffe nécessaire" };
+    }
     return data[rating] || { label: rating, color: "#6b7280", icon: "mdi:shield-outline", desc: "" };
   }
 
@@ -101,6 +112,11 @@ class HomePerformanceCard extends LitElement {
       to_optimize: { label: "À optimiser", color: "#f97316", icon: "mdi:trending-up", badge: "+20%" },
     };
     return data[level] || { label: level, color: "#6b7280", icon: "mdi:help", badge: "?" };
+  }
+
+  // Check if value is valid (not null, undefined, unavailable, unknown)
+  _isValidValue(value) {
+    return value !== null && value !== undefined && value !== "unavailable" && value !== "unknown";
   }
 
   // Format energy values to 3 decimals
@@ -133,6 +149,7 @@ class HomePerformanceCard extends LitElement {
       return html`<ha-card>Chargement...</ha-card>`;
     }
 
+    const storageLoaded = this._isStorageLoaded();
     const dataReady = this._isDataReady();
     const progress = this._getProgress();
 
@@ -154,9 +171,25 @@ class HomePerformanceCard extends LitElement {
 
         <!-- Content -->
         <div class="content">
-          ${!dataReady ? this._renderAnalyzing(progress) : this._renderData()}
+          ${!storageLoaded
+        ? this._renderLoading()
+        : (!dataReady ? this._renderAnalyzing(progress) : this._renderData())}
         </div>
       </ha-card>
+    `;
+  }
+
+  _renderLoading() {
+    return html`
+      <div class="analyzing">
+        <div class="loading-spinner">
+          <ha-icon icon="mdi:database-sync"></ha-icon>
+        </div>
+        <div class="analyzing-title" style="margin-top: 12px;">Chargement des données...</div>
+        <div class="analyzing-info" style="margin-top: 8px;">
+          Restauration des données depuis le stockage persistant.
+        </div>
+      </div>
     `;
   }
 
@@ -193,10 +226,11 @@ class HomePerformanceCard extends LitElement {
     const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
     const performance = demo ? demo.performance : this._getState(this._getEntityId("performance_energetique"));
 
-    let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_mesuree_jour"));
+    // Priority: measured energy (if available) > estimated energy
+    let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_jour_mesuree"));
     let energyType = "mesurée";
-    if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown")) {
-      dailyEnergy = this._getState(this._getEntityId("energie_journaliere"));
+    if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown" || dailyEnergy === null)) {
+      dailyEnergy = this._getState(this._getEntityId("energie_24h_estimee"));
       energyType = "estimée";
     }
     // Format energy to 3 decimals
@@ -269,10 +303,10 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:heat-wave"></ha-icon>
               <span>Coefficient K</span>
             </div>
-            <div class="metric-value">${kCoef} W/°C</div>
-            ${kPerM3 !== "unavailable" && kPerM3 !== "unknown"
+            <div class="metric-value">${this._isValidValue(kCoef) ? `${kCoef} W/°C` : "--"}</div>
+            ${this._isValidValue(kPerM3)
         ? html`<div class="metric-sub">${kPerM3} W/(°C·m³)</div>`
-        : ""}
+        : html`<div class="metric-sub waiting">En attente de chauffe</div>`}
           </div>
 
           <div class="metric">
@@ -280,7 +314,7 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:lightning-bolt"></ha-icon>
               <span>Énergie/jour</span>
             </div>
-            <div class="metric-value">${dailyEnergy} kWh</div>
+            <div class="metric-value">${this._isValidValue(dailyEnergy) ? `${dailyEnergy} kWh` : "--"}</div>
             <div class="metric-unit"><span class="metric-type">(${energyType})</span></div>
           </div>
 
@@ -289,9 +323,9 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:radiator"></ha-icon>
               <span>Temps chauffe</span>
             </div>
-            <div class="metric-value">${heatingTime}</div>
+            <div class="metric-value">${this._isValidValue(heatingTime) ? heatingTime : "0min"}</div>
             <div class="metric-unit">sur 24h</div>
-            ${heatingRatio !== "unavailable"
+            ${this._isValidValue(heatingRatio)
         ? html`<div class="metric-sub">${heatingRatio}% du temps</div>`
         : ""}
           </div>
@@ -301,7 +335,7 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:thermometer"></ha-icon>
               <span>Écart moyen</span>
             </div>
-            <div class="metric-value">${deltaT}°C</div>
+            <div class="metric-value">${this._isValidValue(deltaT) ? `${deltaT}°C` : "--"}</div>
             <div class="metric-sub">Int. - Ext.</div>
           </div>
         </div>
@@ -334,7 +368,6 @@ class HomePerformanceCard extends LitElement {
         align-items: center;
         padding: 12px 14px;
         background: #1C1C1C;
-        border-bottom: 1px solid var(--border-color);
       }
 
       .header-title {
@@ -384,6 +417,24 @@ class HomePerformanceCard extends LitElement {
       @keyframes pulse {
         0%, 100% { opacity: 0.4; transform: scale(1); }
         50% { opacity: 1; transform: scale(1.1); }
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      .loading-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .loading-spinner ha-icon {
+        --mdc-icon-size: 48px;
+        color: #6366f1;
+        animation: spin 2s linear infinite;
       }
 
       /* Content - Compact */
@@ -593,6 +644,11 @@ class HomePerformanceCard extends LitElement {
         color: var(--text-secondary);
         opacity: 0.7;
         margin-top: 2px;
+      }
+
+      .metric-sub.waiting {
+        font-style: italic;
+        opacity: 0.5;
       }
 
       /* Responsive */
