@@ -5,7 +5,9 @@
     "@Hugofromfrance"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": [
+    "http"
+  ],
   "documentation": "https://github.com/Hugofromfrance/home_performance",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Hugofromfrance/home_performance/issues",
