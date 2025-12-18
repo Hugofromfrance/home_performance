@@ -61,6 +61,8 @@ You use electric heating and wonder:
 - ⚡ **Event-driven architecture** - Instant detection (heating, windows)
 - 🪟 **Open window detection** - Real-time alert on temperature drop
 
+<img width="509" height="702" alt="image" src="https://github.com/user-attachments/assets/34ddaf7b-b39b-40ac-bd04-09be47520204" />
+
 ## 🔌 Hardware Compatibility
 
 **The integration is 100% hardware agnostic!** It works with anything that exposes standard Home Assistant entities.
