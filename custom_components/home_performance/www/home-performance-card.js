@@ -1,5 +1,5 @@
 /**
- * Home Performance Card v1.1.1
+ * Home Performance Card v1.1.3
  * Modern dashboard card for Home Performance integration
  */
 
@@ -339,7 +339,7 @@ class HomePerformanceCard extends LitElement {
             <div class="score-desc">${insulationData.desc}</div>
           </div>
         </div>
-        
+
         <div class="score-card" style="--accent: ${perfData.color}">
           <div class="score-icon">
             <ha-icon icon="${perfData.icon}"></ha-icon>
@@ -374,7 +374,7 @@ class HomePerformanceCard extends LitElement {
       <!-- Metrics Grid -->
       <div class="metrics-section">
         <div class="section-title">Détails techniques</div>
-        
+
         <div class="metrics-grid">
           <div class="metric">
             <div class="metric-header">
@@ -734,11 +734,11 @@ class HomePerformanceCard extends LitElement {
         .score-section {
           grid-template-columns: 1fr 1fr;
         }
-        
+
         .temp-card {
           grid-column: span 2;
         }
-        
+
         .metrics-grid {
           grid-template-columns: 1fr 1fr;
         }
@@ -748,11 +748,11 @@ class HomePerformanceCard extends LitElement {
         .score-section {
           grid-template-columns: 1fr;
         }
-        
+
         .temp-card {
           grid-column: span 1;
         }
-        
+
         .metrics-grid {
           grid-template-columns: 1fr;
         }
@@ -852,7 +852,7 @@ window.customCards.push({
 });
 
 console.info(
-  `%c HOME-PERFORMANCE %c v1.1.1 `,
+  `%c HOME-PERFORMANCE %c v1.1.3 `,
   "color: white; background: #6366f1; font-weight: bold; border-radius: 4px 0 0 4px; padding: 2px 6px;",
   "color: #6366f1; background: #1a1a2e; font-weight: bold; border-radius: 0 4px 4px 0; padding: 2px 6px;"
 );

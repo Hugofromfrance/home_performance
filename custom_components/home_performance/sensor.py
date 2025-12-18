@@ -38,7 +38,7 @@ def format_duration(hours: float | None) -> str | None:
 def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> dict[str, Any]:
     """
     Evaluate energy performance based on French national statistics.
-    
+
     Thresholds based on heater power:
     - Excellent: < (power/1000) * 4 kWh/day (-40% vs national average)
     - Standard: between excellent and (power/1000) * 6 kWh/day
@@ -53,11 +53,11 @@ def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> di
             "excellent_threshold": None,
             "standard_threshold": None,
         }
-    
+
     # Thresholds based on heater power
     excellent_threshold = (heater_power_w / 1000) * 4
     standard_threshold = (heater_power_w / 1000) * 6
-    
+
     if daily_kwh < excellent_threshold:
         saving = round((1 - daily_kwh / standard_threshold) * 100)
         return {
@@ -154,7 +154,7 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
             "name": f"Home Performance - {self._zone_name}",
             "manufacturer": "Home Performance",
             "model": "Thermal Analyzer",
-            "sw_version": "1.1.1",
+            "sw_version": "1.1.3",
         }
 
 
@@ -519,14 +519,14 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
         """Return remaining time in human readable format."""
         data_hours = 0
         data_ready = False
-        
+
         if self.coordinator.data:
             data_hours = self.coordinator.data.get("data_hours", 0) or 0
             data_ready = self.coordinator.data.get("data_ready", False)
-        
+
         if data_ready:
             return "Prêt"
-        
+
         remaining = max(0, 12 - data_hours)
         return format_duration(remaining)
 
@@ -545,7 +545,7 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
         data_ready = data.get("data_ready", False)
         remaining = max(0, 12 - data_hours)
         progress_pct = min(100, round((data_hours / 12) * 100))
-        
+
         return {
             "remaining_hours": round(remaining, 2) if not data_ready else 0,
             "remaining_minutes": round(remaining * 60) if not data_ready else 0,
@@ -574,10 +574,10 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
         if self.coordinator.data:
             data_hours = self.coordinator.data.get("data_hours", 0) or 0
             data_ready = self.coordinator.data.get("data_ready", False)
-            
+
             if data_ready:
                 return 100
-            
+
             return min(100, round((data_hours / 12) * 100))
         return 0
 
@@ -588,7 +588,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
             data_ready = self.coordinator.data.get("data_ready", False)
             if data_ready:
                 return "mdi:check-circle"
-            
+
             progress = self.native_value
             if progress < 25:
                 return "mdi:circle-outline"
@@ -606,7 +606,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
         data = self.coordinator.data or {}
         data_hours = data.get("data_hours", 0) or 0
         data_ready = data.get("data_ready", False)
-        
+
         return {
             "hours_collected": round(data_hours, 2),
             "hours_required": 12,
@@ -617,7 +617,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
 
 class InsulationRatingSensor(HomePerformanceBaseSensor):
     """Sensor for insulation rating (qualitative).
-    
+
     Handles multiple scenarios:
     - Calculated rating from K coefficient
     - Inferred excellent rating (minimal heating needed)
@@ -634,7 +634,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
     @property
     def native_value(self) -> str | None:
         """Return insulation rating.
-        
+
         Priority:
         1. Calculated rating from K coefficient
         2. Inferred excellent rating
@@ -654,7 +654,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         insulation_status = data.get("insulation_status", {})
-        
+
         rating = insulation_status.get("rating") or data.get("insulation_rating")
         status = insulation_status.get("status", "waiting_data")
         season = insulation_status.get("season", "heating_season")
@@ -670,7 +670,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
             "poor": "Mal isolé",
             "very_poor": "Très mal isolé / pont thermique",
         }
-        
+
         season_descriptions = {
             "summer": "☀️ Mode été",
             "off_season": "🌤️ Hors saison",
@@ -697,11 +697,11 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
 
 class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
     """Sensor for daily measured energy.
-    
+
     Priority:
     1. External energy sensor (if configured) - uses user's own HA energy counter
     2. Integrated calculation from power sensor
-    
+
     This sensor behaves like a Utility Meter (Compteur de services publics):
     - state_class: TOTAL (not TOTAL_INCREASING)
     - last_reset: datetime of last midnight reset
@@ -720,7 +720,7 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
     @property
     def native_value(self) -> float | None:
         """Return daily measured energy in kWh.
-        
+
         Uses external energy sensor if configured, otherwise uses internal calculation.
         """
         if self.coordinator.data:
@@ -728,7 +728,7 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
             external = self.coordinator.data.get("external_energy_daily_kwh")
             if external is not None:
                 return round(external, 3)
-            
+
             # Priority 2: Internal calculation from power sensor
             value = self.coordinator.data.get("measured_energy_daily_kwh")
             if value is not None:
@@ -738,7 +738,7 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
     @property
     def last_reset(self):
         """Return the time when the sensor was last reset (midnight).
-        
+
         This is required for Utility Meter compatibility.
         Only applies to internal calculation, not external sensor.
         """
