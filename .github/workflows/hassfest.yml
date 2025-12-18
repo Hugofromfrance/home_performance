@@ -21,4 +21,3 @@ jobs:
 
       - name: Hassfest Validation
         uses: home-assistant/actions/hassfest@master
-

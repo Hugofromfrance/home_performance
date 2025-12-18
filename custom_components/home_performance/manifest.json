@@ -9,6 +9,7 @@
     "http"
   ],
   "documentation": "https://github.com/Hugofromfrance/home_performance",
+  "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Hugofromfrance/home_performance/issues",
   "requirements": [],
