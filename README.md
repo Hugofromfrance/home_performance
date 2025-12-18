@@ -2,8 +2,34 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/Hugofromfrance/home_performance.svg)](https://github.com/Hugofromfrance/home_performance/releases)
+[![Liberapay](https://img.shields.io/liberapay/goal/Hugofromfrance.svg?logo=liberapay)](https://liberapay.com/Hugofromfrance/donate)
 
 A Home Assistant integration to analyze and monitor the thermal performance of your home.
+
+---
+
+## 📑 Table of Contents
+
+- [Why Home Performance?](#-why-home-performance)
+- [Main Features](#-main-features)
+- [Hardware Compatibility](#-hardware-compatibility)
+- [Concept](#-concept)
+- [Created Sensors](#-created-sensors-per-zone)
+- [Multi-zones](#-multi-zones)
+- [Lovelace Card](#-built-in-lovelace-card)
+- [Prerequisites](#-prerequisites)
+- [Configuration](#️-configuration)
+- [Data Persistence](#-data-persistence)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Dashboard Examples](#-dashboard-examples)
+- [Energy Performance](#-energy-performance)
+- [Roadmap](#️-roadmap)
+- [Support](#-support)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
 
 ## 🤔 Why Home Performance?
 
@@ -422,9 +448,15 @@ Needs optimization : beyond
 - [ ] Automatic heater detection
 - [ ] Guided "insulation diagnostic" mode
 
+## ☕ Support
+
+If this project helps you save energy or understand your home better, consider supporting its development:
+
+[![Donate using Liberapay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/Hugofromfrance/donate)
+
 ## 🤝 Contributing
 
-Contributions are welcome! Open an issue to discuss before submitting a PR.
+Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md) before submitting a PR.
 
 ## 📄 License
 
