@@ -28,7 +28,7 @@
           "indoor_temp_sensor": "Capteur mesurant la température dans la pièce",
           "outdoor_temp_sensor": "Capteur mesurant la température extérieure",
           "heating_entity": "Interrupteur, thermostat ou climate contrôlant le chauffage",
-          "heater_power": "Puissance nominale du radiateur en watts"
+          "heater_power": "Puissance nominale en Watts (pour BTU/h : diviser par 3.41, ex: 60 000 BTU/h ≈ 17 600W)"
         }
       },
       "dimensions": {
@@ -70,7 +70,7 @@
           "energy_sensor": "Compteur d'énergie externe"
         },
         "data_description": {
-          "heater_power": "Puissance nominale du radiateur en watts",
+          "heater_power": "Puissance nominale en Watts (pour BTU/h : diviser par 3.41, ex: 60 000 BTU/h ≈ 17 600W)",
           "surface": "Surface au sol pour calculer le coefficient K par m²",
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée (>50W = chauffe)",

@@ -43,7 +43,7 @@ def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None
         outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR, default=default_outdoor)
     else:
         outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR)
-    
+
     return vol.Schema(
         {
             vol.Required(CONF_ZONE_NAME): selector.TextSelector(
@@ -56,12 +56,12 @@ def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
             vol.Required(CONF_HEATING_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean"])
+                selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean", "binary_sensor"])
             ),
             vol.Required(CONF_HEATER_POWER): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=100,
-                    max=10000,
+                    max=100000,
                     step=50,
                     unit_of_measurement="W",
                     mode="box",
@@ -226,7 +226,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
                             min=100,
-                            max=10000,
+                            max=100000,
                             step=50,
                             unit_of_measurement="W",
                             mode="box",
