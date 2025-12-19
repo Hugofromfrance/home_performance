@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, CONF_ZONE_NAME
+from .const import DOMAIN, CONF_ZONE_NAME, VERSION
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
             "name": f"Home Performance - {self._zone_name}",
             "manufacturer": "Home Performance",
             "model": "Thermal Analyzer",
-            "sw_version": "1.1.3",
+            "sw_version": VERSION,
         }
 
 

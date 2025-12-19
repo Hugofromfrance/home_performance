@@ -437,8 +437,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_on": heating_on,
                 "delta_t": delta_t,
                 "window_open": window_open,
-                # Calculated coefficients (rolling 24h for accuracy)
-                "k_coefficient": analysis.get("k_coefficient"),
+                # Calculated coefficients
+                "k_coefficient": analysis.get("k_coefficient"),  # Prefers 7-day stable K
+                "k_coefficient_24h": analysis.get("k_coefficient_24h"),  # Real-time 24h K
+                "k_coefficient_7d": analysis.get("k_coefficient_7d"),  # Stable 7-day K
                 "k_per_m2": analysis.get("k_per_m2"),
                 "k_per_m3": analysis.get("k_per_m3"),
                 # Daily data (minuit-minuit)
@@ -462,6 +464,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "samples_count": analysis.get("samples_count"),
                 "data_ready": analysis.get("data_ready"),
                 "storage_loaded": self._data_loaded,
+                # 7-day history status
+                "history_days": analysis.get("history_days", 0),
+                "history_has_valid_k": analysis.get("history_has_valid_k", False),
                 # Configuration
                 "heater_power": self.heater_power,
                 "surface": self.surface,
@@ -485,6 +490,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "delta_t": None,
             "window_open": self._window_open_realtime,
             "k_coefficient": None,
+            "k_coefficient_24h": None,
+            "k_coefficient_7d": None,
             "k_per_m2": None,
             "k_per_m3": None,
             "heating_hours": None,
@@ -498,6 +505,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "samples_count": 0,
             "data_ready": False,
             "storage_loaded": self._data_loaded,
+            "history_days": 0,
+            "history_has_valid_k": False,
             "heater_power": self.heater_power,
             "surface": self.surface,
             "volume": self.volume,
@@ -536,8 +545,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heating_on": self._is_heating_realtime,
             "delta_t": None,
             "window_open": self._window_open_realtime,
-            # Restored coefficients from model (rolling 24h)
-            "k_coefficient": analysis.get("k_coefficient"),
+            # Restored coefficients from model
+            "k_coefficient": analysis.get("k_coefficient"),  # Prefers 7-day stable K
+            "k_coefficient_24h": analysis.get("k_coefficient_24h"),
+            "k_coefficient_7d": analysis.get("k_coefficient_7d"),
             "k_per_m2": analysis.get("k_per_m2"),
             "k_per_m3": analysis.get("k_per_m3"),
             # Restored daily data (minuit-minuit)
@@ -559,6 +570,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "samples_count": analysis.get("samples_count"),
             "data_ready": analysis.get("data_ready"),
             "storage_loaded": self._data_loaded,
+            # 7-day history status
+            "history_days": analysis.get("history_days", 0),
+            "history_has_valid_k": analysis.get("history_has_valid_k", False),
             # Configuration
             "heater_power": self.heater_power,
             "surface": self.surface,
@@ -570,11 +584,19 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
     def _check_daily_reset(self, now_dt) -> None:
-        """Check and perform daily reset at midnight."""
+        """Check and perform daily reset at midnight.
+        
+        IMPORTANT: Archives yesterday's data to 7-day history BEFORE resetting counters.
+        This ensures the insulation rating remains stable across midnight.
+        """
         today = now_dt.strftime("%Y-%m-%d")
         if self._last_daily_reset_date != today:
-            _LOGGER.debug(
-                "[%s] Daily reset (new day: %s)",
+            # Archive yesterday's data BEFORE resetting (if we have data)
+            if self._last_daily_reset_date and self._delta_t_count_daily > 0:
+                self._archive_daily_data(self._last_daily_reset_date)
+            
+            _LOGGER.info(
+                "[%s] 🌙 Daily reset (new day: %s)",
                 self.zone_name, today
             )
             # Reset all daily counters
@@ -587,6 +609,58 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._daily_reset_datetime = now_dt.replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
+
+    def _archive_daily_data(self, date: str) -> None:
+        """Archive a day's data to the thermal model's 7-day history.
+        
+        Called at midnight before resetting daily counters.
+        
+        Args:
+            date: The date (YYYY-MM-DD) of the data to archive
+        """
+        # Calculate averages
+        avg_delta_t = (
+            self._delta_t_sum_daily / self._delta_t_count_daily
+            if self._delta_t_count_daily > 0 else 0.0
+        )
+        
+        # Get average temps from the last aggregation or estimate
+        analysis = self.thermal_model.get_analysis()
+        avg_indoor = 0.0
+        avg_outdoor = 0.0
+        
+        # Try to get from model's last aggregation
+        if hasattr(self.thermal_model, '_last_aggregation') and self.thermal_model._last_aggregation:
+            agg = self.thermal_model._last_aggregation
+            avg_indoor = agg.avg_indoor_temp
+            avg_outdoor = agg.avg_outdoor_temp
+        
+        heating_hours = self._heating_seconds_daily / 3600
+        
+        _LOGGER.info(
+            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d",
+            self.zone_name, date, heating_hours, avg_delta_t,
+            self._estimated_energy_daily_kwh, self._delta_t_count_daily
+        )
+        
+        # Add to thermal model history
+        self.thermal_model.add_daily_summary(
+            date=date,
+            heating_hours=heating_hours,
+            avg_delta_t=avg_delta_t,
+            energy_kwh=self._estimated_energy_daily_kwh,
+            avg_indoor_temp=avg_indoor,
+            avg_outdoor_temp=avg_outdoor,
+            sample_count=self._delta_t_count_daily,
+        )
+
+    def reset_history(self) -> None:
+        """Reset the 7-day history (manual reset service).
+        
+        Use this after insulation work or to clear anomalous data.
+        """
+        _LOGGER.info("[%s] 🔄 Manual history reset requested", self.zone_name)
+        self.thermal_model.clear_history()
 
     def _update_daily_counters(self, now: float, heating_on: bool, delta_t: float) -> None:
         """Update daily counters (minuit-minuit)."""
