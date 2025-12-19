@@ -1,4 +1,16 @@
 {
+  "services": {
+    "reset_history": {
+      "name": "Réinitialiser l'historique",
+      "description": "Réinitialise l'historique glissant de 7 jours pour une zone. Utilisez ceci après des travaux d'isolation ou pour effacer des données anormales. La note d'isolation sera recalculée à partir de zéro.",
+      "fields": {
+        "zone_name": {
+          "name": "Nom de la zone",
+          "description": "Le nom de la zone à réinitialiser (insensible à la casse)"
+        }
+      }
+    }
+  },
   "config": {
     "step": {
       "user": {

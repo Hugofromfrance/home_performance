@@ -141,7 +141,9 @@ Home Performance's **K coefficient** measures the **global heat loss** of an ent
 
 ### 🎯 Smart Insulation Rating
 
-The insulation rating automatically adapts to all situations:
+The insulation rating is calculated over a **7-day rolling window** for stability. This prevents rating changes at midnight and smooths out anomalous days (open window, guests, etc.).
+
+The rating automatically adapts to all situations:
 
 | Situation | Display | Description |
 |-----------|---------|-------------|
@@ -165,6 +167,30 @@ If after **24h** of observation:
 #### Last Valid K Conservation
 
 In summer or off-season, the integration **keeps the last calculated K coefficient** and displays it with the appropriate season message. You thus keep a useful reference all year round.
+
+#### 🔄 Reset After Insulation Work
+
+Completed renovation work? Changed windows? You can **reset the 7-day history** to start fresh measurements:
+
+```yaml
+# Developer Tools > Services
+service: home_performance.reset_history
+data:
+  zone_name: "Living Room"
+```
+
+**What the reset does:**
+- ✅ Clears the 7-day history
+- ✅ K coefficient recalculates from new data
+- ❌ Does NOT delete current day's data (no 12h wait)
+- ❌ Does NOT lose last valid K (kept as reference)
+
+**Timeline after reset:**
+
+| Delay | What you see |
+|-------|--------------|
+| ~24h | K reflects new insulation conditions |
+| ~7 days | Stable K based entirely on post-work data |
 
 ### Daily Energy
 
@@ -412,6 +438,8 @@ Needs optimization : beyond
 - [x] K Coefficient (W/°C) - empirical thermal loss
 - [x] K/m² and K/m³ normalization
 - [x] Smart insulation rating (calculated, inferred, or conserved)
+- [x] 7-day rolling history for stable insulation rating
+- [x] Manual reset service (`home_performance.reset_history`)
 - [x] Season management (summer, off-season, heating season)
 - [x] Automatically inferred excellent insulation (low heating + stable T°)
 - [x] Last valid K conservation (off-season)

@@ -1,4 +1,16 @@
 {
+  "services": {
+    "reset_history": {
+      "name": "Reset History",
+      "description": "Reset the 7-day rolling history for a zone. Use this after insulation work or to clear anomalous data. The insulation rating will be recalculated from scratch.",
+      "fields": {
+        "zone_name": {
+          "name": "Zone Name",
+          "description": "The name of the zone to reset (case insensitive)"
+        }
+      }
+    }
+  },
   "config": {
     "step": {
       "user": {

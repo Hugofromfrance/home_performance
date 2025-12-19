@@ -29,6 +29,7 @@ from .const import (
     MIN_DELTA_T,
     MIN_HEATING_TIME_HOURS,
     MIN_DATA_HOURS,
+    HISTORY_DAYS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,6 +98,48 @@ class AggregatedPeriod:
         return self.heating_hours / self.duration_hours
 
 
+@dataclass
+class DailyHistoryEntry:
+    """Daily aggregated data for 7-day rolling K calculation.
+    
+    Stores summary of one complete day of heating data.
+    Used to calculate a stable K coefficient over multiple days.
+    """
+    
+    date: str  # ISO format YYYY-MM-DD
+    heating_hours: float  # Total heating hours that day
+    avg_delta_t: float  # Average ΔT that day
+    energy_kwh: float  # Estimated energy consumption
+    avg_indoor_temp: float  # Average indoor temperature
+    avg_outdoor_temp: float  # Average outdoor temperature
+    sample_count: int  # Number of samples (data points)
+    
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for persistence."""
+        return {
+            "date": self.date,
+            "heating_hours": self.heating_hours,
+            "avg_delta_t": self.avg_delta_t,
+            "energy_kwh": self.energy_kwh,
+            "avg_indoor_temp": self.avg_indoor_temp,
+            "avg_outdoor_temp": self.avg_outdoor_temp,
+            "sample_count": self.sample_count,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DailyHistoryEntry":
+        """Create from dictionary."""
+        return cls(
+            date=data["date"],
+            heating_hours=data.get("heating_hours", 0.0),
+            avg_delta_t=data.get("avg_delta_t", 0.0),
+            energy_kwh=data.get("energy_kwh", 0.0),
+            avg_indoor_temp=data.get("avg_indoor_temp", 0.0),
+            avg_outdoor_temp=data.get("avg_outdoor_temp", 0.0),
+            sample_count=data.get("sample_count", 0),
+        )
+
+
 class ThermalLossModel:
     """Model to calculate thermal loss coefficient K.
 
@@ -135,8 +178,12 @@ class ThermalLossModel:
         # Data storage
         self.data_points: deque[ThermalDataPoint] = deque(maxlen=MAX_DATA_POINTS)
 
+        # Daily history for 7-day rolling K calculation (stable rating)
+        self._daily_history: list[DailyHistoryEntry] = []
+
         # Calculated values (updated periodically)
-        self._k_coefficient: float | None = None  # W/°C
+        self._k_coefficient: float | None = None  # W/°C - current K from rolling 24h
+        self._k_coefficient_7d: float | None = None  # W/°C - stable K from 7-day history
         self._last_valid_k: float | None = None  # Last valid K (preserved during off-season)
         self._last_aggregation: AggregatedPeriod | None = None
 
@@ -162,8 +209,35 @@ class ThermalLossModel:
 
     @property
     def k_coefficient(self) -> float | None:
-        """Get thermal loss coefficient K in W/°C."""
+        """Get thermal loss coefficient K in W/°C.
+        
+        Returns the 7-day stable K if available, otherwise the 24h rolling K.
+        This ensures the insulation rating is stable across midnight resets.
+        """
+        # Prefer 7-day stable K for rating consistency
+        if self._k_coefficient_7d is not None:
+            return self._k_coefficient_7d
         return self._k_coefficient
+
+    @property
+    def k_coefficient_24h(self) -> float | None:
+        """Get the 24-hour rolling K coefficient (real-time)."""
+        return self._k_coefficient
+
+    @property
+    def k_coefficient_7d(self) -> float | None:
+        """Get the 7-day stable K coefficient."""
+        return self._k_coefficient_7d
+
+    @property
+    def daily_history(self) -> list[DailyHistoryEntry]:
+        """Get the daily history entries."""
+        return self._daily_history.copy()
+
+    @property
+    def history_days_count(self) -> int:
+        """Get number of days in history."""
+        return len(self._daily_history)
 
     @property
     def k_per_m2(self) -> float | None:
@@ -291,16 +365,152 @@ class ThermalLossModel:
             sample_count=len(points),
         )
 
+    def add_daily_summary(
+        self,
+        date: str,
+        heating_hours: float,
+        avg_delta_t: float,
+        energy_kwh: float,
+        avg_indoor_temp: float,
+        avg_outdoor_temp: float,
+        sample_count: int,
+    ) -> None:
+        """Archive a day's data into the rolling 7-day history.
+        
+        Called at midnight to store the previous day's aggregated data.
+        Automatically removes entries older than HISTORY_DAYS.
+        
+        Args:
+            date: ISO date string (YYYY-MM-DD)
+            heating_hours: Total hours of heating that day
+            avg_delta_t: Average temperature difference
+            energy_kwh: Estimated energy consumption
+            avg_indoor_temp: Average indoor temperature
+            avg_outdoor_temp: Average outdoor temperature
+            sample_count: Number of data samples
+        """
+        # Don't add if we don't have meaningful data
+        if sample_count < 10:
+            _LOGGER.debug(
+                "[%s] Skipping daily archive for %s - insufficient samples (%d)",
+                self.zone_name, date, sample_count
+            )
+            return
+        
+        # Check if we already have this date
+        existing_dates = [e.date for e in self._daily_history]
+        if date in existing_dates:
+            _LOGGER.debug("[%s] Date %s already in history, skipping", self.zone_name, date)
+            return
+        
+        # Create and add entry
+        entry = DailyHistoryEntry(
+            date=date,
+            heating_hours=heating_hours,
+            avg_delta_t=avg_delta_t,
+            energy_kwh=energy_kwh,
+            avg_indoor_temp=avg_indoor_temp,
+            avg_outdoor_temp=avg_outdoor_temp,
+            sample_count=sample_count,
+        )
+        self._daily_history.append(entry)
+        
+        # Sort by date and keep only last HISTORY_DAYS days
+        self._daily_history.sort(key=lambda e: e.date)
+        if len(self._daily_history) > HISTORY_DAYS:
+            removed = self._daily_history.pop(0)
+            _LOGGER.debug("[%s] Removed oldest history entry: %s", self.zone_name, removed.date)
+        
+        _LOGGER.info(
+            "[%s] 📅 Added daily summary for %s: %.1fh heating, ΔT=%.1f°C, %.2f kWh "
+            "(history: %d days)",
+            self.zone_name, date, heating_hours, avg_delta_t, energy_kwh,
+            len(self._daily_history)
+        )
+        
+        # Recalculate 7-day K coefficient
+        self._calculate_k_from_history()
+
+    def _calculate_k_from_history(self) -> None:
+        """Calculate K coefficient from 7-day rolling history.
+        
+        This provides a stable K that doesn't reset at midnight.
+        Uses weighted average based on sample count per day.
+        """
+        if not self._daily_history:
+            return
+        
+        # Filter valid days (sufficient ΔT and heating time)
+        valid_days = [
+            d for d in self._daily_history
+            if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
+        ]
+        
+        if not valid_days:
+            _LOGGER.debug(
+                "[%s] No valid days in history for K calculation (%d days total)",
+                self.zone_name, len(self._daily_history)
+            )
+            return
+        
+        # Calculate K for each valid day and weight by sample count
+        total_weighted_k = 0.0
+        total_weight = 0.0
+        
+        for day in valid_days:
+            # K = Energy / (ΔT × 24h)
+            # Energy = Power × heating_hours (Wh)
+            energy_wh = self.heater_power * day.heating_hours
+            k_day = energy_wh / (day.avg_delta_t * 24)  # Normalize to 24h period
+            
+            weight = day.sample_count
+            total_weighted_k += k_day * weight
+            total_weight += weight
+            
+            _LOGGER.debug(
+                "[%s] Day %s: K=%.1f W/°C (heating=%.1fh, ΔT=%.1f°C, weight=%d)",
+                self.zone_name, day.date, k_day, day.heating_hours, day.avg_delta_t, weight
+            )
+        
+        if total_weight > 0:
+            self._k_coefficient_7d = total_weighted_k / total_weight
+            self._last_valid_k = self._k_coefficient_7d  # Update last valid K
+            
+            _LOGGER.info(
+                "[%s] 📊 7-day K coefficient: %.1f W/°C (from %d valid days, %d total)",
+                self.zone_name, self._k_coefficient_7d, len(valid_days), len(self._daily_history)
+            )
+
+    def clear_history(self) -> None:
+        """Clear all history data for manual reset.
+        
+        Use this when:
+        - User completed insulation work and wants fresh measurement
+        - User changed windows/doors
+        - User wants to reset anomalous data
+        """
+        old_count = len(self._daily_history)
+        self._daily_history.clear()
+        self._k_coefficient_7d = None
+        # Don't clear _last_valid_k - keep it as reference
+        
+        _LOGGER.info(
+            "[%s] 🔄 History cleared (%d days removed). Last valid K preserved: %.1f W/°C",
+            self.zone_name, old_count, self._last_valid_k or 0
+        )
+
     def get_analysis(self) -> dict[str, Any]:
         """Get current analysis results."""
         agg = self._last_aggregation
 
         return {
-            # Main coefficient
-            "k_coefficient": self._k_coefficient,
+            # Main coefficient (prefers 7-day stable K)
+            "k_coefficient": self.k_coefficient,  # Uses property that prefers 7d
+            "k_coefficient_24h": self._k_coefficient,  # Real-time 24h K
+            "k_coefficient_7d": self._k_coefficient_7d,  # Stable 7-day K
             "k_per_m2": self.k_per_m2,
             "k_per_m3": self.k_per_m3,
-            # Aggregation data
+            # Aggregation data (current 24h period)
             "heating_hours": agg.heating_hours if agg else None,
             "heating_ratio": agg.heating_ratio if agg else None,
             "avg_delta_t": agg.delta_t if agg else None,
@@ -313,6 +523,9 @@ class ThermalLossModel:
             "data_hours": self.data_hours,
             "samples_count": self.samples_count,
             "data_ready": self.data_hours >= MIN_DATA_HOURS,
+            # History status
+            "history_days": len(self._daily_history),
+            "history_has_valid_k": self._k_coefficient_7d is not None,
             # Configuration
             "heater_power": self.heater_power,
             "surface": self.surface,
@@ -551,6 +764,7 @@ class ThermalLossModel:
                 for p in self.data_points
             ],
             "k_coefficient": self._k_coefficient,
+            "k_coefficient_7d": self._k_coefficient_7d,
             "last_valid_k": self._last_valid_k,
             "total_energy_kwh": self._total_energy_kwh,
             "last_point": {
@@ -559,10 +773,15 @@ class ThermalLossModel:
                 "outdoor_temp": self._last_point.outdoor_temp,
                 "heating_on": self._last_point.heating_on,
             } if self._last_point else None,
+            # 7-day history for stable K calculation
+            "daily_history": [entry.to_dict() for entry in self._daily_history],
         }
 
     def from_dict(self, data: dict[str, Any]) -> None:
-        """Restore model state from dictionary."""
+        """Restore model state from dictionary.
+        
+        Backward compatible: handles data from versions without daily_history.
+        """
         if not data:
             return
 
@@ -581,8 +800,15 @@ class ThermalLossModel:
         if "k_coefficient" in data:
             self._k_coefficient = data["k_coefficient"]
 
+        # Restore 7-day K (new in v1.2.0)
+        if "k_coefficient_7d" in data:
+            self._k_coefficient_7d = data["k_coefficient_7d"]
+
         if "last_valid_k" in data:
             self._last_valid_k = data["last_valid_k"]
+        elif self._k_coefficient_7d is not None:
+            # Prefer 7-day K as last valid
+            self._last_valid_k = self._k_coefficient_7d
         elif self._k_coefficient is not None:
             # Backward compatibility: use k_coefficient as last_valid_k
             self._last_valid_k = self._k_coefficient
@@ -600,14 +826,39 @@ class ThermalLossModel:
                 heating_on=lp["heating_on"],
             )
 
+        # Restore 7-day history (new in v1.2.0, backward compatible)
+        if "daily_history" in data:
+            self._daily_history.clear()
+            for entry_data in data["daily_history"]:
+                try:
+                    entry = DailyHistoryEntry.from_dict(entry_data)
+                    self._daily_history.append(entry)
+                except (KeyError, TypeError) as err:
+                    _LOGGER.warning(
+                        "[%s] Could not restore history entry: %s",
+                        self.zone_name, err
+                    )
+            # Sort by date
+            self._daily_history.sort(key=lambda e: e.date)
+            _LOGGER.info(
+                "[%s] Restored %d days of history",
+                self.zone_name, len(self._daily_history)
+            )
+
         # Recalculate aggregation if we have data
         if self.data_hours >= MIN_DATA_HOURS:
             self._calculate_k()
 
+        # Recalculate 7-day K from history if available
+        if self._daily_history:
+            self._calculate_k_from_history()
+
         _LOGGER.info(
-            "Restored %d data points for %s (%.1fh of data, K=%.1f W/°C)",
+            "Restored %d data points for %s (%.1fh of data, K_24h=%.1f, K_7d=%.1f W/°C, %d history days)",
             len(self.data_points),
             self.zone_name,
             self.data_hours,
             self._k_coefficient or 0,
+            self._k_coefficient_7d or 0,
+            len(self._daily_history),
         )
