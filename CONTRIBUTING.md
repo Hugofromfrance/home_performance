@@ -176,24 +176,38 @@ type: description
 
 ### Types
 
-| Type | Description |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation only |
-| `style` | Code style (formatting, no logic change) |
-| `refactor` | Code refactoring |
-| `perf` | Performance improvement |
-| `test` | Adding tests |
-| `chore` | Maintenance tasks |
+| Type | Description | Version Bump | In Changelog |
+|------|-------------|--------------|--------------|
+| `feat` | ✨ New feature | Minor (1.0.0 → 1.1.0) | ✅ Yes |
+| `fix` | 🐛 Bug fix | Patch (1.0.0 → 1.0.1) | ✅ Yes |
+| `perf` | ⚡ Performance improvement | Patch | ✅ Yes |
+| `refactor` | ♻️ Code refactoring | Patch | ✅ Yes |
+| `docs` | 📚 Documentation only | Patch | ✅ Yes |
+| `style` | 💄 Code style (formatting) | Patch | ✅ Yes |
+| `test` | ✅ Adding/updating tests | None | ❌ Hidden |
+| `chore` | 🔧 Maintenance tasks | None | ❌ Hidden |
+| `ci` | 👷 CI/CD changes | None | ❌ Hidden |
+
+### Breaking Changes
+
+For breaking changes, add `!` after the type or include `BREAKING CHANGE:` in the body:
+
+```bash
+feat!: change configuration format
+# Results in Major bump: 1.0.0 → 2.0.0
+```
 
 ### Examples
 
 ```bash
 feat: add humidity sensor support
 fix: correct heating time calculation
-docs: add installation instructions
+perf: optimize data refresh cycle
 refactor: simplify K coefficient calculation
+docs: add installation instructions
+style: format code with black
+chore: update dependencies
+ci: add automated tests workflow
 ```
 
 ---
@@ -242,6 +256,26 @@ refactor: simplify K coefficient calculation
 | **Card** | Display, themes, loading states |
 | **Persistence** | Data survives HA restart |
 | **Edge cases** | Missing sensors, unavailable entities |
+
+---
+
+## Branch Naming Convention
+
+This project follows **GitFlow**. Please use the following branch naming:
+
+| Branch Pattern | Purpose | Example |
+|----------------|---------|---------|
+| `feature/*` | New features | `feature/humidity-sensor` |
+| `fix/*` | Bug fixes | `fix/calculation-error` |
+| `docs/*` | Documentation only | `docs/update-readme` |
+| `refactor/*` | Code refactoring | `refactor/simplify-models` |
+
+### Workflow
+
+1. Create your branch from `dev`
+2. Make your changes
+3. Open a PR targeting `dev`
+4. After review and merge, maintainers will handle releases
 
 ---
 
