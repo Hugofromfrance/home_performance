@@ -73,7 +73,7 @@ You use electric heating and wonder:
 |------|---------------------|
 | Indoor temp sensor | Aqara, Sonoff SNZB-02, Xiaomi, Netatmo, Ecobee, Shelly H&T, ESPHome... |
 | Outdoor temp sensor | Local weather station, Weather services, Netatmo Outdoor... |
-| Heating entity | Any `climate.*`, `switch.*` or `input_boolean.*` |
+| Heating entity | Any `climate.*`, `switch.*`, `input_boolean.*` or `binary_sensor.*` |
 
 ### Optional (recommended)
 
@@ -314,7 +314,7 @@ If you use a YAML mode dashboard, manually add the resource:
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
 | Heating entity | climate.xxx or switch.xxx |
-| Heater power | Declared power in Watts |
+| Heater power | Declared power in Watts (up to 100kW). For BTU/h: divide by 3.41 |
 
 ### Optional Parameters
 
