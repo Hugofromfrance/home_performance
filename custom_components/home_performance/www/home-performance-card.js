@@ -45,14 +45,54 @@ class HomePerformanceCard extends LitElement {
     return 5;
   }
 
+  // Entity name mappings: French (primary) -> English (fallback)
+  // This handles systems where HA generates entity IDs from translated names
+  _entityMappings = {
+    // Binary sensors
+    "donnees_pretes": ["donnees_pretes", "data_ready"],
+    "fenetre_ouverte": ["fenetre_ouverte", "window_open"],
+    // Sensors
+    "coefficient_k": ["coefficient_k", "k_coefficient"],
+    "k_par_m3": ["k_par_m3", "k_per_m3"],
+    "note_d_isolation": ["note_d_isolation", "insulation_rating", "note_isolation"],
+    "performance_energetique": ["performance_energetique", "energy_performance"],
+    "energie_mesuree_jour": ["energie_mesuree_jour", "energie_jour_mesuree", "daily_measured_energy"],
+    "energie_24h_estimee": ["energie_24h_estimee", "estimated_daily_energy", "daily_estimated_energy"],
+    "temps_de_chauffe_24h": ["temps_de_chauffe_24h", "heating_time_24h", "daily_heating_time"],
+    "ratio_de_chauffe": ["ratio_de_chauffe", "heating_ratio"],
+    "dt_moyen_24h": ["dt_moyen_24h", "average_delta_t", "avg_delta_t_24h"],
+    "progression_analyse": ["progression_analyse", "analysis_progress"],
+    "temps_restant_analyse": ["temps_restant_analyse", "analysis_time_remaining"],
+  };
+
   _getEntityId(suffix) {
     const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
-    return `sensor.home_performance_${zone}_${suffix}`;
+    const variants = this._entityMappings[suffix] || [suffix];
+
+    // Try each variant and return the first one that exists
+    for (const variant of variants) {
+      const entityId = `sensor.home_performance_${zone}_${variant}`;
+      if (this.hass?.states[entityId] !== undefined) {
+        return entityId;
+      }
+    }
+    // Fallback to primary (first) variant
+    return `sensor.home_performance_${zone}_${variants[0]}`;
   }
 
   _getBinaryEntityId(suffix) {
     const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
-    return `binary_sensor.home_performance_${zone}_${suffix}`;
+    const variants = this._entityMappings[suffix] || [suffix];
+
+    // Try each variant and return the first one that exists
+    for (const variant of variants) {
+      const entityId = `binary_sensor.home_performance_${zone}_${variant}`;
+      if (this.hass?.states[entityId] !== undefined) {
+        return entityId;
+      }
+    }
+    // Fallback to primary (first) variant
+    return `binary_sensor.home_performance_${zone}_${variants[0]}`;
   }
 
   _getState(entityId) {
@@ -69,11 +109,22 @@ class HomePerformanceCard extends LitElement {
     return this.hass?.states[entityId] !== undefined;
   }
 
+  // Check if any of the zone's entities exist (integration is loaded)
   _isIntegrationReady() {
     if (this.config.demo) return true;
-    // Check if the main sensor exists in HA
-    const entityId = this._getBinaryEntityId("donnees_pretes");
-    return this._entityExists(entityId);
+
+    // Try to find any entity for this zone to confirm integration is loaded
+    const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
+    const possibleEntities = [
+      `binary_sensor.home_performance_${zone}_donnees_pretes`,
+      `binary_sensor.home_performance_${zone}_data_ready`,
+      `sensor.home_performance_${zone}_coefficient_k`,
+      `sensor.home_performance_${zone}_k_coefficient`,
+      `sensor.home_performance_${zone}_progression_analyse`,
+      `sensor.home_performance_${zone}_analysis_progress`,
+    ];
+
+    return possibleEntities.some(entityId => this.hass?.states[entityId] !== undefined);
   }
 
   _isDataReady() {
@@ -87,6 +138,13 @@ class HomePerformanceCard extends LitElement {
     const entityId = this._getBinaryEntityId("donnees_pretes");
     const storageLoaded = this._getAttribute(entityId, "storage_loaded");
     return storageLoaded === true;
+  }
+
+  // Get data hours from the data_ready sensor
+  _getDataHours() {
+    if (this.config.demo) return 25;
+    const entityId = this._getBinaryEntityId("donnees_pretes");
+    return this._getAttribute(entityId, "data_hours") || 0;
   }
 
   _getProgress() {
@@ -243,6 +301,9 @@ class HomePerformanceCard extends LitElement {
   }
 
   _renderLoading() {
+    const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
+    const expectedEntity = `binary_sensor.home_performance_${zone}_donnees_pretes`;
+
     return html`
       <div class="analyzing">
         <div class="loading-spinner">
@@ -251,6 +312,11 @@ class HomePerformanceCard extends LitElement {
         <div class="analyzing-title" style="margin-top: 12px;">Chargement de l'intégration...</div>
         <div class="analyzing-info" style="margin-top: 8px;">
           Home Performance démarre. Les données seront disponibles dans quelques secondes.
+        </div>
+        <div class="analyzing-hint" style="margin-top: 16px; font-size: 0.75em; color: var(--text-secondary); opacity: 0.7;">
+          Si ce message persiste, vérifiez que la zone "<strong>${this.config.zone}</strong>"
+          existe dans l'intégration Home Performance.
+          <br/>Entité attendue: <code>${expectedEntity}</code>
         </div>
       </div>
     `;
