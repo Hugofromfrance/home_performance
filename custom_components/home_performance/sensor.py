@@ -183,9 +183,18 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         data = self.coordinator.data or {}
+        k_24h = data.get("k_coefficient_24h")
+        k_7d = data.get("k_coefficient_7d")
+        volume = data.get("volume")
+        k_per_m3_24h = None
+        if k_24h is not None and volume and volume > 0:
+            k_per_m3_24h = round(k_24h / volume, 2)
         return {
             "description": "Déperdition thermique par degré d'écart (W/°C)",
             "heater_power_w": data.get("heater_power"),
+            "k_24h": round(k_24h, 1) if k_24h is not None else None,
+            "k_7d": round(k_7d, 1) if k_7d is not None else None,
+            "k_per_m3_24h": k_per_m3_24h,
             "interpretation": (
                 "Plus K est bas, meilleure est l'isolation. "
                 "Valeurs typiques: 10-20 (bien isolé), 20-40 (moyen), 40+ (mal isolé)"

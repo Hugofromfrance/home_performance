@@ -285,6 +285,9 @@ class HomePerformanceCard extends LitElement {
 
     // Get values - use French slugified names matching _attr_name
     const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
+    const kCoefEntityId = this._getEntityId("coefficient_k");
+    const kCoef24h = demo ? demo.k_coefficient_24h : this._getAttribute(kCoefEntityId, "k_24h");
+    const kPerM3_24h = demo ? demo.k_per_m3_24h : this._getAttribute(kCoefEntityId, "k_per_m3_24h");
     const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
     const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
     const performance = demo ? demo.performance : this._getState(this._getEntityId("performance_energetique"));
@@ -331,8 +334,17 @@ class HomePerformanceCard extends LitElement {
       <!-- Main Score - 3 columns -->
       <div class="score-section">
         <div class="score-card" style="--accent: ${insulationData.color}">
-          <div class="score-icon">
-            <ha-icon icon="${insulationData.icon}"></ha-icon>
+          <div class="score-header">
+            <div class="score-icon">
+              <ha-icon icon="${insulationData.icon}"></ha-icon>
+            </div>
+            ${this._isValidValue(kCoef) ? html`
+              <div class="k-badge">
+                <span class="k-value">${kCoef}</span>
+                <span class="k-unit">W/°C</span>
+                ${this._isValidValue(kPerM3) ? html`<span class="k-sub">${kPerM3} W/m³</span>` : ""}
+              </div>
+            ` : ""}
           </div>
           <div class="score-content">
             <div class="score-label">Isolation</div>
@@ -380,12 +392,12 @@ class HomePerformanceCard extends LitElement {
           <div class="metric">
             <div class="metric-header">
               <ha-icon icon="mdi:heat-wave"></ha-icon>
-              <span>Coefficient K</span>
+              <span>K instantané</span>
             </div>
-            <div class="metric-value">${this._isValidValue(kCoef) ? `${kCoef} W/°C` : "--"}</div>
-            ${this._isValidValue(kPerM3)
-        ? html`<div class="metric-sub">${kPerM3} W/(°C·m³)</div>`
-        : html`<div class="metric-sub waiting">En attente de chauffe</div>`}
+            <div class="metric-value">${this._isValidValue(kCoef24h) ? `${kCoef24h} W/°C` : "--"}</div>
+            ${this._isValidValue(kPerM3_24h)
+        ? html`<div class="metric-sub">${kPerM3_24h} W/(°C·m³)</div>`
+        : html`<div class="metric-sub">sur 24h glissant</div>`}
           </div>
 
           <div class="metric">
@@ -598,6 +610,13 @@ class HomePerformanceCard extends LitElement {
         border-left: 3px solid var(--accent);
       }
 
+      .score-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+
       .score-icon {
         width: 28px;
         height: 28px;
@@ -606,7 +625,38 @@ class HomePerformanceCard extends LitElement {
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
         margin-bottom: 6px;
+      }
+
+      .score-header .score-icon {
+        margin-bottom: 0;
+      }
+
+      .k-badge {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        text-align: right;
+        line-height: 1.1;
+      }
+
+      .k-badge .k-value {
+        font-size: 1.1em;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .k-badge .k-unit {
+        font-size: 0.7em;
+        color: var(--text-secondary);
+        margin-left: 2px;
+      }
+
+      .k-badge .k-sub {
+        font-size: 0.65em;
+        color: var(--text-secondary);
+        opacity: 0.8;
       }
 
       .score-icon ha-icon {
