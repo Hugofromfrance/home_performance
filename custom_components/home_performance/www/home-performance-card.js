@@ -105,6 +105,50 @@ class HomePerformanceCard extends LitElement {
     return state?.attributes?.[attr];
   }
 
+  // Get user's temperature unit from HA config
+  _getTempUnit() {
+    return this.hass?.config?.unit_system?.temperature || "°C";
+  }
+
+  // Check if user uses Fahrenheit
+  _usesFahrenheit() {
+    const unit = this._getTempUnit();
+    return unit === "°F" || unit === "F";
+  }
+
+  // Convert Celsius to Fahrenheit (absolute temperature)
+  _celsiusToFahrenheit(celsius) {
+    if (celsius === null || celsius === undefined || isNaN(parseFloat(celsius))) {
+      return celsius;
+    }
+    return ((parseFloat(celsius) * 9 / 5) + 32).toFixed(1);
+  }
+
+  // Convert temperature DIFFERENCE (delta) to Fahrenheit - NO +32 offset!
+  _celsiusDeltaToFahrenheit(celsiusDelta) {
+    if (celsiusDelta === null || celsiusDelta === undefined || isNaN(parseFloat(celsiusDelta))) {
+      return celsiusDelta;
+    }
+    return (parseFloat(celsiusDelta) * 9 / 5).toFixed(1);
+  }
+
+  // Convert absolute temperature based on user's unit system
+  // Our backend always stores in Celsius, this converts for display
+  _convertTemp(tempCelsius) {
+    if (this._usesFahrenheit()) {
+      return this._celsiusToFahrenheit(tempCelsius);
+    }
+    return tempCelsius;
+  }
+
+  // Convert temperature difference (delta) based on user's unit system
+  _convertTempDelta(deltaCelsius) {
+    if (this._usesFahrenheit()) {
+      return this._celsiusDeltaToFahrenheit(deltaCelsius);
+    }
+    return deltaCelsius;
+  }
+
   _entityExists(entityId) {
     return this.hass?.states[entityId] !== undefined;
   }
@@ -386,12 +430,18 @@ class HomePerformanceCard extends LitElement {
 
     const heatingTime = demo ? demo.heating_time : this._getState(this._getEntityId("temps_de_chauffe_24h"));
     const heatingRatio = demo ? demo.heating_ratio : this._getState(this._getEntityId("ratio_de_chauffe"));
-    const deltaT = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
+    const deltaTRaw = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
 
-    // Get temperatures from DeltaT sensor attributes
+    // Get temperatures from DeltaT sensor attributes (stored in Celsius)
     const deltaTEntityId = this._getEntityId("dt_moyen_24h");
-    const indoorTemp = demo ? demo.indoor_temp : this._getAttribute(deltaTEntityId, "indoor_temp");
-    const outdoorTemp = demo ? demo.outdoor_temp : this._getAttribute(deltaTEntityId, "outdoor_temp");
+    const indoorTempRaw = demo ? demo.indoor_temp : this._getAttribute(deltaTEntityId, "indoor_temp");
+    const outdoorTempRaw = demo ? demo.outdoor_temp : this._getAttribute(deltaTEntityId, "outdoor_temp");
+
+    // Convert temperatures based on user's unit system (backend stores in Celsius)
+    const tempUnit = this._getTempUnit();
+    const indoorTemp = this._convertTemp(indoorTempRaw);
+    const outdoorTemp = this._convertTemp(outdoorTempRaw);
+    const deltaT = this._convertTempDelta(deltaTRaw);  // Use delta conversion (no +32)
 
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const perfData = this._getPerformanceData(performance);
@@ -439,11 +489,11 @@ class HomePerformanceCard extends LitElement {
             <div class="temp-values">
               <div class="temp-row">
                 <ha-icon icon="mdi:home"></ha-icon>
-                <span class="temp-value">${indoorTemp ?? "--"}°C</span>
+                <span class="temp-value">${indoorTemp ?? "--"}${tempUnit}</span>
               </div>
               <div class="temp-row">
                 <ha-icon icon="mdi:tree"></ha-icon>
-                <span class="temp-value">${outdoorTemp ?? "--"}°C</span>
+                <span class="temp-value">${outdoorTemp ?? "--"}${tempUnit}</span>
               </div>
             </div>
           </div>
@@ -492,7 +542,7 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:thermometer"></ha-icon>
               <span>Écart moyen</span>
             </div>
-            <div class="metric-value">${this._isValidValue(deltaT) ? `${deltaT}°C` : "--"}</div>
+            <div class="metric-value">${this._isValidValue(deltaT) ? `${deltaT}${tempUnit}` : "--"}</div>
             <div class="metric-sub">Int. - Ext.</div>
           </div>
         </div>

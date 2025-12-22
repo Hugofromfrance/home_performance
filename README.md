@@ -17,6 +17,7 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 - [Created Sensors](#-created-sensors-per-zone)
 - [Multi-zones](#-multi-zones)
 - [Lovelace Card](#-built-in-lovelace-card)
+- [Temperature Units](#️-temperature-units-celsiusfahrenheit)
 - [Prerequisites](#-prerequisites)
 - [Configuration](#️-configuration)
 - [Data Persistence](#-data-persistence)
@@ -296,6 +297,27 @@ If you use a YAML mode dashboard, manually add the resource:
 - 📈 **Detailed metrics** - K coefficient, Energy, Heating time
 - ⏳ **Progress** - Progress bar during initial analysis
 - 🎨 **Adaptive design** - Adapts to light/dark theme
+
+## 🌡️ Temperature Units (Celsius/Fahrenheit)
+
+The integration **automatically supports both Celsius and Fahrenheit** based on your Home Assistant unit system configuration.
+
+### How It Works
+
+| Component | Unit used |
+|-----------|-----------|
+| **Internal calculations** | Always Celsius (standardized) |
+| **K coefficient** | Always W/°C (scientific standard) |
+| **Temperature display** | Your HA system preference (°C or °F) |
+
+### Why K stays in W/°C?
+
+The K coefficient measures thermal loss in **Watts per degree Celsius**. This is the international scientific standard, ensuring:
+- Consistent comparison between users worldwide
+- Compatibility with building industry standards
+- No confusion with rating thresholds
+
+> **Note**: If your temperature sensors report in Fahrenheit, the integration automatically converts them to Celsius for calculations, then converts back to Fahrenheit for display.
 
 ## 📋 Prerequisites
 
