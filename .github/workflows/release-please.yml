@@ -41,18 +41,36 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Merge tag to dev branch (GitFlow)
+      - name: Create PR to merge release into dev (GitFlow)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG_NAME="${{ needs.release-please.outputs.tag_name }}"
-          echo "🏷️ Merging tag $TAG_NAME to dev branch..."
+          BRANCH_NAME="chore/sync-release-${TAG_NAME}-to-dev"
 
-          # Checkout dev branch
-          git checkout dev
+          echo "🏷️ Creating PR to merge $TAG_NAME into dev..."
 
-          # Merge the tag (not main!) into dev - GitFlow best practice
-          git merge "$TAG_NAME" --no-edit -m "chore: merge release $TAG_NAME into dev"
+          # Create a new branch from the tag
+          git checkout -b "$BRANCH_NAME" "$TAG_NAME"
 
-          # Push changes to dev
-          git push origin dev
+          # Push the branch
+          git push origin "$BRANCH_NAME"
 
-          echo "✅ Successfully merged $TAG_NAME into dev"
+          # Create a PR to dev
+          gh pr create \
+            --base dev \
+            --head "$BRANCH_NAME" \
+            --title "chore: sync release $TAG_NAME to dev" \
+            --body "## 🔄 Release Sync
+
+This PR synchronizes the release **$TAG_NAME** back to the \`dev\` branch.
+
+### Changes included:
+- Updated version numbers
+- Updated CHANGELOG.md
+- Release tag reference
+
+---
+*This PR was automatically created by the release workflow.*"
+
+          echo "✅ PR created to merge $TAG_NAME into dev"
