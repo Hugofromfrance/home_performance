@@ -56,21 +56,27 @@ jobs:
           # Push the branch
           git push origin "$BRANCH_NAME"
 
+          # Create PR body
+          PR_BODY=$(cat <<EOF
+          ## 🔄 Release Sync
+
+          This PR synchronizes the release **${TAG_NAME}** back to the dev branch.
+
+          ### Changes included:
+          - Updated version numbers
+          - Updated CHANGELOG.md
+          - Release tag reference
+
+          ---
+          *This PR was automatically created by the release workflow.*
+          EOF
+          )
+
           # Create a PR to dev
           gh pr create \
             --base dev \
             --head "$BRANCH_NAME" \
             --title "chore: sync release $TAG_NAME to dev" \
-            --body "## 🔄 Release Sync
-
-This PR synchronizes the release **$TAG_NAME** back to the \`dev\` branch.
-
-### Changes included:
-- Updated version numbers
-- Updated CHANGELOG.md
-- Release tag reference
-
----
-*This PR was automatically created by the release workflow.*"
+            --body "$PR_BODY"
 
           echo "✅ PR created to merge $TAG_NAME into dev"
