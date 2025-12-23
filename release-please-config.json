@@ -13,11 +13,6 @@
           "type": "json",
           "path": "custom_components/home_performance/manifest.json",
           "jsonpath": "$.version"
-        },
-        {
-          "type": "toml",
-          "path": "pyproject.toml",
-          "jsonpath": "$.project.version"
         }
       ]
     }
