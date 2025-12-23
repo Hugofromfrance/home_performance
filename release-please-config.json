@@ -17,21 +17,50 @@
         {
           "type": "toml",
           "path": "pyproject.toml",
-          "key": "project.version"
+          "jsonpath": "$.project.version"
         }
       ]
     }
   },
   "changelog-sections": [
-    {"type": "feat", "section": "✨ Nouvelles fonctionnalités"},
-    {"type": "fix", "section": "🐛 Corrections de bugs"},
-    {"type": "perf", "section": "⚡ Améliorations de performance"},
-    {"type": "refactor", "section": "♻️ Refactoring"},
-    {"type": "docs", "section": "📚 Documentation"},
-    {"type": "chore", "section": "🔧 Maintenance", "hidden": true},
-    {"type": "style", "section": "💄 Style"},
-    {"type": "test", "section": "✅ Tests", "hidden": true},
-    {"type": "ci", "section": "👷 CI/CD", "hidden": true}
+    {
+      "type": "feat",
+      "section": "✨ Nouvelles fonctionnalités"
+    },
+    {
+      "type": "fix",
+      "section": "🐛 Corrections de bugs"
+    },
+    {
+      "type": "perf",
+      "section": "⚡ Améliorations de performance"
+    },
+    {
+      "type": "refactor",
+      "section": "♻️ Refactoring"
+    },
+    {
+      "type": "docs",
+      "section": "📚 Documentation"
+    },
+    {
+      "type": "chore",
+      "section": "🔧 Maintenance",
+      "hidden": true
+    },
+    {
+      "type": "style",
+      "section": "💄 Style"
+    },
+    {
+      "type": "test",
+      "section": "✅ Tests",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "👷 CI/CD",
+      "hidden": true
+    }
   ]
 }
-
