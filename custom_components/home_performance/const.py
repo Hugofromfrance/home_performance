@@ -1,6 +1,23 @@
 """Constants for Home Performance integration."""
+import json
+from pathlib import Path
 
 DOMAIN = "home_performance"
+
+
+def get_version() -> str:
+    """Get version from manifest.json (single source of truth)."""
+    manifest_path = Path(__file__).parent / "manifest.json"
+    try:
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = json.load(f)
+            return manifest.get("version", "unknown")
+    except (FileNotFoundError, json.JSONDecodeError):
+        return "unknown"
+
+
+# Version from manifest.json
+VERSION = get_version()
 
 # Configuration keys
 CONF_INDOOR_TEMP_SENSOR = "indoor_temp_sensor"
@@ -21,6 +38,7 @@ AGGREGATION_PERIOD_HOURS = 24  # Période d'agrégation pour le calcul de K
 MIN_DELTA_T = 5.0  # ΔT minimum pour calcul fiable (°C)
 MIN_HEATING_TIME_HOURS = 0.5  # Temps de chauffe minimum sur la période (30 min)
 MIN_DATA_HOURS = 12  # Heures minimum de données pour premier calcul
+HISTORY_DAYS = 7  # Nombre de jours d'historique pour le calcul stable de K
 
 # Sensor types - Thermal
 SENSOR_K_COEFFICIENT = "k_coefficient"  # W/°C

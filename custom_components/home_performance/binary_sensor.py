@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, CONF_ZONE_NAME, MIN_DATA_HOURS
+from .const import DOMAIN, CONF_ZONE_NAME, MIN_DATA_HOURS, VERSION
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class HomePerformanceBaseBinarySensor(
             "name": f"Home Performance - {self._zone_name}",
             "manufacturer": "Home Performance",
             "model": "Thermal Analyzer",
-            "sw_version": "1.1.3",
+            "sw_version": VERSION,
         }
 
 
@@ -74,11 +74,11 @@ class WindowOpenSensor(HomePerformanceBaseBinarySensor):
 
     _attr_device_class = BinarySensorDeviceClass.WINDOW
     _attr_icon = "mdi:window-open-variant"
+    _attr_translation_key = "fenetre_ouverte"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "window_open")
-        self._attr_name = "Fenêtre ouverte"
 
     @property
     def is_on(self) -> bool:
@@ -100,11 +100,11 @@ class DataReadySensor(HomePerformanceBaseBinarySensor):
     """Binary sensor indicating if enough data has been collected."""
 
     _attr_icon = "mdi:database-check"
+    _attr_translation_key = "donnees_pretes"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "data_ready")
-        self._attr_name = "Données prêtes"
 
     @property
     def is_on(self) -> bool:

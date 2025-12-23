@@ -43,7 +43,7 @@ def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None
         outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR, default=default_outdoor)
     else:
         outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR)
-    
+
     return vol.Schema(
         {
             vol.Required(CONF_ZONE_NAME): selector.TextSelector(
@@ -56,12 +56,12 @@ def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
             vol.Required(CONF_HEATING_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean"])
+                selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean", "binary_sensor"])
             ),
             vol.Required(CONF_HEATER_POWER): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=100,
-                    max=10000,
+                    max=100000,
                     step=50,
                     unit_of_measurement="W",
                     mode="box",
@@ -211,69 +211,82 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            # Clean up None values from optional fields
+            cleaned_input = {k: v for k, v in user_input.items() if v is not None}
+            return self.async_create_entry(title="", data=cleaned_input)
 
         # Get current values from data or options
         current = {**self._config_entry.data, **self._config_entry.options}
 
+        # Build schema dynamically to avoid None defaults for NumberSelector
+        schema_dict: dict[Any, Any] = {
+            vol.Required(
+                CONF_HEATER_POWER,
+                default=current.get(CONF_HEATER_POWER, 1000),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=100,
+                    max=100000,
+                    step=50,
+                    unit_of_measurement="W",
+                    mode="box",
+                )
+            ),
+        }
+
+        # Surface - only set default if value exists (NumberSelector doesn't support None)
+        surface_value = current.get(CONF_SURFACE)
+        if surface_value is not None:
+            schema_dict[vol.Optional(CONF_SURFACE, default=surface_value)] = selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box"
+                )
+            )
+        else:
+            schema_dict[vol.Optional(CONF_SURFACE)] = selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box"
+                )
+            )
+
+        # Volume - only set default if value exists
+        volume_value = current.get(CONF_VOLUME)
+        if volume_value is not None:
+            schema_dict[vol.Optional(CONF_VOLUME, default=volume_value)] = selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box"
+                )
+            )
+        else:
+            schema_dict[vol.Optional(CONF_VOLUME)] = selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box"
+                )
+            )
+
+        # Power sensor - EntitySelector handles None gracefully
+        schema_dict[vol.Optional(
+            CONF_POWER_SENSOR,
+            default=current.get(CONF_POWER_SENSOR),
+        )] = selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="power",
+            )
+        )
+
+        # Energy sensor - EntitySelector handles None gracefully
+        schema_dict[vol.Optional(
+            CONF_ENERGY_SENSOR,
+            default=current.get(CONF_ENERGY_SENSOR),
+        )] = selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="energy",
+            )
+        )
+
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_HEATER_POWER,
-                        default=current.get(CONF_HEATER_POWER, 1000),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=100,
-                            max=10000,
-                            step=50,
-                            unit_of_measurement="W",
-                            mode="box",
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_SURFACE,
-                        default=current.get(CONF_SURFACE),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=1,
-                            max=500,
-                            step=0.5,
-                            unit_of_measurement="m²",
-                            mode="box",
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_VOLUME,
-                        default=current.get(CONF_VOLUME),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=1,
-                            max=1500,
-                            step=0.5,
-                            unit_of_measurement="m³",
-                            mode="box",
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_POWER_SENSOR,
-                        default=current.get(CONF_POWER_SENSOR),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            device_class="power",
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_ENERGY_SENSOR,
-                        default=current.get(CONF_ENERGY_SENSOR),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            device_class="energy",
-                        )
-                    ),
-                }
-            ),
+            data_schema=vol.Schema(schema_dict),
         )

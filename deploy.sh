@@ -17,6 +17,7 @@ ssh ha "mkdir -p /config/custom_components/home_performance/www"
 echo "📦 Copie des fichiers..."
 scp "$SOURCE_DIR"/*.py ha:/config/custom_components/home_performance/
 scp "$SOURCE_DIR"/*.json ha:/config/custom_components/home_performance/
+scp "$SOURCE_DIR"/services.yaml ha:/config/custom_components/home_performance/
 scp "$SOURCE_DIR"/translations/*.json ha:/config/custom_components/home_performance/translations/
 
 # Copier la carte Lovelace custom

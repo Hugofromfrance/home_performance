@@ -8,10 +8,13 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import voluptuous as vol
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN
 from .coordinator import HomePerformanceCoordinator
@@ -22,6 +25,14 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
+
+# Service names
+SERVICE_RESET_HISTORY = "reset_history"
+
+# Service schemas
+RESET_HISTORY_SCHEMA = vol.Schema({
+    vol.Required("zone_name"): cv.string,
+})
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -40,6 +51,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await _async_register_frontend(hass)
         hass.data[DOMAIN]["frontend_registered"] = True
 
+    # Register services (only once globally)
+    if "services_registered" not in hass.data[DOMAIN]:
+        await _async_register_services(hass)
+        hass.data[DOMAIN]["services_registered"] = True
+
     # Forward to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -53,6 +69,43 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
     """Handle options update - reload the integration."""
     _LOGGER.info("Options updated for %s, reloading", entry.title)
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def _async_register_services(hass: HomeAssistant) -> None:
+    """Register Home Performance services."""
+
+    async def handle_reset_history(call: ServiceCall) -> None:
+        """Handle the reset_history service call.
+        
+        Clears the 7-day rolling history for a specific zone.
+        Use after insulation work or to clear anomalous data.
+        """
+        zone_name = call.data["zone_name"]
+        _LOGGER.info("Reset history service called for zone: %s", zone_name)
+        
+        # Find the coordinator for this zone
+        found = False
+        for entry_id, coordinator in hass.data[DOMAIN].items():
+            if entry_id in ("frontend_registered", "services_registered", "last_outdoor_temp_sensor"):
+                continue
+            if isinstance(coordinator, HomePerformanceCoordinator):
+                if coordinator.zone_name.lower() == zone_name.lower():
+                    coordinator.reset_history()
+                    found = True
+                    _LOGGER.info("History reset completed for zone: %s", zone_name)
+                    break
+        
+        if not found:
+            _LOGGER.warning("Zone not found for reset: %s", zone_name)
+            raise ValueError(f"Zone '{zone_name}' not found")
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET_HISTORY,
+        handle_reset_history,
+        schema=RESET_HISTORY_SCHEMA,
+    )
+    _LOGGER.info("Home Performance services registered")
 
 
 async def _async_register_frontend(hass: HomeAssistant) -> None:
