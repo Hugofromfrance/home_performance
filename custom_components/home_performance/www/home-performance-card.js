@@ -26,6 +26,7 @@ class HomePerformanceCard extends LitElement {
     return {
       zone: "",
       title: "Performance Thermique",
+      layout: "full",  // "full", "badge", "pill"
       demo: false,
     };
   }
@@ -36,13 +37,19 @@ class HomePerformanceCard extends LitElement {
     }
     this.config = {
       title: "Performance Thermique",
+      layout: "full",
       demo: false,
       ...config,
     };
   }
 
   getCardSize() {
-    return 5;
+    // Different sizes for different layouts
+    switch (this.config?.layout) {
+      case "badge": return 2;
+      case "pill": return 1;
+      default: return 5;
+    }
   }
 
   // Entity name mappings: French (primary) -> English (fallback)
@@ -314,6 +321,21 @@ class HomePerformanceCard extends LitElement {
       return html`<ha-card>Chargement...</ha-card>`;
     }
 
+    const layout = this.config.layout || "full";
+
+    // Dispatch to appropriate layout renderer
+    switch (layout) {
+      case "badge":
+        return this._renderBadgeLayout();
+      case "pill":
+        return this._renderPillLayout();
+      default:
+        return this._renderFullLayout();
+    }
+  }
+
+  // Full layout (default - original card)
+  _renderFullLayout() {
     const integrationReady = this._isIntegrationReady();
     const dataReady = this._isDataReady();
     const progress = this._getProgress();
@@ -344,6 +366,163 @@ class HomePerformanceCard extends LitElement {
     `;
   }
 
+  // Badge layout (Concept A - compact vertical card)
+  _renderBadgeLayout() {
+    const integrationReady = this._isIntegrationReady();
+    const dataReady = this._isDataReady();
+    const progress = this._getProgress();
+
+    if (!integrationReady || !dataReady) {
+      // Calculate circle progress (circumference = 2 * PI * radius)
+      const radius = 24;
+      const circumference = 2 * Math.PI * radius;
+      const offset = circumference - (progress / 100) * circumference;
+
+      return html`
+        <ha-card class="badge-card badge-analyzing">
+          <div class="badge-progress-ring">
+            <svg viewBox="0 0 56 56">
+              <circle
+                class="badge-progress-bg"
+                cx="28" cy="28" r="${radius}"
+                stroke-width="4"
+                fill="none"
+              />
+              <circle
+                class="badge-progress-fill"
+                cx="28" cy="28" r="${radius}"
+                stroke-width="4"
+                fill="none"
+                stroke-dasharray="${circumference}"
+                stroke-dashoffset="${offset}"
+                transform="rotate(-90 28 28)"
+              />
+            </svg>
+            <span class="badge-progress-text">${Math.round(progress)}%</span>
+          </div>
+          <div class="badge-zone-name">${this.config.zone}</div>
+          <div class="badge-status">Analyse en cours</div>
+        </ha-card>
+      `;
+    }
+
+    const demo = this.config.demo ? this._getDemoData() : null;
+    const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
+    const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
+    const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
+
+    const insulationEntityId = this._getEntityId("note_d_isolation");
+    const insulationAttrs = demo ? {} : {
+      status: this._getAttribute(insulationEntityId, "status"),
+      season: this._getAttribute(insulationEntityId, "season"),
+      message: this._getAttribute(insulationEntityId, "message"),
+      k_value: this._getAttribute(insulationEntityId, "k_value"),
+      k_source: this._getAttribute(insulationEntityId, "k_source"),
+    };
+
+    const insulationData = this._getInsulationData(insulation, insulationAttrs);
+    const scoreLetter = this._getScoreLetter(insulation);
+
+    return html`
+      <ha-card class="badge-card" style="--accent: ${insulationData.color}">
+        <div class="badge-accent-bar"></div>
+        <div class="badge-score-circle">
+          <span class="badge-score-letter">${scoreLetter}</span>
+        </div>
+        <div class="badge-rating-label">${insulationData.label}</div>
+        <div class="badge-separator"></div>
+        <div class="badge-zone-name">${this.config.zone}</div>
+        <div class="badge-k-value">
+          ${this._isValidValue(kCoef) ? html`${kCoef}<span class="badge-k-unit">W/°C</span>` : "--"}
+        </div>
+        ${this._isValidValue(kPerM3) ? html`<div class="badge-k-normalized">${kPerM3} W/m³</div>` : ""}
+      </ha-card>
+    `;
+  }
+
+  // Pill layout (Concept D - horizontal strip)
+  _renderPillLayout() {
+    const integrationReady = this._isIntegrationReady();
+    const dataReady = this._isDataReady();
+    const progress = this._getProgress();
+
+    if (!integrationReady || !dataReady) {
+      return html`
+        <ha-card class="pill-card pill-analyzing">
+          <div class="pill-progress-badge">
+            <span class="pill-progress-percent">${Math.round(progress)}%</span>
+          </div>
+          <div class="pill-zone-section">
+            <div class="pill-zone-name">${this.config.zone}</div>
+            <div class="pill-zone-rating">Analyse en cours</div>
+          </div>
+          <div class="pill-separator"></div>
+          <div class="pill-progress-track-wrapper">
+            <div class="pill-progress-track">
+              <div class="pill-progress-fill" style="width: ${progress}%"></div>
+            </div>
+          </div>
+        </ha-card>
+      `;
+    }
+
+    const demo = this.config.demo ? this._getDemoData() : null;
+    const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
+    const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
+    const deltaTRaw = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
+
+    const insulationEntityId = this._getEntityId("note_d_isolation");
+    const insulationAttrs = demo ? {} : {
+      status: this._getAttribute(insulationEntityId, "status"),
+      season: this._getAttribute(insulationEntityId, "season"),
+      message: this._getAttribute(insulationEntityId, "message"),
+      k_value: this._getAttribute(insulationEntityId, "k_value"),
+      k_source: this._getAttribute(insulationEntityId, "k_source"),
+    };
+
+    const insulationData = this._getInsulationData(insulation, insulationAttrs);
+    const scoreLetter = this._getScoreLetter(insulation);
+    const tempUnit = this._getTempUnit();
+    const deltaT = this._convertTempDelta(deltaTRaw);
+
+    return html`
+      <ha-card class="pill-card" style="--accent: ${insulationData.color}">
+        <div class="pill-accent-bar"></div>
+        <div class="pill-score-badge">
+          <span class="pill-score-letter">${scoreLetter}</span>
+        </div>
+        <div class="pill-zone-section">
+          <div class="pill-zone-name">${this.config.zone}</div>
+          <div class="pill-zone-rating">${insulationData.label}</div>
+        </div>
+        <div class="pill-separator"></div>
+        <div class="pill-stats-section">
+          <div class="pill-stat">
+            <div class="pill-stat-value">${this._isValidValue(kCoef) ? kCoef : "--"}</div>
+            <div class="pill-stat-label">W/°C</div>
+          </div>
+          <div class="pill-stat">
+            <div class="pill-stat-value">${this._isValidValue(deltaT) ? `${deltaT}°` : "--"}</div>
+            <div class="pill-stat-label">ΔT</div>
+          </div>
+        </div>
+      </ha-card>
+    `;
+  }
+
+  // Get score letter from insulation rating
+  _getScoreLetter(rating) {
+    const letters = {
+      excellent: "A+",
+      excellent_inferred: "A+",
+      good: "A",
+      average: "B",
+      poor: "C",
+      very_poor: "D",
+    };
+    return letters[rating] || "?";
+  }
+
   _renderLoading() {
     const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
     const expectedEntity = `binary_sensor.home_performance_${zone}_donnees_pretes`;
@@ -351,7 +530,7 @@ class HomePerformanceCard extends LitElement {
     return html`
       <div class="analyzing">
         <div class="loading-spinner">
-          <ha-icon icon="mdi:home-thermometer"></ha-icon>
+          <div class="spinner"></div>
         </div>
         <div class="analyzing-title" style="margin-top: 12px;">Chargement de l'intégration...</div>
         <div class="analyzing-info" style="margin-top: 8px;">
@@ -638,10 +817,13 @@ class HomePerformanceCard extends LitElement {
         padding: 20px;
       }
 
-      .loading-spinner ha-icon {
-        --mdc-icon-size: 48px;
-        color: #6366f1;
-        animation: spin 2s linear infinite;
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-color);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
       }
 
       /* Content - Compact */
@@ -924,6 +1106,290 @@ class HomePerformanceCard extends LitElement {
           grid-template-columns: 1fr;
         }
       }
+
+      /* ========================================
+         BADGE LAYOUT (Concept A)
+         ======================================== */
+      .badge-card {
+        background: var(--bg-primary);
+        border-radius: 14px;
+        border: 1px solid var(--border-color);
+        padding: 20px 16px;
+        width: 140px;
+        min-height: 223px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .badge-accent-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--accent);
+      }
+
+      .badge-score-circle {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--accent) 20%, transparent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 12px;
+      }
+
+      .badge-score-letter {
+        font-size: 26px;
+        font-weight: 800;
+        color: var(--accent);
+        letter-spacing: -1px;
+      }
+
+      .badge-rating-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 8px;
+      }
+
+      .badge-separator {
+        width: 40px;
+        height: 2px;
+        background: var(--border-color);
+        margin: 0 auto 10px;
+        border-radius: 1px;
+      }
+
+      .badge-zone-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .badge-k-value {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .badge-k-unit {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-left: 2px;
+      }
+
+      .badge-k-normalized {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 2px;
+        opacity: 0.8;
+      }
+
+      /* Badge Analyzing State */
+      .badge-analyzing {
+        --accent: #6366f1;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .badge-progress-ring {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 12px;
+        position: relative;
+      }
+
+      .badge-progress-ring svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .badge-progress-bg {
+        stroke: var(--border-color);
+      }
+
+      .badge-progress-fill {
+        stroke: #6366f1;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease;
+      }
+
+      .badge-progress-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 14px;
+        font-weight: 700;
+        color: #6366f1;
+      }
+
+      .badge-status {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      /* ========================================
+         PILL LAYOUT (Concept D)
+         ======================================== */
+      .pill-card {
+        background: var(--bg-primary);
+        border-radius: 14px;
+        border: 1px solid var(--border-color);
+        padding: 8px 16px 8px 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        height: 58px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .pill-accent-bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--accent);
+        border-radius: 14px 0 0 14px;
+      }
+
+      .pill-score-badge {
+        width: 42px;
+        height: 42px;
+        background: color-mix(in srgb, var(--accent) 20%, transparent);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-left: 8px;
+      }
+
+      .pill-score-letter {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--accent);
+      }
+
+      .pill-zone-section {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .pill-zone-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pill-zone-rating {
+        font-size: 11px;
+        color: var(--accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .pill-separator {
+        width: 1px;
+        height: 28px;
+        background: var(--border-color);
+      }
+
+      .pill-stats-section {
+        display: flex;
+        gap: 16px;
+        flex-shrink: 0;
+      }
+
+      .pill-stat {
+        text-align: center;
+      }
+
+      .pill-stat-value {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .pill-stat-label {
+        font-size: 9px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      /* Pill Analyzing State */
+      .pill-analyzing {
+        --accent: #6366f1;
+      }
+
+      .pill-analyzing .pill-accent-bar {
+        background: #6366f1;
+      }
+
+      .pill-progress-badge {
+        width: 42px;
+        height: 42px;
+        background: color-mix(in srgb, #6366f1 20%, transparent);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-left: 8px;
+      }
+
+      .pill-progress-percent {
+        font-size: 13px;
+        font-weight: 800;
+        color: #6366f1;
+      }
+
+      .pill-progress-track-wrapper {
+        flex: 1;
+        min-width: 60px;
+        max-width: 120px;
+      }
+
+      .pill-progress-track {
+        width: 100%;
+        height: 4px;
+        background: var(--border-color);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .pill-progress-fill {
+        height: 100%;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        border-radius: 2px;
+        transition: width 0.5s ease;
+      }
     `;
   }
 }
@@ -961,6 +1427,16 @@ class HomePerformanceCardEditor extends LitElement {
     this.dispatchEvent(event);
   }
 
+  _setLayout(layout) {
+    const newConfig = { ...this.config, layout };
+    const event = new CustomEvent("config-changed", {
+      detail: { config: newConfig },
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(event);
+  }
+
   render() {
     if (!this.hass || !this.config) {
       return html``;
@@ -982,6 +1458,42 @@ class HomePerformanceCardEditor extends LitElement {
           @input=${this.configChanged}
         ></ha-textfield>
 
+        <div class="layout-selector">
+          <label>Style de carte</label>
+          <div class="layout-options">
+            <div
+              class="layout-option ${this.config.layout === "full" || !this.config.layout ? "selected" : ""}"
+              @click=${() => this._setLayout("full")}
+            >
+              <div class="layout-preview layout-full">
+                <div class="lp-header"></div>
+                <div class="lp-content"></div>
+              </div>
+              <span>Complète</span>
+            </div>
+            <div
+              class="layout-option ${this.config.layout === "badge" ? "selected" : ""}"
+              @click=${() => this._setLayout("badge")}
+            >
+              <div class="layout-preview layout-badge">
+                <div class="lp-circle"></div>
+                <div class="lp-text"></div>
+              </div>
+              <span>Badge</span>
+            </div>
+            <div
+              class="layout-option ${this.config.layout === "pill" ? "selected" : ""}"
+              @click=${() => this._setLayout("pill")}
+            >
+              <div class="layout-preview layout-pill">
+                <div class="lp-dot"></div>
+                <div class="lp-bar"></div>
+              </div>
+              <span>Pilule</span>
+            </div>
+          </div>
+        </div>
+
         <ha-formfield label="Mode démo (prévisualisation)">
           <ha-checkbox
             .checked=${this.config.demo === true}
@@ -1002,6 +1514,117 @@ class HomePerformanceCardEditor extends LitElement {
         padding: 16px;
       }
       ha-textfield { width: 100%; }
+
+      .layout-selector label {
+        display: block;
+        font-size: 12px;
+        color: var(--secondary-text-color);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .layout-options {
+        display: flex;
+        gap: 12px;
+      }
+
+      .layout-option {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        border: 2px solid var(--divider-color);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .layout-option:hover {
+        border-color: var(--primary-color);
+        background: rgba(var(--rgb-primary-color), 0.05);
+      }
+
+      .layout-option.selected {
+        border-color: var(--primary-color);
+        background: rgba(var(--rgb-primary-color), 0.1);
+      }
+
+      .layout-option span {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--primary-text-color);
+      }
+
+      .layout-preview {
+        width: 50px;
+        height: 40px;
+        background: var(--card-background-color);
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        padding: 4px;
+        gap: 3px;
+      }
+
+      .layout-full .lp-header {
+        height: 8px;
+        background: var(--divider-color);
+        border-radius: 2px;
+      }
+
+      .layout-full .lp-content {
+        flex: 1;
+        background: var(--divider-color);
+        border-radius: 2px;
+        opacity: 0.5;
+      }
+
+      .layout-badge {
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+
+      .layout-badge .lp-circle {
+        width: 16px;
+        height: 16px;
+        background: var(--primary-color);
+        border-radius: 4px;
+        opacity: 0.6;
+      }
+
+      .layout-badge .lp-text {
+        width: 24px;
+        height: 4px;
+        background: var(--divider-color);
+        border-radius: 2px;
+      }
+
+      .layout-pill {
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 8px;
+        gap: 6px;
+      }
+
+      .layout-pill .lp-dot {
+        width: 12px;
+        height: 12px;
+        background: var(--primary-color);
+        border-radius: 3px;
+        opacity: 0.6;
+      }
+
+      .layout-pill .lp-bar {
+        flex: 1;
+        height: 6px;
+        background: var(--divider-color);
+        border-radius: 2px;
+      }
     `;
   }
 }
