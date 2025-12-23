@@ -74,11 +74,11 @@ class WindowOpenSensor(HomePerformanceBaseBinarySensor):
 
     _attr_device_class = BinarySensorDeviceClass.WINDOW
     _attr_icon = "mdi:window-open-variant"
+    _attr_translation_key = "fenetre_ouverte"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "window_open")
-        self._attr_name = "Fenêtre ouverte"
 
     @property
     def is_on(self) -> bool:
@@ -100,11 +100,11 @@ class DataReadySensor(HomePerformanceBaseBinarySensor):
     """Binary sensor indicating if enough data has been collected."""
 
     _attr_icon = "mdi:database-check"
+    _attr_translation_key = "donnees_pretes"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "data_ready")
-        self._attr_name = "Données prêtes"
 
     @property
     def is_on(self) -> bool:

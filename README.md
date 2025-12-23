@@ -17,6 +17,7 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 - [Created Sensors](#-created-sensors-per-zone)
 - [Multi-zones](#-multi-zones)
 - [Lovelace Card](#-built-in-lovelace-card)
+- [Temperature Units](#️-temperature-units-celsiusfahrenheit)
 - [Prerequisites](#-prerequisites)
 - [Configuration](#️-configuration)
 - [Data Persistence](#-data-persistence)
@@ -73,7 +74,7 @@ You use electric heating and wonder:
 |------|---------------------|
 | Indoor temp sensor | Aqara, Sonoff SNZB-02, Xiaomi, Netatmo, Ecobee, Shelly H&T, ESPHome... |
 | Outdoor temp sensor | Local weather station, Weather services, Netatmo Outdoor... |
-| Heating entity | Any `climate.*`, `switch.*` or `input_boolean.*` |
+| Heating entity | Any `climate.*`, `switch.*`, `input_boolean.*` or `binary_sensor.*` |
 
 ### Optional (recommended)
 
@@ -127,6 +128,28 @@ This integration uses **empirical measurement** of thermal performance, unlike t
 **U** coefficients (formerly "K" in standards) measure the thermal transmission of a **specific wall** (window, wall) in W/(m²·K). They are measured in laboratories and allow product comparison.
 
 Home Performance's **K coefficient** measures the **global heat loss** of an entire room in W/°C. It's equivalent to the **G** (or GV) coefficient used in building thermal engineering, but measured empirically rather than calculated.
+
+#### K Stability Across Weather Conditions
+
+The K coefficient is a **physical constant** of your room's insulation. It measures heat loss **per degree of temperature difference**, so it should remain stable regardless of outdoor temperature.
+
+| Weather | ΔT | Daily Energy | K Coefficient |
+|---------|-----|--------------|---------------|
+| Mild (10°C outside, 20°C inside) | 10°C | 5 kWh | **5.0 W/°C** |
+| Cold (-2°C outside, 20°C inside) | 22°C | 11 kWh | **5.0 W/°C** |
+
+➡️ You'll consume more energy when it's cold, but **your insulation rating should stay the same**.
+
+**Why might K slightly vary in practice?**
+
+| Factor | Impact |
+|--------|--------|
+| **Thermal bridges** | More apparent in extreme cold |
+| **Air infiltrations** | Increase with wind (often stronger in winter) |
+| **Material behavior** | Some insulation loses efficiency at very low temperatures |
+| **Condensation** | Moisture can temporarily degrade insulation |
+
+> **Tip**: If you notice a significant drop in your insulation rating during cold spells, it may reveal thermal bridges, air leaks around windows/doors, or sealing issues. This is the value of empirical measurement!
 
 ## 📊 Created Sensors (per zone)
 
@@ -251,7 +274,7 @@ Each zone has its **own sensors** and **own Lovelace card**.
 
 ## 🎴 Built-in Lovelace Card
 
-The integration includes a **ready-to-use modern custom card**!
+The integration includes a **ready-to-use modern custom card** with multiple layout options!
 
 ### Card Installation
 
@@ -281,21 +304,78 @@ If you use a YAML mode dashboard, manually add the resource:
 
 </details>
 
+### Card Layouts
+
+Choose the layout that fits your dashboard style:
+
+| Layout | Description | Best for |
+|--------|-------------|----------|
+| `full` | Complete card with all metrics (default) | Main dashboard, detailed view |
+| `badge` | Compact vertical badge with score | Grid of rooms, quick overview |
+| `pill` | Horizontal strip with key info | Sidebar, compact lists |
+
+#### Full Layout (default)
+```yaml
+type: custom:home-performance-card
+zone: Living Room
+layout: full
+```
+The complete card showing insulation rating, performance, temperatures, and detailed metrics.
+
+#### Badge Layout
+```yaml
+type: custom:home-performance-card
+zone: Bedroom
+layout: badge
+```
+A compact vertical card showing the score letter (A+ to D), zone name, and K coefficient. Perfect for creating a grid of all your rooms.
+
+#### Pill Layout
+```yaml
+type: custom:home-performance-card
+zone: Office
+layout: pill
+```
+A slim horizontal bar showing score, zone name, K coefficient, and ΔT. Ideal for sidebars or compact dashboards.
+
 ### Card Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `zone` | *required* | Exact name of your zone |
-| `title` | "Thermal Performance" | Displayed title |
+| `title` | "Thermal Performance" | Displayed title (full layout only) |
+| `layout` | "full" | Card style: `full`, `badge`, or `pill` |
 | `demo` | false | Demo mode with fake data |
 
 ### Card Features
 
-- 📊 **Visual scores** - Insulation and Performance with colors
+- 📊 **Visual scores** - Insulation rating from A+ to D with colors
 - 🌡️ **Temperatures** - Indoor/Outdoor in real-time
 - 📈 **Detailed metrics** - K coefficient, Energy, Heating time
 - ⏳ **Progress** - Progress bar during initial analysis
 - 🎨 **Adaptive design** - Adapts to light/dark theme
+- 🎛️ **Visual editor** - Choose layout directly in the UI
+
+## 🌡️ Temperature Units (Celsius/Fahrenheit)
+
+The integration **automatically supports both Celsius and Fahrenheit** based on your Home Assistant unit system configuration.
+
+### How It Works
+
+| Component | Unit used |
+|-----------|-----------|
+| **Internal calculations** | Always Celsius (standardized) |
+| **K coefficient** | Always W/°C (scientific standard) |
+| **Temperature display** | Your HA system preference (°C or °F) |
+
+### Why K stays in W/°C?
+
+The K coefficient measures thermal loss in **Watts per degree Celsius**. This is the international scientific standard, ensuring:
+- Consistent comparison between users worldwide
+- Compatibility with building industry standards
+- No confusion with rating thresholds
+
+> **Note**: If your temperature sensors report in Fahrenheit, the integration automatically converts them to Celsius for calculations, then converts back to Fahrenheit for display.
 
 ## 📋 Prerequisites
 
@@ -314,7 +394,7 @@ If you use a YAML mode dashboard, manually add the resource:
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
 | Heating entity | climate.xxx or switch.xxx |
-| Heater power | Declared power in Watts |
+| Heater power | Declared power in Watts (up to 100kW). For BTU/h: divide by 3.41 |
 
 ### Optional Parameters
 
@@ -448,6 +528,8 @@ Needs optimization : beyond
 - [x] Precise heat detection via power sensor (event-driven)
 - [x] Real-time open window detection (event-driven)
 - [x] Built-in Lovelace card (auto-registered)
+- [x] Multiple card layouts (full, badge, pill) 🎄
+- [x] Celsius/Fahrenheit automatic support
 - [x] Data persistence
 - [x] Energy performance vs national average
 - [x] Utility Meter counter (midnight-to-midnight reset)

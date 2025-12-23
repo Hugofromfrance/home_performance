@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTime, PERCENTAGE
+from homeassistant.const import UnitOfTime, UnitOfTemperature, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -164,11 +164,11 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = "W/°C"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:heat-wave"
+    _attr_translation_key = "coefficient_k"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "k_coefficient")
-        self._attr_name = "Coefficient K"
 
     @property
     def native_value(self) -> float | None:
@@ -183,9 +183,18 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         data = self.coordinator.data or {}
+        k_24h = data.get("k_coefficient_24h")
+        k_7d = data.get("k_coefficient_7d")
+        volume = data.get("volume")
+        k_per_m3_24h = None
+        if k_24h is not None and volume and volume > 0:
+            k_per_m3_24h = round(k_24h / volume, 2)
         return {
             "description": "Déperdition thermique par degré d'écart (W/°C)",
             "heater_power_w": data.get("heater_power"),
+            "k_24h": round(k_24h, 1) if k_24h is not None else None,
+            "k_7d": round(k_7d, 1) if k_7d is not None else None,
+            "k_per_m3_24h": k_per_m3_24h,
             "interpretation": (
                 "Plus K est bas, meilleure est l'isolation. "
                 "Valeurs typiques: 10-20 (bien isolé), 20-40 (moyen), 40+ (mal isolé)"
@@ -199,11 +208,11 @@ class KPerM2Sensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = "W/(°C·m²)"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:square-outline"
+    _attr_translation_key = "k_par_m2"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "k_per_m2")
-        self._attr_name = "K par m²"
 
     @property
     def native_value(self) -> float | None:
@@ -230,11 +239,11 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = "W/(°C·m³)"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:cube-outline"
+    _attr_translation_key = "k_par_m3"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "k_per_m3")
-        self._attr_name = "K par m³"
 
     @property
     def native_value(self) -> float | None:
@@ -262,11 +271,11 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:lightning-bolt-outline"
+    _attr_translation_key = "energie_estimee_journaliere"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "daily_energy")
-        self._attr_name = "Énergie 24h (estimée)"
 
     @property
     def native_value(self) -> float | None:
@@ -299,11 +308,11 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
 
     _attr_state_class = None  # Text format, no state class
     _attr_icon = "mdi:clock-outline"
+    _attr_translation_key = "temps_de_chauffe_24h"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "heating_time")
-        self._attr_name = "Temps de chauffe (24h)"
 
     @property
     def native_value(self) -> str | None:
@@ -334,11 +343,11 @@ class HeatingRatioSensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:percent"
+    _attr_translation_key = "taux_de_chauffe_24h"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "heating_ratio")
-        self._attr_name = "Ratio de chauffe"
 
     @property
     def native_value(self) -> float | None:
@@ -363,11 +372,11 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
     """Sensor for energy performance evaluation based on French national statistics."""
 
     _attr_icon = "mdi:leaf"
+    _attr_translation_key = "performance_energetique"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "energy_performance")
-        self._attr_name = "Performance énergétique"
 
     @property
     def native_value(self) -> str | None:
@@ -429,14 +438,15 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
 class DeltaTSensor(HomePerformanceBaseSensor):
     """Sensor for average temperature difference."""
 
-    _attr_native_unit_of_measurement = "°C"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:thermometer"
+    _attr_translation_key = "dt_moyen_24h"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "avg_delta_t")
-        self._attr_name = "ΔT moyen (24h)"
 
     @property
     def native_value(self) -> float | None:
@@ -476,11 +486,11 @@ class DataHoursSensor(HomePerformanceBaseSensor):
 
     _attr_state_class = None  # Text format, no state class
     _attr_icon = "mdi:database-clock"
+    _attr_translation_key = "heures_de_donnees"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "data_hours")
-        self._attr_name = "Heures de données"
 
     @property
     def native_value(self) -> str | None:
@@ -508,11 +518,11 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
 
     _attr_state_class = None  # Text format, no state class
     _attr_icon = "mdi:timer-sand"
+    _attr_translation_key = "temps_d_analyse_restant"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "analysis_remaining")
-        self._attr_name = "Temps restant analyse"
 
     @property
     def native_value(self) -> str | None:
@@ -562,11 +572,11 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:progress-clock"
+    _attr_translation_key = "progression_analyse"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "analysis_progress")
-        self._attr_name = "Progression analyse"
 
     @property
     def native_value(self) -> int:
@@ -625,11 +635,11 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
     """
 
     _attr_icon = "mdi:home-thermometer"
+    _attr_translation_key = "note_d_isolation"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "insulation_rating")
-        self._attr_name = "Note d'isolation"
 
     @property
     def native_value(self) -> str | None:
@@ -711,11 +721,11 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:counter"
+    _attr_translation_key = "energie_mesuree_journaliere"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "measured_energy_daily")
-        self._attr_name = "Énergie jour (mesurée)"
 
     @property
     def native_value(self) -> float | None:
