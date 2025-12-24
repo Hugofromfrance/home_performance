@@ -39,6 +39,7 @@ class HomePerformanceCard extends LitElement {
     this.config = {
       title: "Performance Thermique",
       layout: "full",
+      show_graph: true,
       demo: false,
       ...config,
     };
@@ -330,7 +331,125 @@ class HomePerformanceCard extends LitElement {
       outdoor_temp: "8.8",
       insulation: "good",
       performance: "excellent",
+      k_history_7d: [
+        { date: "2024-12-18", k: 12.5, estimated: false },  // excellent
+        { date: "2024-12-19", k: 18.0, estimated: false },  // good
+        { date: "2024-12-20", k: 18.0, estimated: true },   // carry-forward
+        { date: "2024-12-21", k: 28.5, estimated: false },  // average
+        { date: "2024-12-22", k: 35.0, estimated: false },  // poor
+        { date: "2024-12-23", k: 35.0, estimated: true },   // carry-forward
+        { date: "2024-12-24", k: 22.0, estimated: false },  // good
+      ],
     };
+  }
+
+  // Get K history from sensor attributes
+  _getKHistory() {
+    if (this.config.demo) {
+      return this._getDemoData().k_history_7d;
+    }
+    const kCoefEntityId = this._getEntityId("coefficient_k");
+    return this._getAttribute(kCoefEntityId, "k_history_7d") || [];
+  }
+
+  // Render sparkline SVG for pill/badge layouts (simple polyline like HA native)
+  _renderSparkline(kHistory, width = 80, height = 24, accentColor = "var(--accent)") {
+    if (!kHistory || kHistory.length < 2) return '';
+
+    const values = kHistory.map(d => d.k);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    // Use integer coordinates for crisp rendering
+    const margin = 1;
+    const graphWidth = width - margin * 2;
+    const graphHeight = height - margin * 2;
+
+    // Calculate points
+    const points = values.map((v, i) => {
+      const x = margin + (i / (values.length - 1)) * graphWidth;
+      const y = margin + (1 - (v - min) / range) * graphHeight;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
+
+    return html`
+      <svg
+        class="sparkline"
+        viewBox="0 0 ${width} ${height}"
+        preserveAspectRatio="none"
+      >
+        <polyline
+          points="${points}"
+          fill="none"
+          stroke="${accentColor}"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+    `;
+  }
+
+  // Calculate score (K/m³) - used for both color and height
+  _getKScore(k, volume) {
+    if (volume && volume > 0) {
+      return k / volume;
+    }
+    // Without volume, use K directly with typical room thresholds (assuming ~30m³)
+    return k / 30;
+  }
+
+  // Get color based on score (K/m³)
+  _getColorFromScore(score) {
+    if (score < 0.4) return "#10b981";      // excellent - green
+    if (score < 0.7) return "#22c55e";      // good - light green
+    if (score < 1.0) return "#eab308";      // average - yellow
+    if (score < 1.5) return "#f97316";      // poor - orange
+    return "#ef4444";                        // very_poor - red
+  }
+
+  // Render bar chart for full layout
+  _renderBarChart(kHistory, volume) {
+    if (!kHistory || kHistory.length === 0) return '';
+
+    // Calculate scores (K/m³) for each day - this is what determines both color AND height
+    const scores = kHistory.map(d => this._getKScore(d.k, volume));
+    const minScore = Math.min(...scores);
+    const maxScore = Math.max(...scores);
+    const range = maxScore - minScore;
+    const days = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
+
+    // Bar height: 20px minimum (best) to 60px maximum (worst)
+    const minHeight = 20;
+    const maxHeight = 60;
+
+    return html`
+      <div class="k-chart">
+        ${kHistory.map((day, index) => {
+      const date = new Date(day.date + 'T00:00:00');
+      const dayLabel = days[date.getDay()];
+      const score = scores[index];
+      // Height based on SCORE: higher score (worse) = taller bar
+      const heightPx = range > 0.01
+        ? minHeight + ((score - minScore) / range) * (maxHeight - minHeight)
+        : (minHeight + maxHeight) / 2; // If all nearly same, show at middle height
+      const barColor = this._getColorFromScore(score);
+      const isEstimated = day.estimated === true;
+      const opacity = isEstimated ? 0.5 : 1;
+      const tooltip = isEstimated
+        ? `${day.date}: ${day.k} W/°C (estimé)`
+        : `${day.date}: ${day.k} W/°C`;
+      return html`
+            <div class="bar-wrapper ${isEstimated ? 'estimated' : ''}" title="${tooltip}">
+              <div class="bar" style="height: ${heightPx}px; background: ${barColor}; opacity: ${opacity}"></div>
+              <span class="bar-label">${dayLabel}</span>
+            </div>
+          `;
+    })}
+      </div>
+    `;
   }
 
   render() {
@@ -427,6 +546,7 @@ class HomePerformanceCard extends LitElement {
     const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
     const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
     const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
+    const kHistory = this._getKHistory();
 
     const insulationEntityId = this._getEntityId("note_d_isolation");
     const insulationAttrs = demo ? {} : {
@@ -439,6 +559,7 @@ class HomePerformanceCard extends LitElement {
 
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const scoreLetter = this._getScoreLetter(insulation);
+    const hasHistory = kHistory && kHistory.length >= 2;
 
     return html`
       <ha-card class="badge-card" style="--accent: ${insulationData.color}">
@@ -447,7 +568,11 @@ class HomePerformanceCard extends LitElement {
           <span class="badge-score-letter">${scoreLetter}</span>
         </div>
         <div class="badge-rating-label">${insulationData.label}</div>
-        <div class="badge-separator"></div>
+        ${this.config.show_graph && hasHistory ? html`
+          <div class="badge-sparkline-wrapper">
+            ${this._renderSparkline(kHistory, 60, 20, insulationData.color)}
+          </div>
+        ` : html`<div class="badge-separator"></div>`}
         <div class="badge-zone-name">${this.config.zone}</div>
         <div class="badge-k-value">
           ${this._isValidValue(kCoef) ? html`${kCoef}<span class="badge-k-unit">W/°C</span>` : "--"}
@@ -487,6 +612,7 @@ class HomePerformanceCard extends LitElement {
     const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
     const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
     const deltaTRaw = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
+    const kHistory = this._getKHistory();
 
     const insulationEntityId = this._getEntityId("note_d_isolation");
     const insulationAttrs = demo ? {} : {
@@ -503,6 +629,7 @@ class HomePerformanceCard extends LitElement {
     const deltaTEntityId = this._getEntityId("dt_moyen_24h");
     const deltaTUnit = this._getEntityUnit(deltaTEntityId);
     const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);
+    const hasHistory = kHistory && kHistory.length >= 2;
 
     return html`
       <ha-card class="pill-card" style="--accent: ${insulationData.color}">
@@ -514,6 +641,11 @@ class HomePerformanceCard extends LitElement {
           <div class="pill-zone-name">${this.config.zone}</div>
           <div class="pill-zone-rating">${insulationData.label}</div>
         </div>
+        ${this.config.show_graph && hasHistory ? html`
+          <div class="pill-sparkline-wrapper">
+            ${this._renderSparkline(kHistory, 100, 24, insulationData.color)}
+          </div>
+        ` : ''}
         <div class="pill-separator"></div>
         <div class="pill-stats-section">
           <div class="pill-stat">
@@ -597,8 +729,11 @@ class HomePerformanceCard extends LitElement {
     const kCoef24h = demo ? demo.k_coefficient_24h : this._getAttribute(kCoefEntityId, "k_24h");
     const kPerM3_24h = demo ? demo.k_per_m3_24h : this._getAttribute(kCoefEntityId, "k_per_m3_24h");
     const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
+    const kPerM3EntityId = this._getEntityId("k_par_m3");
+    const volume = demo ? 35 : this._getAttribute(kPerM3EntityId, "volume_m3");
     const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
     const performance = demo ? demo.performance : this._getState(this._getEntityId("performance_energetique"));
+    const kHistory = this._getKHistory();
 
     // Get insulation attributes for season/inference support
     const insulationEntityId = this._getEntityId("note_d_isolation");
@@ -746,6 +881,14 @@ class HomePerformanceCard extends LitElement {
           </div>
         </div>
       </div>
+
+      <!-- K History Chart (7 days) -->
+      ${this.config.show_graph && kHistory && kHistory.length >= 2 ? html`
+        <div class="history-section">
+          <div class="section-title">Historique K (7 jours)</div>
+          ${this._renderBarChart(kHistory, volume)}
+        </div>
+      ` : ''}
     `;
   }
 
@@ -1098,6 +1241,72 @@ class HomePerformanceCard extends LitElement {
         opacity: 0.5;
       }
 
+      /* ========================================
+         K HISTORY - FULL LAYOUT (Bar Chart)
+         ======================================== */
+      .history-section {
+        background: var(--bg-secondary);
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin-top: 8px;
+      }
+
+      .k-chart {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        height: 80px;
+        gap: 4px;
+        padding: 4px 0;
+      }
+
+      .bar-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        height: 100%;
+        cursor: pointer;
+      }
+
+      .bar-wrapper .bar {
+        width: 100%;
+        border-radius: 3px 3px 0 0;
+        transition: all 0.2s ease;
+        min-height: 4px;
+        /* height is set via inline style */
+      }
+
+      .bar-wrapper:hover .bar {
+        filter: brightness(1.2);
+      }
+
+      .bar-wrapper.estimated .bar {
+        background-image: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 2px,
+          rgba(255,255,255,0.1) 2px,
+          rgba(255,255,255,0.1) 4px
+        );
+      }
+
+      .bar-label {
+        font-size: 9px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+      }
+
+      /* Sparkline (shared for pill & badge) */
+      .sparkline {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
       /* Responsive */
       @media (max-width: 400px) {
         .score-section {
@@ -1124,6 +1333,22 @@ class HomePerformanceCard extends LitElement {
 
         .metrics-grid {
           grid-template-columns: 1fr;
+        }
+
+        .pill-sparkline-wrapper {
+          display: none;
+        }
+
+        .k-chart {
+          height: 60px;
+        }
+
+        .k-chart .bar {
+          max-height: 40px;
+        }
+
+        .bar-label {
+          font-size: 7px;
         }
       }
 
@@ -1186,6 +1411,12 @@ class HomePerformanceCard extends LitElement {
         background: var(--border-color);
         margin: 0 auto 10px;
         border-radius: 1px;
+      }
+
+      .badge-sparkline-wrapper {
+        width: 80%;
+        height: 24px;
+        margin: 8px auto 12px;
       }
 
       .badge-zone-name {
@@ -1312,7 +1543,7 @@ class HomePerformanceCard extends LitElement {
       }
 
       .pill-zone-section {
-        flex: 1;
+        flex-shrink: 0;
         min-width: 0;
       }
 
@@ -1331,6 +1562,13 @@ class HomePerformanceCard extends LitElement {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.3px;
+      }
+
+      .pill-sparkline-wrapper {
+        flex: 1;
+        min-width: 50px;
+        height: 24px;
+        margin: 0 12px;
       }
 
       .pill-separator {

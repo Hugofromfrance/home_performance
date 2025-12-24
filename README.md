@@ -346,13 +346,15 @@ A slim horizontal bar showing score, zone name, K coefficient, and ΔT. Ideal fo
 | `zone` | *required* | Exact name of your zone |
 | `title` | "Thermal Performance" | Displayed title (full layout only) |
 | `layout` | "full" | Card style: `full`, `badge`, or `pill` |
+| `show_graph` | true | Show/hide the historical K graph |
 | `demo` | false | Demo mode with fake data |
 
 ### Card Features
 
 - 📊 **Visual scores** - Insulation rating from A+ to D with colors
+- 📈 **Historical K graph** - 7-day history with bar chart (full) or sparkline (badge/pill)
 - 🌡️ **Temperatures** - Indoor/Outdoor in real-time
-- 📈 **Detailed metrics** - K coefficient, Energy, Heating time
+- 📉 **Detailed metrics** - K coefficient, Energy, Heating time
 - ⏳ **Progress** - Progress bar during initial analysis
 - 🎨 **Adaptive design** - Adapts to light/dark theme
 - 🎛️ **Visual editor** - Choose layout directly in the UI
@@ -385,6 +387,29 @@ HOME-PERFORMANCE v1.2.0
 ```
 
 If you see an older version, the cache hasn't been cleared yet.
+
+### Historical K Graph
+
+The card displays a **7-day history** of your K coefficient score:
+
+| Layout | Graph type | Description |
+|--------|------------|-------------|
+| `full` | Bar chart | Colored bars showing score evolution (height = K value, color = rating) |
+| `badge` | Sparkline | Minimal trend line |
+| `pill` | Sparkline | Minimal trend line |
+
+**Features:**
+- 🎨 **Color-coded** - Each bar/point colored by its insulation rating (A+ green → D red)
+- 📅 **Daily K_7j** - Shows the rolling 7-day average you had each day (not daily fluctuations)
+- 🔮 **Estimated days** - Days without sufficient data show estimated values (semi-transparent)
+
+**Disable the graph:**
+```yaml
+type: custom:home-performance-card
+zone: Living Room
+layout: pill
+show_graph: false
+```
 
 ## 🌡️ Temperature Units (Celsius/Fahrenheit)
 
@@ -543,7 +568,7 @@ Needs optimization : beyond
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (v1.0.0)
+### ✅ Completed (v1.0.0 - v1.2.0)
 
 - [x] K Coefficient (W/°C) - empirical thermal loss
 - [x] K/m² and K/m³ normalization
@@ -567,9 +592,13 @@ Needs optimization : beyond
 - [x] Multi-zones (add/remove rooms)
 - [x] Event-driven architecture (instant reactivity)
 
-### 🔜 v1.1 - Visualization
+### 🔜 v1.3 - Historical Visualization
 
-- [ ] K coefficient historical graphs (ApexCharts)
+- [ ] **Historical K graph** - 7-day bar chart (full) and sparkline (badge/pill) 📊
+- [ ] **Configurable graph display** (`show_graph` option)
+
+### 🔮 v1.4 - Multi-zone & Comparisons
+
 - [ ] Multi-zone comparison in a single card
 - [ ] Performance evolution over time
 

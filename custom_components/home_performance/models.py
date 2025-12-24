@@ -101,11 +101,11 @@ class AggregatedPeriod:
 @dataclass
 class DailyHistoryEntry:
     """Daily aggregated data for 7-day rolling K calculation.
-    
+
     Stores summary of one complete day of heating data.
     Used to calculate a stable K coefficient over multiple days.
     """
-    
+
     date: str  # ISO format YYYY-MM-DD
     heating_hours: float  # Total heating hours that day
     avg_delta_t: float  # Average ΔT that day
@@ -113,10 +113,11 @@ class DailyHistoryEntry:
     avg_indoor_temp: float  # Average indoor temperature
     avg_outdoor_temp: float  # Average outdoor temperature
     sample_count: int  # Number of samples (data points)
-    
+    k_7d: float | None = None  # K_7j at the time of archival (for historical graph)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for persistence."""
-        return {
+        result = {
             "date": self.date,
             "heating_hours": self.heating_hours,
             "avg_delta_t": self.avg_delta_t,
@@ -125,7 +126,10 @@ class DailyHistoryEntry:
             "avg_outdoor_temp": self.avg_outdoor_temp,
             "sample_count": self.sample_count,
         }
-    
+        if self.k_7d is not None:
+            result["k_7d"] = self.k_7d
+        return result
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DailyHistoryEntry":
         """Create from dictionary."""
@@ -137,6 +141,7 @@ class DailyHistoryEntry:
             avg_indoor_temp=data.get("avg_indoor_temp", 0.0),
             avg_outdoor_temp=data.get("avg_outdoor_temp", 0.0),
             sample_count=data.get("sample_count", 0),
+            k_7d=data.get("k_7d"),
         )
 
 
@@ -210,7 +215,7 @@ class ThermalLossModel:
     @property
     def k_coefficient(self) -> float | None:
         """Get thermal loss coefficient K in W/°C.
-        
+
         Returns the 7-day stable K if available, otherwise the 24h rolling K.
         This ensures the insulation rating is stable across midnight resets.
         """
@@ -375,12 +380,13 @@ class ThermalLossModel:
         avg_indoor_temp: float,
         avg_outdoor_temp: float,
         sample_count: int,
+        k_7d: float | None = None,
     ) -> None:
         """Archive a day's data into the rolling 7-day history.
-        
+
         Called at midnight to store the previous day's aggregated data.
         Automatically removes entries older than HISTORY_DAYS.
-        
+
         Args:
             date: ISO date string (YYYY-MM-DD)
             heating_hours: Total hours of heating that day
@@ -389,6 +395,7 @@ class ThermalLossModel:
             avg_indoor_temp: Average indoor temperature
             avg_outdoor_temp: Average outdoor temperature
             sample_count: Number of data samples
+            k_7d: The K_7j score at time of archival (for historical graph)
         """
         # Don't add if we don't have meaningful data
         if sample_count < 10:
@@ -397,13 +404,13 @@ class ThermalLossModel:
                 self.zone_name, date, sample_count
             )
             return
-        
+
         # Check if we already have this date
         existing_dates = [e.date for e in self._daily_history]
         if date in existing_dates:
             _LOGGER.debug("[%s] Date %s already in history, skipping", self.zone_name, date)
             return
-        
+
         # Create and add entry
         entry = DailyHistoryEntry(
             date=date,
@@ -413,70 +420,71 @@ class ThermalLossModel:
             avg_indoor_temp=avg_indoor_temp,
             avg_outdoor_temp=avg_outdoor_temp,
             sample_count=sample_count,
+            k_7d=k_7d,
         )
         self._daily_history.append(entry)
-        
+
         # Sort by date and keep only last HISTORY_DAYS days
         self._daily_history.sort(key=lambda e: e.date)
         if len(self._daily_history) > HISTORY_DAYS:
             removed = self._daily_history.pop(0)
             _LOGGER.debug("[%s] Removed oldest history entry: %s", self.zone_name, removed.date)
-        
+
         _LOGGER.info(
             "[%s] 📅 Added daily summary for %s: %.1fh heating, ΔT=%.1f°C, %.2f kWh "
             "(history: %d days)",
             self.zone_name, date, heating_hours, avg_delta_t, energy_kwh,
             len(self._daily_history)
         )
-        
+
         # Recalculate 7-day K coefficient
         self._calculate_k_from_history()
 
     def _calculate_k_from_history(self) -> None:
         """Calculate K coefficient from 7-day rolling history.
-        
+
         This provides a stable K that doesn't reset at midnight.
         Uses weighted average based on sample count per day.
         """
         if not self._daily_history:
             return
-        
+
         # Filter valid days (sufficient ΔT and heating time)
         valid_days = [
             d for d in self._daily_history
             if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
         ]
-        
+
         if not valid_days:
             _LOGGER.debug(
                 "[%s] No valid days in history for K calculation (%d days total)",
                 self.zone_name, len(self._daily_history)
             )
             return
-        
+
         # Calculate K for each valid day and weight by sample count
         total_weighted_k = 0.0
         total_weight = 0.0
-        
+
         for day in valid_days:
             # K = Energy / (ΔT × 24h)
             # Energy = Power × heating_hours (Wh)
             energy_wh = self.heater_power * day.heating_hours
             k_day = energy_wh / (day.avg_delta_t * 24)  # Normalize to 24h period
-            
+
             weight = day.sample_count
             total_weighted_k += k_day * weight
             total_weight += weight
-            
+
             _LOGGER.debug(
                 "[%s] Day %s: K=%.1f W/°C (heating=%.1fh, ΔT=%.1f°C, weight=%d)",
                 self.zone_name, day.date, k_day, day.heating_hours, day.avg_delta_t, weight
             )
-        
+
         if total_weight > 0:
             self._k_coefficient_7d = total_weighted_k / total_weight
             self._last_valid_k = self._k_coefficient_7d  # Update last valid K
-            
+
             _LOGGER.info(
                 "[%s] 📊 7-day K coefficient: %.1f W/°C (from %d valid days, %d total)",
                 self.zone_name, self._k_coefficient_7d, len(valid_days), len(self._daily_history)
@@ -484,7 +492,7 @@ class ThermalLossModel:
 
     def clear_history(self) -> None:
         """Clear all history data for manual reset.
-        
+
         Use this when:
         - User completed insulation work and wants fresh measurement
         - User changed windows/doors
@@ -494,7 +502,7 @@ class ThermalLossModel:
         self._daily_history.clear()
         self._k_coefficient_7d = None
         # Don't clear _last_valid_k - keep it as reference
-        
+
         _LOGGER.info(
             "[%s] 🔄 History cleared (%d days removed). Last valid K preserved: %.1f W/°C",
             self.zone_name, old_count, self._last_valid_k or 0
@@ -557,7 +565,7 @@ class ThermalLossModel:
 
     def get_season_status(self) -> str:
         """Determine current season status based on ΔT.
-        
+
         Returns:
             SEASON_SUMMER: T° ext > T° int (negative ΔT)
             SEASON_OFF: 0 < ΔT < MIN_DELTA_T
@@ -566,9 +574,9 @@ class ThermalLossModel:
         if not self._last_aggregation:
             # No data yet, assume heating season
             return SEASON_HEATING
-        
+
         delta_t = self._last_aggregation.delta_t
-        
+
         if delta_t < 0:
             return SEASON_SUMMER
         elif delta_t < MIN_DELTA_T:
@@ -578,7 +586,7 @@ class ThermalLossModel:
 
     def get_temp_stability(self) -> dict[str, Any]:
         """Analyze indoor temperature stability over the aggregation period.
-        
+
         Returns dict with:
             - stable: bool - True if temp variation < TEMP_STABILITY_THRESHOLD
             - min_temp: float - Minimum indoor temp
@@ -587,19 +595,19 @@ class ThermalLossModel:
         """
         if len(self.data_points) < 10:
             return {"stable": False, "min_temp": None, "max_temp": None, "variation": None}
-        
+
         now = self.data_points[-1].timestamp
         period_start = now - (AGGREGATION_PERIOD_HOURS * SECONDS_PER_HOUR)
         period_points = [p for p in self.data_points if p.timestamp >= period_start]
-        
+
         if len(period_points) < 10:
             return {"stable": False, "min_temp": None, "max_temp": None, "variation": None}
-        
+
         indoor_temps = [p.indoor_temp for p in period_points]
         min_temp = min(indoor_temps)
         max_temp = max(indoor_temps)
         variation = max_temp - min_temp
-        
+
         return {
             "stable": variation < TEMP_STABILITY_THRESHOLD,
             "min_temp": min_temp,
@@ -609,38 +617,38 @@ class ThermalLossModel:
 
     def is_excellent_by_inference(self) -> bool:
         """Check if excellent isolation can be inferred.
-        
+
         Conditions for inference:
         1. At least 24h of data
         2. ΔT >= MIN_DELTA_T (it's cold outside)
         3. Heating time < MIN_HEATING_TIME_HOURS (radiator barely ran)
         4. Indoor temperature is stable (room maintains temp)
-        
+
         If all conditions met, the room is excellently insulated!
         """
         # Need enough data
         if self.data_hours < EXCELLENT_INFERENCE_MIN_HOURS:
             return False
-        
+
         # Need aggregation data
         if not self._last_aggregation:
             return False
-        
+
         agg = self._last_aggregation
-        
+
         # Must be heating season (ΔT >= 5°C)
         if agg.delta_t < MIN_DELTA_T:
             return False
-        
+
         # Radiator must have run very little
         if agg.heating_hours >= MIN_HEATING_TIME_HOURS:
             return False
-        
+
         # Temperature must be stable
         stability = self.get_temp_stability()
         if not stability["stable"]:
             return False
-        
+
         _LOGGER.info(
             "[%s] 🏆 Excellent isolation inferred: ΔT=%.1f°C, heating=%.1fmin, temp_variation=%.1f°C",
             self.zone_name,
@@ -652,7 +660,7 @@ class ThermalLossModel:
 
     def get_insulation_status(self) -> dict[str, Any]:
         """Get comprehensive insulation status.
-        
+
         Returns dict with:
             - status: str - One of INSULATION_* constants
             - rating: str | None - Insulation rating (excellent, good, etc.)
@@ -663,7 +671,7 @@ class ThermalLossModel:
         """
         season = self.get_season_status()
         stability = self.get_temp_stability()
-        
+
         # Case 1: Not enough data yet
         if self.data_hours < MIN_DATA_HOURS:
             return {
@@ -675,7 +683,7 @@ class ThermalLossModel:
                 "message": "Collecte de données en cours",
                 "temp_stable": stability["stable"],
             }
-        
+
         # Case 2: Summer mode (T° ext > T° int)
         if season == SEASON_SUMMER:
             return {
@@ -687,7 +695,7 @@ class ThermalLossModel:
                 "message": "Mode été - mesure impossible",
                 "temp_stable": stability["stable"],
             }
-        
+
         # Case 3: Off-season (ΔT too low)
         if season == SEASON_OFF:
             return {
@@ -699,7 +707,7 @@ class ThermalLossModel:
                 "message": "Hors saison - ΔT insuffisant",
                 "temp_stable": stability["stable"],
             }
-        
+
         # Case 4: K is calculated
         if self._k_coefficient is not None:
             return {
@@ -711,7 +719,7 @@ class ThermalLossModel:
                 "message": None,
                 "temp_stable": stability["stable"],
             }
-        
+
         # Case 5: Excellent by inference
         if self.is_excellent_by_inference():
             return {
@@ -723,7 +731,7 @@ class ThermalLossModel:
                 "message": "Excellente - chauffe minimale nécessaire",
                 "temp_stable": True,
             }
-        
+
         # Case 6: Waiting for heating
         agg = self._last_aggregation
         if agg and not stability["stable"]:
@@ -736,7 +744,7 @@ class ThermalLossModel:
                 "message": "Chauffage insuffisant - température instable",
                 "temp_stable": False,
             }
-        
+
         return {
             "status": INSULATION_WAITING_HEAT,
             "rating": None,
@@ -780,7 +788,7 @@ class ThermalLossModel:
 
     def from_dict(self, data: dict[str, Any]) -> None:
         """Restore model state from dictionary.
-        
+
         Backward compatible: handles data from versions without daily_history.
         """
         if not data:
