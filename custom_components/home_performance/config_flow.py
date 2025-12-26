@@ -264,27 +264,39 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 )
             )
 
-        # Power sensor - EntitySelector handles None gracefully
-        schema_dict[vol.Optional(
-            CONF_POWER_SENSOR,
-            default=current.get(CONF_POWER_SENSOR),
-        )] = selector.EntitySelector(
-            selector.EntitySelectorConfig(
-                domain="sensor",
-                device_class="power",
+        # Power sensor - only set default if value exists (EntitySelector may not handle None in all HA versions)
+        power_sensor_value = current.get(CONF_POWER_SENSOR)
+        if power_sensor_value is not None:
+            schema_dict[vol.Optional(CONF_POWER_SENSOR, default=power_sensor_value)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="power",
+                )
             )
-        )
+        else:
+            schema_dict[vol.Optional(CONF_POWER_SENSOR)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="power",
+                )
+            )
 
-        # Energy sensor - EntitySelector handles None gracefully
-        schema_dict[vol.Optional(
-            CONF_ENERGY_SENSOR,
-            default=current.get(CONF_ENERGY_SENSOR),
-        )] = selector.EntitySelector(
-            selector.EntitySelectorConfig(
-                domain="sensor",
-                device_class="energy",
+        # Energy sensor - only set default if value exists
+        energy_sensor_value = current.get(CONF_ENERGY_SENSOR)
+        if energy_sensor_value is not None:
+            schema_dict[vol.Optional(CONF_ENERGY_SENSOR, default=energy_sensor_value)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="energy",
+                )
             )
-        )
+        else:
+            schema_dict[vol.Optional(CONF_ENERGY_SENSOR)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="energy",
+                )
+            )
 
         return self.async_show_form(
             step_id="init",
