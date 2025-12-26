@@ -40,20 +40,20 @@
           "indoor_temp_sensor": "Sensor measuring the room temperature",
           "outdoor_temp_sensor": "Sensor measuring the outdoor temperature",
           "heating_entity": "Switch, thermostat or climate controlling the heating",
-          "heat_source_type": "Type of heating system (electric requires power, others require energy sensor)",
+          "heat_source_type": "Type of heating system",
           "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
           "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90"
         }
       },
       "dimensions": {
         "title": "Dimensions and optional sensors",
-        "description": "These parameters are optional but allow for more precise analysis. Energy sensor is required for non-electric heat sources.",
+        "description": "These parameters are optional but improve accuracy. Energy source priority: energy_sensor > power_sensor > heater_power.",
         "data": {
           "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor (optional)",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "Energy meter",
+          "energy_sensor": "Energy meter (optional)",
           "window_sensor": "Window/Door sensor (optional)",
           "weather_entity": "Weather entity (optional)",
           "room_orientation": "Room orientation (optional)"
@@ -61,9 +61,9 @@
         "data_description": {
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
-          "power_sensor": "Instantaneous power sensor to measure actual heating time and consumption",
+          "power_sensor": "Real-time power sensor (W) for precise heating detection and energy integration",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Energy meter (required for heat pump/gas/district heating, optional for electric)",
+          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Required for heat pump/gas/district, falls back to power_sensor or heater_power if not set",
           "window_sensor": "Physical window/door contact sensor for accurate open detection (instead of temperature-based)",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
@@ -121,9 +121,9 @@
           "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90",
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
-          "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
+          "power_sensor": "Real-time power sensor (W) for precise heating detection",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Energy meter (required for heat pump/gas/district heating, takes priority)",
+          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Required for heat pump/gas/district, takes priority",
           "window_sensor": "Physical window/door contact sensor for accurate open detection",
           "window_notification_enabled": "Send push notification when window is open and heating is active",
           "notify_device": "Select the mobile device to receive notifications",

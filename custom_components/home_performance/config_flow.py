@@ -39,7 +39,6 @@ from .const import (
     HEAT_SOURCE_HEATPUMP,
     HEAT_SOURCE_GAS,
     HEAT_SOURCE_DISTRICT,
-    HEAT_SOURCES_REQUIRING_ENERGY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -137,9 +136,11 @@ def get_schema_step_dimensions(
     heat_source_type: str = HEAT_SOURCE_ELECTRIC,
     default_weather: str | None = None,
 ) -> vol.Schema:
-    """Return schema for room dimensions and optional power sensor configuration.
+    """Return schema for room dimensions and optional sensors configuration.
 
-    For non-electric heat sources (heatpump, gas, district), energy_sensor is required.
+    Energy sensor is always optional. When configured, it provides the most
+    accurate K coefficient calculation. When not configured, the integration
+    falls back to power_sensor integration or heater_power estimation.
     """
     # Energy sensor: required for non-electric sources, optional for electric
     requires_energy = heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY
@@ -197,6 +198,7 @@ def get_schema_step_dimensions(
             )
         )
     else:
+        # Energy sensor is always optional but recommended for best accuracy
         schema_dict[vol.Optional(CONF_ENERGY_SENSOR)] = selector.EntitySelector(
             selector.EntitySelectorConfig(
                 domain="sensor",
@@ -306,13 +308,15 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         heat_source_type = self._data.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
 
         if user_input is not None:
-            # Validate energy sensor for non-electric sources
-            if heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY:
-                energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
-                if not energy_sensor:
-                    errors[CONF_ENERGY_SENSOR] = "energy_sensor_required"
-                elif not self.hass.states.get(energy_sensor):
-                    errors[CONF_ENERGY_SENSOR] = "entity_not_found"
+            # Validate energy sensor if provided (optional for all heat sources)
+            energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
+            if energy_sensor and not self.hass.states.get(energy_sensor):
+                errors[CONF_ENERGY_SENSOR] = "entity_not_found"
+
+            # Validate power sensor if provided
+            power_sensor = user_input.get(CONF_POWER_SENSOR)
+            if power_sensor and not self.hass.states.get(power_sensor):
+                errors[CONF_POWER_SENSOR] = "entity_not_found"
 
             if not errors:
                 self._data.update(user_input)
@@ -367,7 +371,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             # Validate based on heat source type
             new_heat_source = user_input.get(CONF_HEAT_SOURCE_TYPE, heat_source_type)
 
-            # Validate heater power for electric
+            # Validate heater power for electric (required)
             if new_heat_source == HEAT_SOURCE_ELECTRIC:
                 heater_power = user_input.get(CONF_HEATER_POWER)
                 if not heater_power or heater_power <= 0:
@@ -378,14 +382,9 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             if power_sensor and not self.hass.states.get(power_sensor):
                 errors[CONF_POWER_SENSOR] = "entity_not_found"
 
-            # Validate energy sensor for non-electric (required) or if provided (must exist)
+            # Validate energy sensor if provided (optional for all heat sources)
             energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
-            if new_heat_source in HEAT_SOURCES_REQUIRING_ENERGY:
-                if not energy_sensor:
-                    errors[CONF_ENERGY_SENSOR] = "energy_sensor_required"
-                elif not self.hass.states.get(energy_sensor):
-                    errors[CONF_ENERGY_SENSOR] = "entity_not_found"
-            elif energy_sensor and not self.hass.states.get(energy_sensor):
+            if energy_sensor and not self.hass.states.get(energy_sensor):
                 errors[CONF_ENERGY_SENSOR] = "entity_not_found"
 
             # Validate window sensor if provided
@@ -515,19 +514,9 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             )
         )
 
-        # Energy sensor - required for non-electric, optional for electric
+        # Energy sensor - always optional but recommended for best accuracy
         energy_sensor_value = current.get(CONF_ENERGY_SENSOR)
-        if heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY:
-            schema_dict[vol.Required(
-                CONF_ENERGY_SENSOR,
-                default=energy_sensor_value,
-            )] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="energy",
-                )
-            )
-        elif energy_sensor_value is not None:
+        if energy_sensor_value is not None:
             schema_dict[vol.Optional(CONF_ENERGY_SENSOR, default=energy_sensor_value)] = selector.EntitySelector(
                 selector.EntitySelectorConfig(
                     domain="sensor",
