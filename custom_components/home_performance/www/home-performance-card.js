@@ -1533,7 +1533,8 @@ class HomePerformanceCard extends LitElement {
         border-radius: 14px;
         border: 1px solid var(--border-color);
         padding: 20px 16px;
-        width: 140px;
+        min-width: 120px;
+        flex: 1 1 140px;
         min-height: 223px;
         text-align: center;
         position: relative;
@@ -1850,7 +1851,8 @@ class HomePerformanceCardEditor extends LitElement {
     const newConfig = { ...this.config };
 
     if (target.configValue) {
-      if (target.type === "checkbox") {
+      // ha-checkbox uses 'checked' property, not 'value'
+      if (target.tagName === "HA-CHECKBOX" || target.type === "checkbox") {
         newConfig[target.configValue] = target.checked;
       } else {
         newConfig[target.configValue] = target.value;
