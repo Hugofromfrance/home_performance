@@ -81,6 +81,10 @@
           "energy_sensor": "Existing Home Assistant energy meter (takes priority)"
         }
       }
+    },
+    "error": {
+      "entity_not_found": "Entity not found or unavailable",
+      "invalid_power": "Invalid heater power"
     }
   },
   "entity": {

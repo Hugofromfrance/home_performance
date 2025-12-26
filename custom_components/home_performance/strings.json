@@ -16,7 +16,7 @@
           "indoor_temp_sensor": "Temperature sensor inside the zone",
           "outdoor_temp_sensor": "Temperature sensor outside (can be shared across zones)",
           "heating_entity": "The entity that controls heating in this zone",
-          "heater_power": "Declared power of the heater in Watts"
+          "heater_power": "Nominal heater power in Watts (for BTU/h: divide by 3.41, e.g. 60,000 BTU/h ≈ 17,600W)"
         }
       },
       "dimensions": {
@@ -48,16 +48,28 @@
     "step": {
       "init": {
         "title": "Home Performance Options",
+        "description": "Modify this zone's parameters.",
         "data": {
-          "heater_power": "Heater Power (W)",
-          "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)",
-          "power_threshold": "Power Threshold (W)"
+          "heater_power": "Heater Power",
+          "surface": "Room surface area",
+          "volume": "Room volume",
+          "power_sensor": "Power sensor",
+          "power_threshold": "Heating detection threshold",
+          "energy_sensor": "External energy meter"
         },
         "data_description": {
-          "power_threshold": "Power above which heating is considered active (default: 50W)"
+          "heater_power": "Nominal heater power in Watts (for BTU/h: divide by 3.41, e.g. 60,000 BTU/h ≈ 17,600W)",
+          "surface": "Floor area to calculate K coefficient per m²",
+          "volume": "Volume to calculate K coefficient per m³",
+          "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
+          "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
+          "energy_sensor": "Existing Home Assistant energy meter (takes priority)"
         }
       }
+    },
+    "error": {
+      "entity_not_found": "Entity not found or unavailable",
+      "invalid_power": "Invalid heater power"
     }
   },
   "entity": {

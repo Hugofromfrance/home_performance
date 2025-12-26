@@ -81,6 +81,10 @@
           "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire)"
         }
       }
+    },
+    "error": {
+      "entity_not_found": "Entité introuvable ou indisponible",
+      "invalid_power": "Puissance invalide"
     }
   },
   "entity": {
