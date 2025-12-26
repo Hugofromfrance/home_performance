@@ -189,12 +189,88 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
         k_per_m3_24h = None
         if k_24h is not None and volume and volume > 0:
             k_per_m3_24h = round(k_24h / volume, 2)
+
+        # Build K history for sparkline/chart visualization (7 days)
+        # Strategy: Use K_7j (rolling average) for each day to match the displayed score
+        # This shows how the score EVOLVED over time, not daily fluctuations
+        history = self.coordinator.thermal_model.daily_history
+        heater_power = self.coordinator.heater_power
+        current_k_7d = k_7d  # Current K_7j (for today and fallback)
+
+        # Create a dict of history entries by date for easy lookup
+        history_by_date = {entry.date: entry for entry in history}
+
+        # Generate last 7 days
+        from datetime import datetime, timedelta
+        today = datetime.now().date()
+
+        # First pass: get K_7j for each day (stored at archival time)
+        days_data = []
+        for i in range(6, -1, -1):  # 6 days ago to today
+            day = today - timedelta(days=i)
+            date_str = day.strftime("%Y-%m-%d")
+            entry = history_by_date.get(date_str)
+
+            k_value = None
+            is_today = (i == 0)
+
+            if is_today:
+                # Today: use current K_7j (not yet archived)
+                k_value = current_k_7d
+            elif entry:
+                # Historical day: prefer stored K_7j, fallback to calculated K_daily
+                if entry.k_7d is not None:
+                    k_value = entry.k_7d
+                elif entry.avg_delta_t >= 5 and entry.heating_hours >= 0.5:
+                    # Fallback for old data without k_7d: calculate daily K
+                    energy_wh = heater_power * entry.heating_hours
+                    k_value = energy_wh / (entry.avg_delta_t * 24)
+
+            days_data.append({
+                "date": date_str,
+                "k": k_value,  # None if no valid data
+            })
+
+        # Second pass: fill gaps using carry-forward and backfill
+        # Forward pass: carry-forward from first valid day
+        last_valid_k = None
+        for day_data in days_data:
+            if day_data["k"] is not None:
+                last_valid_k = day_data["k"]
+            elif last_valid_k is not None:
+                day_data["k"] = last_valid_k
+                day_data["estimated"] = True
+
+        # Backward pass: backfill days before first valid day with first valid K
+        first_valid_k = None
+        for day_data in days_data:
+            if day_data["k"] is not None and "estimated" not in day_data:
+                first_valid_k = day_data["k"]
+                break
+
+        if first_valid_k is not None:
+            for day_data in days_data:
+                if day_data["k"] is None:
+                    day_data["k"] = first_valid_k
+                    day_data["estimated"] = True
+
+        # Build final k_history (only include days with K values)
+        k_history = []
+        for day_data in days_data:
+            if day_data["k"] is not None:
+                k_history.append({
+                    "date": day_data["date"],
+                    "k": round(day_data["k"], 1),
+                    "estimated": day_data.get("estimated", False)
+                })
+
         return {
             "description": "Déperdition thermique par degré d'écart (W/°C)",
             "heater_power_w": data.get("heater_power"),
             "k_24h": round(k_24h, 1) if k_24h is not None else None,
             "k_7d": round(k_7d, 1) if k_7d is not None else None,
             "k_per_m3_24h": k_per_m3_24h,
+            "k_history_7d": k_history,
             "interpretation": (
                 "Plus K est bas, meilleure est l'isolation. "
                 "Valeurs typiques: 10-20 (bien isolé), 20-40 (moyen), 40+ (mal isolé)"

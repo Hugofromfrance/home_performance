@@ -1,6 +1,6 @@
 # Home Performance
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/Hugofromfrance/home_performance.svg)](https://github.com/Hugofromfrance/home_performance/releases)
 [![Liberapay](https://img.shields.io/liberapay/goal/Hugofromfrance.svg?logo=liberapay)](https://liberapay.com/Hugofromfrance/donate)
 
@@ -12,6 +12,7 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 
 - [Why Home Performance?](#-why-home-performance)
 - [Main Features](#-main-features)
+- [Installation](#-installation)
 - [Hardware Compatibility](#-hardware-compatibility)
 - [Concept](#-concept)
 - [Created Sensors](#-created-sensors-per-zone)
@@ -22,7 +23,6 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 - [Prerequisites](#-prerequisites)
 - [Configuration](#️-configuration)
 - [Data Persistence](#-data-persistence)
-- [Installation](#-installation)
 - [Usage](#-usage)
 - [Dashboard Examples](#-dashboard-examples)
 - [Energy Performance](#-energy-performance)
@@ -64,6 +64,21 @@ You use electric heating and wonder:
 - 🪟 **Open window detection** - Real-time alert on temperature drop
 
 <img width="509" height="702" alt="image" src="https://github.com/user-attachments/assets/34ddaf7b-b39b-40ac-bd04-09be47520204" />
+
+## 📦 Installation
+
+### HACS (Recommended)
+
+1. Open HACS
+2. Click on "Integrations"
+3. Search for **"Home Performance"**
+4. Click "Download"
+5. Restart Home Assistant
+
+### Manual
+
+1. Copy `custom_components/home_performance` to your `config/custom_components/` folder
+2. Restart Home Assistant
 
 ## 🔌 Hardware Compatibility
 
@@ -323,6 +338,10 @@ layout: full
 ```
 The complete card showing insulation rating, performance, temperatures, and detailed metrics.
 
+<img width="449" alt="Full layout - light theme" src="https://github.com/user-attachments/assets/5e90f237-6375-4bca-ac8d-2f27ded35b6c" />
+
+<img width="449" alt="Full layout - dark theme" src="https://github.com/user-attachments/assets/ceea3e85-8187-4913-907e-211db6273ad6" />
+
 #### Badge Layout
 ```yaml
 type: custom:home-performance-card
@@ -330,6 +349,8 @@ zone: Bedroom
 layout: badge
 ```
 A compact vertical card showing the score letter (A+ to D), zone name, and K coefficient. Perfect for creating a grid of all your rooms.
+
+<img width="470" alt="Badge layout" src="https://github.com/user-attachments/assets/a03b1af9-9540-45cf-b3bc-070cf796a5ab" />
 
 #### Pill Layout
 ```yaml
@@ -339,6 +360,8 @@ layout: pill
 ```
 A slim horizontal bar showing score, zone name, K coefficient, and ΔT. Ideal for sidebars or compact dashboards.
 
+<img width="483" alt="Pill layout" src="https://github.com/user-attachments/assets/3de72907-1882-47dc-9b7a-e512867cfaef" />
+
 ### Card Options
 
 | Option | Default | Description |
@@ -346,13 +369,15 @@ A slim horizontal bar showing score, zone name, K coefficient, and ΔT. Ideal fo
 | `zone` | *required* | Exact name of your zone |
 | `title` | "Thermal Performance" | Displayed title (full layout only) |
 | `layout` | "full" | Card style: `full`, `badge`, or `pill` |
+| `show_graph` | true | Show/hide the historical K graph |
 | `demo` | false | Demo mode with fake data |
 
 ### Card Features
 
 - 📊 **Visual scores** - Insulation rating from A+ to D with colors
+- 📈 **Historical K graph** - 7-day history with bar chart (full) or sparkline (badge/pill)
 - 🌡️ **Temperatures** - Indoor/Outdoor in real-time
-- 📈 **Detailed metrics** - K coefficient, Energy, Heating time
+- 📉 **Detailed metrics** - K coefficient, Energy, Heating time
 - ⏳ **Progress** - Progress bar during initial analysis
 - 🎨 **Adaptive design** - Adapts to light/dark theme
 - 🎛️ **Visual editor** - Choose layout directly in the UI
@@ -385,6 +410,29 @@ HOME-PERFORMANCE v1.2.0
 ```
 
 If you see an older version, the cache hasn't been cleared yet.
+
+### Historical K Graph
+
+The card displays a **7-day history** of your K coefficient score:
+
+| Layout | Graph type | Description |
+|--------|------------|-------------|
+| `full` | Bar chart | Colored bars showing score evolution (height = K value, color = rating) |
+| `badge` | Sparkline | Minimal trend line |
+| `pill` | Sparkline | Minimal trend line |
+
+**Features:**
+- 🎨 **Color-coded** - Each bar/point colored by its insulation rating (A+ green → D red)
+- 📅 **Daily K_7j** - Shows the rolling 7-day average you had each day (not daily fluctuations)
+- 🔮 **Estimated days** - Days without sufficient data show estimated values (semi-transparent)
+
+**Disable the graph:**
+```yaml
+type: custom:home-performance-card
+zone: Living Room
+layout: pill
+show_graph: false
+```
 
 ## 🌡️ Temperature Units (Celsius/Fahrenheit)
 
@@ -452,22 +500,6 @@ Data is **automatically saved** and restored after a Home Assistant restart:
 **Storage**: `/config/.storage/home_performance.{zone}`
 
 **Save frequency**: Every 5 minutes + at HA shutdown
-
-## 📦 Installation
-
-### HACS (Recommended)
-
-1. Open HACS
-2. Click on "Integrations"
-3. Menu ⋮ → "Custom repositories"
-4. Add `https://github.com/Hugofromfrance/home_performance` (category: Integration)
-5. Install "Home Performance"
-6. Restart Home Assistant
-
-### Manual
-
-1. Copy `custom_components/home_performance` to your `config/custom_components/` folder
-2. Restart Home Assistant
 
 ## 🚀 Usage
 
@@ -543,7 +575,7 @@ Needs optimization : beyond
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (v1.0.0)
+### ✅ Completed (v1.0.0 - v1.2.0)
 
 - [x] K Coefficient (W/°C) - empirical thermal loss
 - [x] K/m² and K/m³ normalization
@@ -567,9 +599,13 @@ Needs optimization : beyond
 - [x] Multi-zones (add/remove rooms)
 - [x] Event-driven architecture (instant reactivity)
 
-### 🔜 v1.1 - Visualization
+### 🔜 v1.3 - Historical Visualization
 
-- [ ] K coefficient historical graphs (ApexCharts)
+- [ ] **Historical K graph** - 7-day bar chart (full) and sparkline (badge/pill) 📊
+- [ ] **Configurable graph display** (`show_graph` option)
+
+### 🔮 v1.4 - Multi-zone & Comparisons
+
 - [ ] Multi-zone comparison in a single card
 - [ ] Performance evolution over time
 

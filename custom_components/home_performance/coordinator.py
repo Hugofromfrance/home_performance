@@ -679,13 +679,17 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         heating_hours = self._heating_seconds_daily / 3600
 
+        # Get current K_7j BEFORE adding today's data (this is the score we had today)
+        current_k_7d = self.thermal_model.k_coefficient_7d
+
         _LOGGER.info(
-            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d",
+            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d, k_7d=%.1f",
             self.zone_name, date, heating_hours, avg_delta_t,
-            self._estimated_energy_daily_kwh, self._delta_t_count_daily
+            self._estimated_energy_daily_kwh, self._delta_t_count_daily,
+            current_k_7d if current_k_7d else 0.0
         )
 
-        # Add to thermal model history
+        # Add to thermal model history (with the K_7j score we had at this moment)
         self.thermal_model.add_daily_summary(
             date=date,
             heating_hours=heating_hours,
@@ -694,14 +698,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             avg_indoor_temp=avg_indoor,
             avg_outdoor_temp=avg_outdoor,
             sample_count=self._delta_t_count_daily,
+            k_7d=current_k_7d,
         )
 
         # Log history status after archiving
         history_count = len(self.thermal_model.daily_history)
-        k_7d = self.thermal_model.k_coefficient_7d
+        new_k_7d = self.thermal_model.k_coefficient_7d
         _LOGGER.warning(
             "[%s] ✅ ARCHIVE COMPLETE - history_days=%d, k_7d=%s W/°C",
-            self.zone_name, history_count, f"{k_7d:.1f}" if k_7d else "None"
+            self.zone_name, history_count, f"{new_k_7d:.1f}" if new_k_7d else "None"
         )
 
     def reset_history(self) -> None:
