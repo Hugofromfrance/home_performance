@@ -40,20 +40,20 @@
           "indoor_temp_sensor": "Sensor measuring the room temperature",
           "outdoor_temp_sensor": "Sensor measuring the outdoor temperature",
           "heating_entity": "Switch, thermostat or climate controlling the heating",
-          "heat_source_type": "Type of heating system",
+          "heat_source_type": "Type of heating system (electric requires power, others require energy sensor)",
           "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
           "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90"
         }
       },
       "dimensions": {
         "title": "Dimensions and optional sensors",
-        "description": "These parameters are optional but allow for more precise analysis.",
+        "description": "These parameters are optional but allow for more precise analysis. Energy sensor is required for non-electric heat sources.",
         "data": {
           "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor (optional)",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "External energy meter (optional)",
+          "energy_sensor": "Energy meter",
           "window_sensor": "Window/Door sensor (optional)",
           "weather_entity": "Weather entity (optional)",
           "room_orientation": "Room orientation (optional)"
@@ -63,7 +63,7 @@
           "volume": "Volume to calculate K coefficient per m³",
           "power_sensor": "Instantaneous power sensor to measure actual heating time and consumption",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority over integrated calculation)",
+          "energy_sensor": "Energy meter (required for heat pump/gas/district heating, optional for electric)",
           "window_sensor": "Physical window/door contact sensor for accurate open detection (instead of temperature-based)",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
@@ -87,6 +87,7 @@
     "error": {
       "entity_not_found": "Entity not found",
       "invalid_power": "Invalid power",
+      "energy_sensor_required": "Energy sensor is required for this heat source type",
       "unknown": "Unexpected error"
     },
     "abort": {
@@ -106,7 +107,7 @@
           "volume": "Room volume",
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "External energy meter",
+          "energy_sensor": "Energy meter",
           "window_sensor": "Window/Door sensor",
           "window_notification_enabled": "Enable window open alerts",
           "notify_device": "Mobile device for notifications",
@@ -122,7 +123,7 @@
           "volume": "Volume to calculate K coefficient per m³",
           "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority)",
+          "energy_sensor": "Energy meter (required for heat pump/gas/district heating, takes priority)",
           "window_sensor": "Physical window/door contact sensor for accurate open detection",
           "window_notification_enabled": "Send push notification when window is open and heating is active",
           "notify_device": "Select the mobile device to receive notifications",

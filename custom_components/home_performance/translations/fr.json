@@ -40,20 +40,20 @@
           "indoor_temp_sensor": "Capteur mesurant la température dans la pièce",
           "outdoor_temp_sensor": "Capteur mesurant la température extérieure",
           "heating_entity": "Interrupteur, thermostat ou climate contrôlant le chauffage",
-          "heat_source_type": "Type de système de chauffage",
+          "heat_source_type": "Type de système de chauffage (électrique nécessite la puissance, les autres nécessitent un capteur d'énergie)",
           "heater_power": "Puissance nominale en Watts (obligatoire pour électrique, optionnel pour autres)",
           "efficiency_factor": "Convertit l'énergie consommée en chaleur. Électrique: 1.0, PAC: 2.5-4.0 (COP), Chaudière gaz: 0.85-0.95, Fournaise gaz: 0.78-0.90"
         }
       },
       "dimensions": {
         "title": "Dimensions et capteurs optionnels",
-        "description": "Ces paramètres sont optionnels mais permettent des analyses plus précises.",
+        "description": "Ces paramètres sont optionnels mais permettent des analyses plus précises. Le capteur d'énergie est obligatoire pour les sources non-électriques.",
         "data": {
           "surface": "Surface de la pièce",
           "volume": "Volume de la pièce",
           "power_sensor": "Capteur de puissance (optionnel)",
           "power_threshold": "Seuil de détection chauffe",
-          "energy_sensor": "Compteur d'énergie externe (optionnel)",
+          "energy_sensor": "Compteur d'énergie",
           "window_sensor": "Capteur d'ouverture fenêtre/porte (optionnel)",
           "weather_entity": "Entité météo (optionnel)",
           "room_orientation": "Orientation de la pièce (optionnel)"
@@ -63,7 +63,7 @@
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée pour mesurer le temps de chauffe réel et la consommation",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
-          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire sur le calcul intégré)",
+          "energy_sensor": "Compteur d'énergie (obligatoire pour PAC/gaz/chauffage urbain, optionnel pour électrique)",
           "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise (remplace la détection par température)",
           "weather_entity": "Entité météo pour les données de vent (partagée entre zones)",
           "room_orientation": "Orientation principale de la façade pour déterminer l'exposition au vent"
@@ -87,6 +87,7 @@
     "error": {
       "entity_not_found": "Entité introuvable",
       "invalid_power": "Puissance invalide",
+      "energy_sensor_required": "Un capteur d'énergie est requis pour ce type de source de chaleur",
       "unknown": "Erreur inattendue"
     },
     "abort": {
@@ -106,7 +107,7 @@
           "volume": "Volume de la pièce",
           "power_sensor": "Capteur de puissance",
           "power_threshold": "Seuil de détection chauffe",
-          "energy_sensor": "Compteur d'énergie externe",
+          "energy_sensor": "Compteur d'énergie",
           "window_sensor": "Capteur d'ouverture fenêtre/porte",
           "window_notification_enabled": "Activer les alertes fenêtre ouverte",
           "notify_device": "Appareil mobile pour notifications",
@@ -122,7 +123,7 @@
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée (puissance > seuil = chauffe)",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
-          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire)",
+          "energy_sensor": "Compteur d'énergie (obligatoire pour PAC/gaz/chauffage urbain, prioritaire)",
           "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise",
           "window_notification_enabled": "Envoyer une notification push quand la fenêtre est ouverte et le chauffage actif",
           "notify_device": "Sélectionnez l'appareil mobile pour recevoir les notifications",
