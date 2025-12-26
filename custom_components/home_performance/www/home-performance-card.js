@@ -19,6 +19,179 @@ class HomePerformanceCard extends LitElement {
     };
   }
 
+  // Translations for i18n support
+  static _translations = {
+    en: {
+      // Config & titles
+      default_title: "Thermal Performance",
+      error_no_zone: "Please specify a zone",
+      loading: "Loading...",
+      loading_integration: "Loading integration...",
+
+      // Section headers
+      isolation: "INSULATION",
+      performance: "PERFORMANCE",
+      temperatures: "TEMPERATURES",
+      technical_details: "TECHNICAL DETAILS",
+      history_title: "K HISTORY (7 DAYS)",
+
+      // Insulation ratings
+      excellent: "Excellent",
+      excellent_desc: "Very well insulated",
+      good: "Good",
+      good_desc: "Well insulated",
+      average: "Average",
+      average_desc: "Standard insulation",
+      poor: "Poor",
+      poor_desc: "Needs improvement",
+      very_poor: "Critical",
+      very_poor_desc: "Insufficient insulation",
+      excellent_inferred: "🏆 Excellent",
+      excellent_inferred_desc: "Minimal heating needed",
+      summer_mode: "☀️ Summer mode",
+      summer_mode_desc: "Measurement not possible",
+      off_season: "🌤️ Off-season",
+      off_season_desc: "ΔT insufficient",
+      waiting: "Waiting",
+      waiting_desc: "Heating required",
+      last_measurement: "Last measurement",
+      last_k: "Last K",
+
+      // Performance ratings
+      perf_excellent: "Excellent",
+      perf_standard: "Standard",
+      perf_optimize: "Needs optimization",
+      vs_average: "vs average",
+
+      // Metrics
+      k_instant: "K instant",
+      energy_day: "Energy/day",
+      heating_time: "Heating time",
+      avg_delta: "Avg delta",
+      measured: "measured",
+      estimated: "estimated",
+      on_24h: "over 24h",
+      rolling_24h: "rolling 24h",
+      of_time: "of time",
+      indoor_outdoor: "In. - Out.",
+
+      // Tooltips
+      tooltip_estimated: "estimated",
+
+      // Days
+      days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+
+      // Loading & analyzing
+      integration_starting: "Home Performance is starting. Data will be available in a few seconds.",
+      zone_check_hint: "If this message persists, check that the zone",
+      exists_in_integration: "exists in the Home Performance integration.",
+      expected_entity: "Expected entity",
+      analyzing: "Analyzing",
+      analysis_in_progress: "Collecting thermal data to calculate room performance. Results available after 12h of analysis.",
+      remaining_time: "remaining",
+      completed: "Completed",
+      ready: "Ready",
+
+      // Editor
+      editor_zone: "Zone (e.g.: Living Room, Bedroom)",
+      editor_title: "Title",
+      editor_card_style: "Card style",
+      editor_full: "Full",
+      editor_badge: "Badge",
+      editor_pill: "Pill",
+      editor_demo: "Demo mode (preview)",
+      editor_show_graph: "Show history graph",
+    },
+    fr: {
+      // Config & titles
+      default_title: "Performance Thermique",
+      error_no_zone: "Veuillez spécifier une zone",
+      loading: "Chargement...",
+      loading_integration: "Chargement de l'intégration...",
+
+      // Section headers
+      isolation: "ISOLATION",
+      performance: "PERFORMANCE",
+      temperatures: "TEMPÉRATURES",
+      technical_details: "DÉTAILS TECHNIQUES",
+      history_title: "HISTORIQUE K (7 JOURS)",
+
+      // Insulation ratings
+      excellent: "Excellent",
+      excellent_desc: "Très bien isolé",
+      good: "Bon",
+      good_desc: "Bien isolé",
+      average: "Moyen",
+      average_desc: "Isolation standard",
+      poor: "Faible",
+      poor_desc: "À améliorer",
+      very_poor: "Critique",
+      very_poor_desc: "Isolation insuffisante",
+      excellent_inferred: "🏆 Excellente",
+      excellent_inferred_desc: "Chauffe minimale nécessaire",
+      summer_mode: "☀️ Mode été",
+      summer_mode_desc: "Mesure impossible",
+      off_season: "🌤️ Hors saison",
+      off_season_desc: "ΔT insuffisant",
+      waiting: "En attente",
+      waiting_desc: "Chauffe nécessaire",
+      last_measurement: "Dernière mesure",
+      last_k: "Dernier K",
+
+      // Performance ratings
+      perf_excellent: "Excellente",
+      perf_standard: "Standard",
+      perf_optimize: "À optimiser",
+      vs_average: "vs moyenne",
+
+      // Metrics
+      k_instant: "K instantané",
+      energy_day: "Énergie/jour",
+      heating_time: "Temps chauffe",
+      avg_delta: "Écart moyen",
+      measured: "mesurée",
+      estimated: "estimée",
+      on_24h: "sur 24h",
+      rolling_24h: "sur 24h glissant",
+      of_time: "du temps",
+      indoor_outdoor: "Int. - Ext.",
+
+      // Tooltips
+      tooltip_estimated: "estimé",
+
+      // Days
+      days: ["Di", "Lu", "Ma", "Me", "Je", "Ve", "Sa"],
+
+      // Loading & analyzing
+      integration_starting: "Home Performance démarre. Les données seront disponibles dans quelques secondes.",
+      zone_check_hint: "Si ce message persiste, vérifiez que la zone",
+      exists_in_integration: "existe dans l'intégration Home Performance.",
+      expected_entity: "Entité attendue",
+      analyzing: "Analyse en cours",
+      analysis_in_progress: "Collecte des données thermiques pour calculer les performances de la pièce. Résultats disponibles après 12h d'analyse.",
+      remaining_time: "restantes",
+      completed: "Terminé",
+      ready: "Prêt",
+
+      // Editor
+      editor_zone: "Zone (ex: Salon, Chambre)",
+      editor_title: "Titre",
+      editor_card_style: "Style de carte",
+      editor_full: "Complète",
+      editor_badge: "Badge",
+      editor_pill: "Pilule",
+      editor_demo: "Mode démo (prévisualisation)",
+      editor_show_graph: "Afficher le graphique historique",
+    }
+  };
+
+  // Get translation for key
+  _t(key) {
+    const lang = this.hass?.language?.substring(0, 2) || 'en';
+    const translations = HomePerformanceCard._translations[lang] || HomePerformanceCard._translations['en'];
+    return translations[key] !== undefined ? translations[key] : key;
+  }
+
   static getConfigElement() {
     return document.createElement("home-performance-card-editor");
   }
@@ -26,7 +199,7 @@ class HomePerformanceCard extends LitElement {
   static getStubConfig() {
     return {
       zone: "",
-      title: "Performance Thermique",
+      title: "",
       layout: "full",  // "full", "badge", "pill"
       demo: false,
     };
@@ -34,10 +207,10 @@ class HomePerformanceCard extends LitElement {
 
   setConfig(config) {
     if (!config.zone) {
-      throw new Error("Veuillez spécifier une zone");
+      throw new Error(HomePerformanceCard._translations.en.error_no_zone);
     }
     this.config = {
-      title: "Performance Thermique",
+      title: "",  // Will use _t('default_title') if empty
       layout: "full",
       show_graph: true,
       demo: false,
@@ -224,7 +397,7 @@ class HomePerformanceCard extends LitElement {
   }
 
   _getTimeRemaining() {
-    if (this.config.demo) return "Prêt";
+    if (this.config.demo) return this._t('ready');
     const entityId = this._getEntityId("temps_restant_analyse");
     return this._getState(entityId);
   }
@@ -232,13 +405,13 @@ class HomePerformanceCard extends LitElement {
   _getInsulationData(rating, insulationAttrs = {}) {
     const data = {
       // Calculated ratings
-      excellent: { label: "Excellent", color: "#10b981", icon: "mdi:shield-check", desc: "Très bien isolé" },
-      good: { label: "Bon", color: "#22c55e", icon: "mdi:shield-half-full", desc: "Bien isolé" },
-      average: { label: "Moyen", color: "#eab308", icon: "mdi:shield-outline", desc: "Isolation standard" },
-      poor: { label: "Faible", color: "#f97316", icon: "mdi:shield-alert", desc: "À améliorer" },
-      very_poor: { label: "Critique", color: "#ef4444", icon: "mdi:shield-off", desc: "Isolation insuffisante" },
+      excellent: { label: this._t('excellent'), color: "#10b981", icon: "mdi:shield-check", desc: this._t('excellent_desc') },
+      good: { label: this._t('good'), color: "#22c55e", icon: "mdi:shield-half-full", desc: this._t('good_desc') },
+      average: { label: this._t('average'), color: "#eab308", icon: "mdi:shield-outline", desc: this._t('average_desc') },
+      poor: { label: this._t('poor'), color: "#f97316", icon: "mdi:shield-alert", desc: this._t('poor_desc') },
+      very_poor: { label: this._t('very_poor'), color: "#ef4444", icon: "mdi:shield-off", desc: this._t('very_poor_desc') },
       // Inferred excellent
-      excellent_inferred: { label: "🏆 Excellente", color: "#059669", icon: "mdi:trophy", desc: "Chauffe minimale nécessaire" },
+      excellent_inferred: { label: this._t('excellent_inferred'), color: "#059669", icon: "mdi:trophy", desc: this._t('excellent_inferred_desc') },
     };
 
     // Get season and status from attributes
@@ -252,20 +425,20 @@ class HomePerformanceCard extends LitElement {
     if (season === "summer") {
       const lastK = kValue ? `(K=${kValue} W/°C)` : "";
       return {
-        label: "☀️ Mode été",
+        label: this._t('summer_mode'),
         color: "#f59e0b",
         icon: "mdi:weather-sunny",
-        desc: kValue ? `Dernière mesure ${lastK}` : "Mesure impossible"
+        desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('summer_mode_desc')
       };
     }
 
     if (season === "off_season") {
       const lastK = kValue ? `(K=${kValue} W/°C)` : "";
       return {
-        label: "🌤️ Hors saison",
+        label: this._t('off_season'),
         color: "#8b5cf6",
         icon: "mdi:weather-partly-cloudy",
-        desc: kValue ? `Dernière mesure ${lastK}` : "ΔT insuffisant"
+        desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('off_season_desc')
       };
     }
 
@@ -279,17 +452,17 @@ class HomePerformanceCard extends LitElement {
       // Check if we have a last valid K to show
       if (kValue && kSource === "last_valid") {
         return {
-          label: "En attente",
+          label: this._t('waiting'),
           color: "#6b7280",
           icon: "mdi:shield-outline",
-          desc: `Dernier K: ${kValue} W/°C`
+          desc: `${this._t('last_k')}: ${kValue} W/°C`
         };
       }
       // Show specific message from status
       if (message) {
-        return { label: "En attente", color: "#6b7280", icon: "mdi:shield-outline", desc: message };
+        return { label: this._t('waiting'), color: "#6b7280", icon: "mdi:shield-outline", desc: message };
       }
-      return { label: "En attente", color: "#6b7280", icon: "mdi:shield-outline", desc: "Chauffe nécessaire" };
+      return { label: this._t('waiting'), color: "#6b7280", icon: "mdi:shield-outline", desc: this._t('waiting_desc') };
     }
 
     return data[rating] || { label: rating, color: "#6b7280", icon: "mdi:shield-outline", desc: "" };
@@ -297,9 +470,9 @@ class HomePerformanceCard extends LitElement {
 
   _getPerformanceData(level) {
     const data = {
-      excellent: { label: "Excellente", color: "#10b981", icon: "mdi:leaf", badge: "−40%" },
-      standard: { label: "Standard", color: "#eab308", icon: "mdi:minus", badge: "~" },
-      to_optimize: { label: "À optimiser", color: "#f97316", icon: "mdi:trending-up", badge: "+20%" },
+      excellent: { label: this._t('perf_excellent'), color: "#10b981", icon: "mdi:leaf", badge: "−40%" },
+      standard: { label: this._t('perf_standard'), color: "#eab308", icon: "mdi:minus", badge: "~" },
+      to_optimize: { label: this._t('perf_optimize'), color: "#f97316", icon: "mdi:trending-up", badge: "+20%" },
     };
     return data[level] || { label: level, color: "#6b7280", icon: "mdi:help", badge: "?" };
   }
@@ -419,7 +592,7 @@ class HomePerformanceCard extends LitElement {
     const minScore = Math.min(...scores);
     const maxScore = Math.max(...scores);
     const range = maxScore - minScore;
-    const days = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
+    const days = this._t('days');
 
     // Bar height: 20px minimum (best) to 60px maximum (worst)
     const minHeight = 20;
@@ -439,7 +612,7 @@ class HomePerformanceCard extends LitElement {
       const isEstimated = day.estimated === true;
       const opacity = isEstimated ? 0.5 : 1;
       const tooltip = isEstimated
-        ? `${day.date}: ${day.k} W/°C (estimé)`
+        ? `${day.date}: ${day.k} W/°C (${this._t('tooltip_estimated')})`
         : `${day.date}: ${day.k} W/°C`;
       return html`
             <div class="bar-wrapper ${isEstimated ? 'estimated' : ''}" title="${tooltip}">
@@ -454,7 +627,7 @@ class HomePerformanceCard extends LitElement {
 
   render() {
     if (!this.hass || !this.config) {
-      return html`<ha-card>Chargement...</ha-card>`;
+      return html`<ha-card>${this._t('loading')}</ha-card>`;
     }
 
     const layout = this.config.layout || "full";
@@ -482,7 +655,7 @@ class HomePerformanceCard extends LitElement {
         <div class="header">
           <div class="header-left">
             <div class="header-title">${this.config.zone}</div>
-            <div class="header-subtitle">${this.config.title}</div>
+            <div class="header-subtitle">${this.config.title || this._t('default_title')}</div>
           </div>
           <div class="header-right">
             ${dataReady
@@ -683,14 +856,14 @@ class HomePerformanceCard extends LitElement {
         <div class="loading-spinner">
           <div class="spinner"></div>
         </div>
-        <div class="analyzing-title" style="margin-top: 12px;">Chargement de l'intégration...</div>
+        <div class="analyzing-title" style="margin-top: 12px;">${this._t('loading_integration')}</div>
         <div class="analyzing-info" style="margin-top: 8px;">
-          Home Performance démarre. Les données seront disponibles dans quelques secondes.
+          ${this._t('integration_starting')}
         </div>
         <div class="analyzing-hint" style="margin-top: 16px; font-size: 0.75em; color: var(--text-secondary); opacity: 0.7;">
-          Si ce message persiste, vérifiez que la zone "<strong>${this.config.zone}</strong>"
-          existe dans l'intégration Home Performance.
-          <br/>Entité attendue: <code>${expectedEntity}</code>
+          ${this._t('zone_check_hint')} "<strong>${this.config.zone}</strong>"
+          ${this._t('exists_in_integration')}
+          <br/>${this._t('expected_entity')}: <code>${expectedEntity}</code>
         </div>
       </div>
     `;
@@ -698,11 +871,12 @@ class HomePerformanceCard extends LitElement {
 
   _renderAnalyzing(progress) {
     const timeRemaining = this._getTimeRemaining();
+    const isReady = timeRemaining === "Prêt" || timeRemaining === "Ready" || timeRemaining === this._t('ready');
 
     return html`
       <div class="analyzing">
         <div class="analyzing-header">
-          <span class="analyzing-title">Analyse en cours</span>
+          <span class="analyzing-title">${this._t('analyzing')}</span>
           <span class="analyzing-percent">${Math.round(progress)}%</span>
         </div>
         <div class="progress-track">
@@ -710,11 +884,10 @@ class HomePerformanceCard extends LitElement {
         </div>
         <div class="analyzing-footer">
           <ha-icon icon="mdi:clock-outline"></ha-icon>
-          <span>${timeRemaining !== "Prêt" ? `Reste ${timeRemaining}` : "Terminé"}</span>
+          <span>${!isReady ? `${timeRemaining} ${this._t('remaining_time')}` : this._t('completed')}</span>
         </div>
         <div class="analyzing-info">
-          Collecte des données thermiques pour calculer les performances de la pièce.
-          Résultats disponibles après 12h d'analyse.
+          ${this._t('analysis_in_progress')}
         </div>
       </div>
     `;
@@ -797,7 +970,7 @@ class HomePerformanceCard extends LitElement {
             ` : ""}
           </div>
           <div class="score-content">
-            <div class="score-label">Isolation</div>
+            <div class="score-label">${this._t('isolation')}</div>
             <div class="score-value">${insulationData.label}</div>
             <div class="score-desc">${insulationData.desc}</div>
           </div>
@@ -808,9 +981,9 @@ class HomePerformanceCard extends LitElement {
             <ha-icon icon="${perfData.icon}"></ha-icon>
           </div>
           <div class="score-content">
-            <div class="score-label">Performance</div>
+            <div class="score-label">${this._t('performance')}</div>
             <div class="score-value">${perfData.label}</div>
-            <div class="score-badge">${perfData.badge} vs moyenne</div>
+            <div class="score-badge">${perfData.badge} ${this._t('vs_average')}</div>
           </div>
         </div>
 
@@ -819,7 +992,7 @@ class HomePerformanceCard extends LitElement {
             <ha-icon icon="mdi:thermometer"></ha-icon>
           </div>
           <div class="score-content">
-            <div class="score-label">Températures</div>
+            <div class="score-label">${this._t('temperatures')}</div>
             <div class="temp-values">
               <div class="temp-row">
                 <ha-icon icon="mdi:home"></ha-icon>
@@ -836,48 +1009,48 @@ class HomePerformanceCard extends LitElement {
 
       <!-- Metrics Grid -->
       <div class="metrics-section">
-        <div class="section-title">Détails techniques</div>
+        <div class="section-title">${this._t('technical_details')}</div>
 
         <div class="metrics-grid">
           <div class="metric">
             <div class="metric-header">
               <ha-icon icon="mdi:heat-wave"></ha-icon>
-              <span>K instantané</span>
+              <span>${this._t('k_instant')}</span>
             </div>
             <div class="metric-value">${this._isValidValue(kCoef24h) ? `${kCoef24h} W/°C` : "--"}</div>
             ${this._isValidValue(kPerM3_24h)
         ? html`<div class="metric-sub">${kPerM3_24h} W/(°C·m³)</div>`
-        : html`<div class="metric-sub">sur 24h glissant</div>`}
+        : html`<div class="metric-sub">${this._t('rolling_24h')}</div>`}
           </div>
 
           <div class="metric">
             <div class="metric-header">
               <ha-icon icon="mdi:lightning-bolt"></ha-icon>
-              <span>Énergie/jour</span>
+              <span>${this._t('energy_day')}</span>
             </div>
             <div class="metric-value">${this._isValidValue(dailyEnergy) ? `${dailyEnergy} kWh` : "--"}</div>
-            <div class="metric-unit"><span class="metric-type">(${energyType})</span></div>
+            <div class="metric-unit"><span class="metric-type">(${energyType === "mesurée" ? this._t('measured') : this._t('estimated')})</span></div>
           </div>
 
           <div class="metric">
             <div class="metric-header">
               <ha-icon icon="mdi:radiator"></ha-icon>
-              <span>Temps chauffe</span>
+              <span>${this._t('heating_time')}</span>
             </div>
             <div class="metric-value">${this._isValidValue(heatingTime) ? heatingTime : "0min"}</div>
-            <div class="metric-unit">sur 24h</div>
+            <div class="metric-unit">${this._t('on_24h')}</div>
             ${this._isValidValue(heatingRatio)
-        ? html`<div class="metric-sub">${heatingRatio}% du temps</div>`
+        ? html`<div class="metric-sub">${heatingRatio}% ${this._t('of_time')}</div>`
         : ""}
           </div>
 
           <div class="metric">
             <div class="metric-header">
               <ha-icon icon="mdi:thermometer"></ha-icon>
-              <span>Écart moyen</span>
+              <span>${this._t('avg_delta')}</span>
             </div>
             <div class="metric-value">${this._isValidValue(deltaT) ? `${deltaT}${tempUnit}` : "--"}</div>
-            <div class="metric-sub">Int. - Ext.</div>
+            <div class="metric-sub">${this._t('indoor_outdoor')}</div>
           </div>
         </div>
       </div>
@@ -885,7 +1058,7 @@ class HomePerformanceCard extends LitElement {
       <!-- K History Chart (7 days) -->
       ${this.config.show_graph && kHistory && kHistory.length >= 2 ? html`
         <div class="history-section">
-          <div class="section-title">Historique K (7 jours)</div>
+          <div class="section-title">${this._t('history_title')}</div>
           ${this._renderBarChart(kHistory, volume)}
         </div>
       ` : ''}
@@ -1661,6 +1834,13 @@ class HomePerformanceCardEditor extends LitElement {
     };
   }
 
+  // Get translation for key (reuse HomePerformanceCard translations)
+  _t(key) {
+    const lang = this.hass?.language?.substring(0, 2) || 'en';
+    const translations = HomePerformanceCard._translations[lang] || HomePerformanceCard._translations['en'];
+    return translations[key] !== undefined ? translations[key] : key;
+  }
+
   setConfig(config) {
     this.config = config;
   }
@@ -1703,21 +1883,21 @@ class HomePerformanceCardEditor extends LitElement {
     return html`
       <div class="editor">
         <ha-textfield
-          label="Zone (ex: Salon, Chambre)"
+          label="${this._t('editor_zone')}"
           .value=${this.config.zone || ""}
           .configValue=${"zone"}
           @input=${this.configChanged}
         ></ha-textfield>
 
         <ha-textfield
-          label="Titre"
-          .value=${this.config.title || "Performance Thermique"}
+          label="${this._t('editor_title')}"
+          .value=${this.config.title || ""}
           .configValue=${"title"}
           @input=${this.configChanged}
         ></ha-textfield>
 
         <div class="layout-selector">
-          <label>Style de carte</label>
+          <label>${this._t('editor_card_style')}</label>
           <div class="layout-options">
             <div
               class="layout-option ${this.config.layout === "full" || !this.config.layout ? "selected" : ""}"
@@ -1727,7 +1907,7 @@ class HomePerformanceCardEditor extends LitElement {
                 <div class="lp-header"></div>
                 <div class="lp-content"></div>
               </div>
-              <span>Complète</span>
+              <span>${this._t('editor_full')}</span>
             </div>
             <div
               class="layout-option ${this.config.layout === "badge" ? "selected" : ""}"
@@ -1737,7 +1917,7 @@ class HomePerformanceCardEditor extends LitElement {
                 <div class="lp-circle"></div>
                 <div class="lp-text"></div>
               </div>
-              <span>Badge</span>
+              <span>${this._t('editor_badge')}</span>
             </div>
             <div
               class="layout-option ${this.config.layout === "pill" ? "selected" : ""}"
@@ -1747,12 +1927,20 @@ class HomePerformanceCardEditor extends LitElement {
                 <div class="lp-dot"></div>
                 <div class="lp-bar"></div>
               </div>
-              <span>Pilule</span>
+              <span>${this._t('editor_pill')}</span>
             </div>
           </div>
         </div>
 
-        <ha-formfield label="Mode démo (prévisualisation)">
+        <ha-formfield label="${this._t('editor_show_graph')}">
+          <ha-checkbox
+            .checked=${this.config.show_graph !== false}
+            .configValue=${"show_graph"}
+            @change=${this.configChanged}
+          ></ha-checkbox>
+        </ha-formfield>
+
+        <ha-formfield label="${this._t('editor_demo')}">
           <ha-checkbox
             .checked=${this.config.demo === true}
             .configValue=${"demo"}
