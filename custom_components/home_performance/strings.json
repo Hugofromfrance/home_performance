@@ -3,12 +3,13 @@
     "step": {
       "user": {
         "title": "Configure Zone",
-        "description": "Set up a thermal performance analysis zone. You'll need temperature sensors, a heating entity, and the heater's declared power.",
+        "description": "Set up a thermal performance analysis zone. You'll need temperature sensors and a heating entity.",
         "data": {
           "zone_name": "Zone Name",
           "indoor_temp_sensor": "Indoor Temperature Sensor",
           "outdoor_temp_sensor": "Outdoor Temperature Sensor",
           "heating_entity": "Heating Entity (climate, switch, or input_boolean)",
+          "heat_source_type": "Heat Source Type",
           "heater_power": "Heater Power (W)"
         },
         "data_description": {
@@ -16,7 +17,8 @@
           "indoor_temp_sensor": "Temperature sensor inside the zone",
           "outdoor_temp_sensor": "Temperature sensor outside (can be shared across zones)",
           "heating_entity": "The entity that controls heating in this zone",
-          "heater_power": "Declared power of the heater in Watts"
+          "heat_source_type": "Type of heating system (electric requires power, others require energy sensor)",
+          "heater_power": "Declared power of the heater in Watts (required for electric, optional for others)"
         }
       },
       "dimensions": {
@@ -25,12 +27,16 @@
         "data": {
           "surface": "Surface Area (m²)",
           "volume": "Volume (m³)",
-          "power_threshold": "Power Threshold (W)"
+          "power_threshold": "Power Threshold (W)",
+          "power_sensor": "Power Sensor",
+          "energy_sensor": "Energy Sensor"
         },
         "data_description": {
           "surface": "Floor surface area of the zone",
           "volume": "Volume of the zone (surface × ceiling height)",
-          "power_threshold": "Power above which heating is considered active (default: 50W)"
+          "power_threshold": "Power above which heating is considered active (default: 50W)",
+          "power_sensor": "Instantaneous power sensor for precise heating detection",
+          "energy_sensor": "Energy meter (required for heat pump/gas/district heating)"
         }
       }
     },
@@ -38,7 +44,8 @@
       "entity_not_found": "Entity not found or unavailable",
       "invalid_temperature": "Invalid temperature sensor",
       "invalid_power": "Invalid heater power",
-      "already_configured": "This zone is already configured"
+      "already_configured": "This zone is already configured",
+      "energy_sensor_required": "Energy sensor is required for this heat source type"
     },
     "abort": {
       "already_configured": "This zone is already configured"
@@ -49,13 +56,19 @@
       "init": {
         "title": "Home Performance Options",
         "data": {
+          "heat_source_type": "Heat Source Type",
           "heater_power": "Heater Power (W)",
           "surface": "Surface Area (m²)",
           "volume": "Volume (m³)",
-          "power_threshold": "Power Threshold (W)"
+          "power_threshold": "Power Threshold (W)",
+          "power_sensor": "Power Sensor",
+          "energy_sensor": "Energy Sensor"
         },
         "data_description": {
-          "power_threshold": "Power above which heating is considered active (default: 50W)"
+          "heat_source_type": "Type of heating system",
+          "heater_power": "Declared power of the heater in Watts",
+          "power_threshold": "Power above which heating is considered active (default: 50W)",
+          "energy_sensor": "Energy meter (required for heat pump/gas/district heating)"
         }
       }
     }

@@ -27,8 +27,12 @@ from .const import (
     CONF_SURFACE,
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
+    CONF_HEAT_SOURCE_TYPE,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_HEAT_SOURCE_TYPE,
+    HEAT_SOURCE_ELECTRIC,
+    HEAT_SOURCES_REQUIRING_ENERGY,
 )
 from .models import ThermalLossModel, ThermalDataPoint
 
@@ -54,24 +58,32 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.indoor_temp_sensor: str = config[CONF_INDOOR_TEMP_SENSOR]
         self.outdoor_temp_sensor: str = config[CONF_OUTDOOR_TEMP_SENSOR]
         self.heating_entity: str = config[CONF_HEATING_ENTITY]
-        self.heater_power: float = config[CONF_HEATER_POWER]
+        self.heat_source_type: str = config.get(CONF_HEAT_SOURCE_TYPE, DEFAULT_HEAT_SOURCE_TYPE)
+        self.heater_power: float | None = config.get(CONF_HEATER_POWER)
         self.surface: float | None = config.get(CONF_SURFACE)
         self.volume: float | None = config.get(CONF_VOLUME)
         self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
         self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
 
+        # For energy-based sources, energy_sensor should be used for K calculation
+        self._uses_energy_based_calculation = (
+            self.heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY
+            and self.energy_sensor is not None
+        )
+
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
-            "indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
-            "power_sensor=%s, energy_sensor=%s, heater_power=%sW",
+            "heat_source=%s, indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
+            "power_sensor=%s, energy_sensor=%s, heater_power=%s",
             self.zone_name,
+            self.heat_source_type,
             self.indoor_temp_sensor,
             self.outdoor_temp_sensor,
             self.heating_entity,
             self.power_sensor,
             self.energy_sensor,
-            self.heater_power
+            f"{self.heater_power}W" if self.heater_power else "N/A (energy-based)"
         )
 
         # Thermal model
@@ -92,6 +104,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_power_value: float | None = None
         self._measured_energy_total_kwh: float = 0.0
         self._measured_energy_daily_kwh: float = 0.0
+        self._last_external_energy: float | None = None  # For energy-based sources
 
         # Daily counters (reset at midnight) - for minuit-minuit consistency
         self._last_daily_reset_date: str | None = None
@@ -183,13 +196,19 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if self._heating_start_time is not None:
                     duration = now - self._heating_start_time
                     self._heating_seconds_daily += duration
-                    # Also update estimated energy
-                    energy_kwh = (self.heater_power / 1000) * (duration / 3600)
-                    self._estimated_energy_daily_kwh += energy_kwh
-                    _LOGGER.info(
-                        "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min), Energy: %.4f kWh",
-                        self.zone_name, duration, duration / 60, energy_kwh
-                    )
+                    # Update estimated energy (only if heater_power is available)
+                    if self.heater_power is not None and self.heater_power > 0:
+                        energy_kwh = (self.heater_power / 1000) * (duration / 3600)
+                        self._estimated_energy_daily_kwh += energy_kwh
+                        _LOGGER.info(
+                            "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min), Energy: %.4f kWh",
+                            self.zone_name, duration, duration / 60, energy_kwh
+                        )
+                    else:
+                        _LOGGER.info(
+                            "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min)",
+                            self.zone_name, duration, duration / 60
+                        )
                 self._heating_start_time = None
                 self._is_heating_realtime = False
 
@@ -306,8 +325,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._is_heating_realtime and self._heating_start_time is not None:
             duration = time.time() - self._heating_start_time
             self._heating_seconds_daily += duration
-            energy_kwh = (self.heater_power / 1000) * (duration / 3600)
-            self._estimated_energy_daily_kwh += energy_kwh
+            if self.heater_power is not None and self.heater_power > 0:
+                energy_kwh = (self.heater_power / 1000) * (duration / 3600)
+                self._estimated_energy_daily_kwh += energy_kwh
             _LOGGER.info("[%s] Finalized heating session on shutdown: %.1fs", self.zone_name, duration)
 
         # Save data before shutdown
@@ -423,7 +443,20 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 outdoor_temp=outdoor_temp,
                 heating_on=heating_on,
             )
-            self.thermal_model.add_data_point(data_point)
+
+            # For energy-based sources, get energy increment to pass to model
+            measured_energy_increment = None
+            if self._uses_energy_based_calculation and heating_on:
+                # Get energy from external sensor and calculate increment
+                external_energy = self._get_external_energy()
+                if external_energy is not None and hasattr(self, '_last_external_energy'):
+                    if self._last_external_energy is not None:
+                        measured_energy_increment = max(0, external_energy - self._last_external_energy)
+                    self._last_external_energy = external_energy
+                elif external_energy is not None:
+                    self._last_external_energy = external_energy
+
+            self.thermal_model.add_data_point(data_point, measured_energy_increment)
 
             # Detect window open (combine real-time detection with polling fallback)
             window_open = self._window_open_realtime or self._detect_window_open(indoor_temp, now)
@@ -500,6 +533,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "history_has_valid_k": analysis.get("history_has_valid_k", False),
                 # Configuration
                 "heater_power": self.heater_power,
+                "effective_power": analysis.get("effective_power"),
+                "derived_power": analysis.get("derived_power"),
+                "heat_source_type": self.heat_source_type,
                 "surface": self.surface,
                 "volume": self.volume,
                 "power_threshold": self.power_threshold,
@@ -540,6 +576,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "history_days": 0,
             "history_has_valid_k": False,
             "heater_power": self.heater_power,
+            "effective_power": self.heater_power,
+            "derived_power": None,
+            "heat_source_type": self.heat_source_type,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
@@ -607,6 +646,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "history_has_valid_k": analysis.get("history_has_valid_k", False),
             # Configuration
             "heater_power": self.heater_power,
+            "effective_power": analysis.get("effective_power"),
+            "derived_power": analysis.get("derived_power"),
+            "heat_source_type": self.heat_source_type,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
@@ -733,9 +775,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if not self.power_sensor:
                 if self._last_heating_state:
                     self._heating_seconds_daily += time_delta_seconds
-                    # Update estimated energy (power * time)
-                    energy_kwh = (self.heater_power / 1000) * time_delta_hours
-                    self._estimated_energy_daily_kwh += energy_kwh
+                    # Update estimated energy (power * time) - only if heater_power is available
+                    if self.heater_power is not None and self.heater_power > 0:
+                        energy_kwh = (self.heater_power / 1000) * time_delta_hours
+                        self._estimated_energy_daily_kwh += energy_kwh
 
         # Update ΔT average (always done via polling)
         self._delta_t_sum_daily += delta_t
