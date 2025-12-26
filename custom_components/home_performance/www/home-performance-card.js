@@ -1,8 +1,9 @@
 /**
  * Home Performance Card
  * Modern dashboard card for Home Performance integration
- * Version is managed in manifest.json
  */
+
+const CARD_VERSION = "1.2.0";
 
 const LitElement = customElements.get("hui-masonry-view")
   ? Object.getPrototypeOf(customElements.get("hui-masonry-view"))
@@ -112,6 +113,12 @@ class HomePerformanceCard extends LitElement {
     return state?.attributes?.[attr];
   }
 
+  // Get unit of measurement for a specific entity
+  _getEntityUnit(entityId) {
+    const state = this.hass?.states[entityId];
+    return state?.attributes?.unit_of_measurement;
+  }
+
   // Get user's temperature unit from HA config
   _getTempUnit() {
     return this.hass?.config?.unit_system?.temperature || "°C";
@@ -149,11 +156,21 @@ class HomePerformanceCard extends LitElement {
   }
 
   // Convert temperature difference (delta) based on user's unit system
-  _convertTempDelta(deltaCelsius) {
-    if (this._usesFahrenheit()) {
-      return this._celsiusDeltaToFahrenheit(deltaCelsius);
+  // If sensorUnit is provided and already matches user's unit, skip conversion
+  _convertTempDelta(deltaValue, sensorUnit = null) {
+    if (deltaValue === null || deltaValue === undefined || isNaN(parseFloat(deltaValue))) {
+      return deltaValue;
     }
-    return deltaCelsius;
+    const userUnit = this._getTempUnit();
+    // If sensor already provides value in user's unit, no conversion needed
+    if (sensorUnit && sensorUnit === userUnit) {
+      return parseFloat(deltaValue).toFixed(1);
+    }
+    // Otherwise convert from Celsius
+    if (this._usesFahrenheit()) {
+      return this._celsiusDeltaToFahrenheit(deltaValue);
+    }
+    return parseFloat(deltaValue).toFixed(1);
   }
 
   _entityExists(entityId) {
@@ -483,7 +500,9 @@ class HomePerformanceCard extends LitElement {
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const scoreLetter = this._getScoreLetter(insulation);
     const tempUnit = this._getTempUnit();
-    const deltaT = this._convertTempDelta(deltaTRaw);
+    const deltaTEntityId = this._getEntityId("dt_moyen_24h");
+    const deltaTUnit = this._getEntityUnit(deltaTEntityId);
+    const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);
 
     return html`
       <ha-card class="pill-card" style="--accent: ${insulationData.color}">
@@ -620,7 +639,8 @@ class HomePerformanceCard extends LitElement {
     const tempUnit = this._getTempUnit();
     const indoorTemp = this._convertTemp(indoorTempRaw);
     const outdoorTemp = this._convertTemp(outdoorTempRaw);
-    const deltaT = this._convertTempDelta(deltaTRaw);  // Use delta conversion (no +32)
+    const deltaTUnit = this._getEntityUnit(deltaTEntityId);
+    const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);  // Skip conversion if already in user's unit
 
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const perfData = this._getPerformanceData(performance);
@@ -1642,7 +1662,7 @@ window.customCards.push({
 });
 
 console.info(
-  `%c HOME-PERFORMANCE %c Loaded `,
+  `%c HOME-PERFORMANCE %c v${CARD_VERSION} `,
   "color: white; background: #6366f1; font-weight: bold; border-radius: 4px 0 0 4px; padding: 2px 6px;",
   "color: #6366f1; background: #1a1a2e; font-weight: bold; border-radius: 0 4px 4px 0; padding: 2px 6px;"
 );

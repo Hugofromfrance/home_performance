@@ -39,7 +39,7 @@ SECONDS_PER_HOUR = 3600
 MAX_DATA_POINTS = 1440 * 2  # 48h at 1 sample per minute
 
 # Season/inference constants
-TEMP_STABILITY_THRESHOLD = 2.0  # °C - max variation for "stable" temperature
+TEMP_STABILITY_THRESHOLD = 3.0  # °C - max variation for "stable" temperature (increased for fast-cycling systems)
 EXCELLENT_INFERENCE_MIN_HOURS = 24  # Hours needed to infer excellent isolation
 
 # Season status codes
@@ -286,17 +286,18 @@ class ThermalLossModel:
         # Get points in the aggregation period
         period_points = [p for p in self.data_points if p.timestamp >= period_start]
 
-        if len(period_points) < 10:  # Need minimum points
+        if len(period_points) < 10:  # Need minimum points for aggregation
             _LOGGER.debug(
                 "Not enough points for K calculation: %d", len(period_points)
             )
             return
 
-        # Calculate aggregated values
+        # Calculate aggregated values - ALWAYS update aggregation even if K won't be calculated
+        # This is needed for excellent inference detection (minimal heating case)
         aggregation = self._aggregate_period(period_points)
         self._last_aggregation = aggregation
 
-        # Check minimum conditions
+        # Check minimum conditions for K calculation (but aggregation is still updated above)
         if aggregation.delta_t < MIN_DELTA_T:
             _LOGGER.debug(
                 "ΔT too low for reliable K calculation: %.1f°C (min: %.1f°C)",
