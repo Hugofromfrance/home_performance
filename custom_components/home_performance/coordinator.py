@@ -26,6 +26,8 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_SURFACE,
     CONF_VOLUME,
+    CONF_POWER_THRESHOLD,
+    DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
 )
 from .models import ThermalLossModel, ThermalDataPoint
@@ -57,6 +59,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.volume: float | None = config.get(CONF_VOLUME)
         self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
+        self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
 
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
@@ -161,8 +164,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 old_power = 0.0
 
             now = time.time()
-            is_heating_now = new_power > 50
-            was_heating = old_power > 50
+            is_heating_now = new_power > self.power_threshold
+            was_heating = old_power > self.power_threshold
 
             _LOGGER.debug(
                 "[%s] Power sensor changed: %.1fW -> %.1fW (heating: %s -> %s)",
@@ -450,10 +453,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # Add time from current ongoing heating session
                 heating_seconds += (now - self._heating_start_time)
             heating_hours_daily = heating_seconds / 3600
-            avg_delta_t_daily = (
-                self._delta_t_sum_daily / self._delta_t_count_daily
-                if self._delta_t_count_daily > 0 else delta_t
-            )
+
+            # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
+            # (plus stable que le calcul depuis minuit)
+            avg_delta_t_rolling = analysis.get("avg_delta_t") or delta_t
 
             # Periodically save data to persistent storage
             await self._async_maybe_save()
@@ -471,10 +474,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "k_coefficient_7d": analysis.get("k_coefficient_7d"),  # Stable 7-day K
                 "k_per_m2": analysis.get("k_per_m2"),
                 "k_per_m3": analysis.get("k_per_m3"),
-                # Daily data (minuit-minuit)
+                # Usage data (24h rolling window)
                 "heating_hours": heating_hours_daily,
                 "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
-                "avg_delta_t": avg_delta_t_daily,
+                "avg_delta_t": avg_delta_t_rolling,
                 "daily_energy_kwh": self._estimated_energy_daily_kwh,
                 # Cumulative energy (for Energy Dashboard)
                 "total_energy_kwh": analysis.get("total_energy_kwh"),
@@ -499,6 +502,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heater_power": self.heater_power,
                 "surface": self.surface,
                 "volume": self.volume,
+                "power_threshold": self.power_threshold,
                 # Insulation rating (with season/inference support)
                 "insulation_rating": self.thermal_model.get_insulation_rating(),
                 "insulation_status": self.thermal_model.get_insulation_status(),
@@ -538,6 +542,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heater_power": self.heater_power,
             "surface": self.surface,
             "volume": self.volume,
+            "power_threshold": self.power_threshold,
             "insulation_rating": None,
             "insulation_status": {
                 "status": "waiting_data",
@@ -545,7 +550,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "k_value": None,
                 "k_source": None,
                 "season": "heating_season",
-                "message": "Collecte de données en cours",
+                "message": "Data collection in progress",
                 "temp_stable": None,
             },
             "last_valid_k": None,
@@ -555,16 +560,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return data from restored thermal model (when sensors not yet available)."""
         analysis = self.thermal_model.get_analysis()
 
-        # Calculate restored daily values (minuit-minuit)
+        # Calculate restored heating values
         # Include ongoing heating session in the total
         heating_seconds = self._heating_seconds_daily
         if self._is_heating_realtime and self._heating_start_time is not None:
             heating_seconds += (time.time() - self._heating_start_time)
         heating_hours_daily = heating_seconds / 3600
-        avg_delta_t_daily = (
-            self._delta_t_sum_daily / self._delta_t_count_daily
-            if self._delta_t_count_daily > 0 else None
-        )
+
+        # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
+        avg_delta_t_rolling = analysis.get("avg_delta_t")
 
         return {
             # Current values - not available yet
@@ -579,10 +583,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "k_coefficient_7d": analysis.get("k_coefficient_7d"),
             "k_per_m2": analysis.get("k_per_m2"),
             "k_per_m3": analysis.get("k_per_m3"),
-            # Restored daily data (minuit-minuit)
+            # Restored usage data (24h rolling window)
             "heating_hours": heating_hours_daily,
             "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
-            "avg_delta_t": avg_delta_t_daily,
+            "avg_delta_t": avg_delta_t_rolling,
             "daily_energy_kwh": self._estimated_energy_daily_kwh,
             "total_energy_kwh": analysis.get("total_energy_kwh"),
             # Measured energy
@@ -605,6 +609,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heater_power": self.heater_power,
             "surface": self.surface,
             "volume": self.volume,
+            "power_threshold": self.power_threshold,
             # Restored insulation rating (with season/inference support)
             "insulation_rating": self.thermal_model.get_insulation_rating(),
             "insulation_status": self.thermal_model.get_insulation_status(),
@@ -792,10 +797,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if power_state and power_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
                     power_w = float(power_state.state)
-                    is_heating = power_w > 50
+                    is_heating = power_w > self.power_threshold
                     _LOGGER.debug(
-                        "[%s] Heating detection via power sensor %s: %.1fW -> heating=%s",
-                        self.zone_name, self.power_sensor, power_w, is_heating
+                        "[%s] Heating detection via power sensor %s: %.1fW (threshold: %.0fW) -> heating=%s",
+                        self.zone_name, self.power_sensor, power_w, self.power_threshold, is_heating
                     )
                     return is_heating
                 except (ValueError, TypeError) as err:
@@ -841,7 +846,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _detect_window_open(self, current_temp: float, now: float) -> bool:
         """Detect if window is likely open based on rapid temperature drop.
-        
+
         This is the polling fallback - real-time detection is preferred.
         Uses same thresholds as real-time detection for consistency.
         """

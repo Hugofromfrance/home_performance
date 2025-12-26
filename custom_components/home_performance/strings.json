@@ -24,11 +24,13 @@
         "description": "Optional: Add room dimensions to get normalized K values (K/m² and K/m³) for comparison between rooms.",
         "data": {
           "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)"
+          "volume": "Volume (m³)",
+          "power_threshold": "Power Threshold (W)"
         },
         "data_description": {
           "surface": "Floor surface area of the zone",
-          "volume": "Volume of the zone (surface × ceiling height)"
+          "volume": "Volume of the zone (surface × ceiling height)",
+          "power_threshold": "Power above which heating is considered active (default: 50W)"
         }
       }
     },
@@ -49,7 +51,11 @@
         "data": {
           "heater_power": "Heater Power (W)",
           "surface": "Surface Area (m²)",
-          "volume": "Volume (m³)"
+          "volume": "Volume (m³)",
+          "power_threshold": "Power Threshold (W)"
+        },
+        "data_description": {
+          "power_threshold": "Power above which heating is considered active (default: 50W)"
         }
       }
     }

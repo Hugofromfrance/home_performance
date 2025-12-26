@@ -680,7 +680,7 @@ class ThermalLossModel:
                 "k_value": self._last_valid_k,
                 "k_source": "last_valid" if self._last_valid_k else None,
                 "season": season,
-                "message": "Collecte de données en cours",
+                "message": "Data collection in progress",
                 "temp_stable": stability["stable"],
             }
 
@@ -692,7 +692,7 @@ class ThermalLossModel:
                 "k_value": self._last_valid_k,
                 "k_source": "last_valid" if self._last_valid_k else None,
                 "season": season,
-                "message": "Mode été - mesure impossible",
+                "message": "Summer mode - measurement not possible",
                 "temp_stable": stability["stable"],
             }
 
@@ -704,7 +704,7 @@ class ThermalLossModel:
                 "k_value": self._last_valid_k,
                 "k_source": "last_valid" if self._last_valid_k else None,
                 "season": season,
-                "message": "Hors saison - ΔT insuffisant",
+                "message": "Off-season - ΔT insufficient",
                 "temp_stable": stability["stable"],
             }
 
@@ -728,7 +728,7 @@ class ThermalLossModel:
                 "k_value": None,  # Can't calculate, but we know it's very low
                 "k_source": "inferred",
                 "season": season,
-                "message": "Excellente - chauffe minimale nécessaire",
+                "message": "Excellent - minimal heating needed",
                 "temp_stable": True,
             }
 
@@ -741,7 +741,7 @@ class ThermalLossModel:
                 "k_value": self._last_valid_k,
                 "k_source": "last_valid" if self._last_valid_k else None,
                 "season": season,
-                "message": "Chauffage insuffisant - température instable",
+                "message": "Insufficient heating - unstable temperature",
                 "temp_stable": False,
             }
 
@@ -751,7 +751,7 @@ class ThermalLossModel:
             "k_value": self._last_valid_k,
             "k_source": "last_valid" if self._last_valid_k else None,
             "season": season,
-            "message": "En attente de chauffe",
+            "message": "Waiting for heating",
             "temp_stable": stability["stable"],
         }
 

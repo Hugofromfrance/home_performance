@@ -22,6 +22,8 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_SURFACE,
     CONF_VOLUME,
+    CONF_POWER_THRESHOLD,
+    DEFAULT_POWER_THRESHOLD,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,6 +99,17 @@ def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
                 selector.EntitySelectorConfig(
                     domain="sensor",
                     device_class="power",
+                )
+            ),
+            vol.Optional(
+                CONF_POWER_THRESHOLD, default=DEFAULT_POWER_THRESHOLD
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1,
+                    max=1000,
+                    step=1,
+                    unit_of_measurement="W",
+                    mode="box",
                 )
             ),
             vol.Optional(CONF_ENERGY_SENSOR): selector.EntitySelector(
@@ -297,6 +310,18 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                     device_class="energy",
                 )
             )
+
+        # Power threshold - always show with default
+        power_threshold_value = current.get(CONF_POWER_THRESHOLD, DEFAULT_POWER_THRESHOLD)
+        schema_dict[vol.Optional(CONF_POWER_THRESHOLD, default=power_threshold_value)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1,
+                max=1000,
+                step=1,
+                unit_of_measurement="W",
+                mode="box",
+            )
+        )
 
         return self.async_show_form(
             step_id="init",

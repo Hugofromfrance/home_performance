@@ -48,7 +48,7 @@ def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> di
         return {
             "level": None,
             "icon": "mdi:help-circle",
-            "message": "En attente de données",
+            "message": "Waiting for data",
             "saving_percent": None,
             "excellent_threshold": None,
             "standard_threshold": None,
@@ -63,7 +63,7 @@ def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> di
         return {
             "level": "excellent",
             "icon": "mdi:leaf",
-            "message": f"Performance excellente (-{saving}% vs. moyenne)",
+            "message": f"Excellent performance (-{saving}% vs. average)",
             "saving_percent": saving,
             "excellent_threshold": excellent_threshold,
             "standard_threshold": standard_threshold,
@@ -72,7 +72,7 @@ def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> di
         return {
             "level": "standard",
             "icon": "mdi:check-circle",
-            "message": "Performance standard",
+            "message": "Standard performance",
             "saving_percent": 0,
             "excellent_threshold": excellent_threshold,
             "standard_threshold": standard_threshold,
@@ -82,7 +82,7 @@ def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> di
         return {
             "level": "to_optimize",
             "icon": "mdi:alert-circle",
-            "message": f"Marge d'optimisation (+{excess}% vs. moyenne)",
+            "message": f"Needs optimization (+{excess}% vs. average)",
             "saving_percent": -excess,
             "excellent_threshold": excellent_threshold,
             "standard_threshold": standard_threshold,
@@ -265,15 +265,15 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                 })
 
         return {
-            "description": "Déperdition thermique par degré d'écart (W/°C)",
+            "description": "Thermal loss per degree of temperature difference (W/°C)",
             "heater_power_w": data.get("heater_power"),
             "k_24h": round(k_24h, 1) if k_24h is not None else None,
             "k_7d": round(k_7d, 1) if k_7d is not None else None,
             "k_per_m3_24h": k_per_m3_24h,
             "k_history_7d": k_history,
             "interpretation": (
-                "Plus K est bas, meilleure est l'isolation. "
-                "Valeurs typiques: 10-20 (bien isolé), 20-40 (moyen), 40+ (mal isolé)"
+                "Lower K = better insulation. "
+                "Typical values: 10-20 (well insulated), 20-40 (average), 40+ (poorly insulated)"
             ),
         }
 
@@ -304,7 +304,7 @@ class KPerM2Sensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         return {
-            "description": "K normalisé par surface - comparable entre pièces",
+            "description": "K normalized by surface area - comparable between rooms",
             "surface_m2": data.get("surface"),
         }
 
@@ -335,7 +335,7 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         return {
-            "description": "K normalisé par volume - meilleur pour comparer des pièces de hauteurs différentes",
+            "description": "K normalized by volume - better for comparing rooms with different ceiling heights",
             "volume_m3": data.get("volume"),
         }
 
@@ -367,7 +367,7 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         return {
-            "description": "Énergie estimée sur les dernières 24h glissantes",
+            "description": "Estimated energy over the last rolling 24h",
             "heater_power_w": data.get("heater_power"),
             "calculation": "estimation",
             "window": "24h glissantes",
@@ -405,11 +405,13 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         hours = data.get("heating_hours")
         # Source: power sensor (measured) or switch/climate state (estimated)
         has_power_sensor = self.coordinator.power_sensor is not None
+        power_threshold = self.coordinator.power_threshold
         return {
             "hours_decimal": round(hours, 2) if hours is not None else None,
             "source": "measured" if has_power_sensor else "estimated",
-            "detection": f"power > 50W ({self.coordinator.power_sensor})" if has_power_sensor else f"état {self.coordinator.heating_entity}",
-            "description": "Temps cumulé de chauffe sur les dernières 24h",
+            "detection": f"power > {power_threshold}W ({self.coordinator.power_sensor})" if has_power_sensor else f"state of {self.coordinator.heating_entity}",
+            "power_threshold_w": power_threshold if has_power_sensor else None,
+            "description": "Cumulative heating time over the last 24h",
         }
 
 
@@ -438,9 +440,11 @@ class HeatingRatioSensor(HomePerformanceBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         has_power_sensor = self.coordinator.power_sensor is not None
+        power_threshold = self.coordinator.power_threshold
         return {
-            "description": "Pourcentage du temps où le chauffage est actif sur 24h",
+            "description": "Percentage of time heating is active over 24h",
             "source": "measured" if has_power_sensor else "estimated",
+            "power_threshold_w": power_threshold if has_power_sensor else None,
         }
 
 
@@ -483,9 +487,9 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         perf = get_energy_performance(daily_kwh, heater_power)
 
         level_descriptions = {
-            "excellent": "🟢 Excellente",
+            "excellent": "🟢 Excellent",
             "standard": "🟡 Standard",
-            "to_optimize": "🟠 À optimiser",
+            "to_optimize": "🟠 Needs optimization",
         }
 
         return {
@@ -505,8 +509,8 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
             "daily_energy_kwh": round(daily_kwh, 2) if daily_kwh is not None else None,
             "heater_power_w": heater_power,
             "description": (
-                "Évaluation basée sur les statistiques nationales françaises. "
-                "Seuils calculés selon la puissance du radiateur."
+                "Evaluation based on national statistics. "
+                "Thresholds calculated based on heater power."
             ),
         }
 
@@ -564,7 +568,8 @@ class DeltaTSensor(HomePerformanceBaseSensor):
         current_dt = data.get("delta_t")
 
         return {
-            "description": "Écart moyen entre température intérieure et extérieure sur 24h",
+            "description": "Average temperature difference between indoor and outdoor (rolling 24h window)",
+            "window": "rolling 24h",
             "current_delta_t": (
                 round(self._convert_delta(current_dt), 1)
                 if current_dt is not None
@@ -580,7 +585,7 @@ class DeltaTSensor(HomePerformanceBaseSensor):
                 if data.get("outdoor_temp") is not None
                 else None
             ),
-            "unit_note": "Delta de température (pas absolu) - converti correctement pour votre système d'unités",
+            "unit_note": "Temperature delta (not absolute) - correctly converted for your unit system",
         }
 
 
@@ -638,7 +643,7 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
             data_ready = self.coordinator.data.get("data_ready", False)
 
         if data_ready:
-            return "Prêt"
+            return "Ready"
 
         remaining = max(0, 12 - data_hours)
         return format_duration(remaining)
@@ -724,7 +729,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
             "hours_collected": round(data_hours, 2),
             "hours_required": 12,
             "data_ready": data_ready,
-            "description": "Progression de la collecte de données (0-100%)",
+            "description": "Data collection progress (0-100%)",
         }
 
 
@@ -776,22 +781,22 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
         k_value = insulation_status.get("k_value")
 
         rating_descriptions = {
-            "excellent": "Très bien isolé",
-            "excellent_inferred": "🏆 Excellente (déduite)",
-            "good": "Bien isolé",
-            "average": "Isolation moyenne",
-            "poor": "Mal isolé",
-            "very_poor": "Très mal isolé / pont thermique",
+            "excellent": "Very well insulated",
+            "excellent_inferred": "🏆 Excellent (inferred)",
+            "good": "Well insulated",
+            "average": "Average insulation",
+            "poor": "Poorly insulated",
+            "very_poor": "Very poorly insulated / thermal bridge",
         }
 
         season_descriptions = {
-            "summer": "☀️ Mode été",
-            "off_season": "🌤️ Hors saison",
-            "heating_season": "❄️ Saison de chauffe",
+            "summer": "☀️ Summer mode",
+            "off_season": "🌤️ Off-season",
+            "heating_season": "❄️ Heating season",
         }
 
         return {
-            "description": rating_descriptions.get(rating, message or "En attente de données"),
+            "description": rating_descriptions.get(rating, message or "Waiting for data"),
             "status": status,
             "season": season,
             "season_description": season_descriptions.get(season, season),
@@ -804,7 +809,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
             ),
             "temp_stable": insulation_status.get("temp_stable"),
             "message": message,
-            "note": "Basé sur K/m³ ou déduit si chauffe minimale",
+            "note": "Based on K/m³ or inferred if minimal heating needed",
         }
 
 
@@ -868,7 +873,7 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
         data = self.coordinator.data or {}
         uses_external = data.get("external_energy_daily_kwh") is not None
         return {
-            "description": "Compteur d'énergie journalier",
+            "description": "Daily energy counter",
             "source": "external" if uses_external else "integrated",
             "energy_sensor": self.coordinator.energy_sensor if uses_external else None,
             "power_sensor": self.coordinator.power_sensor if not uses_external else None,
