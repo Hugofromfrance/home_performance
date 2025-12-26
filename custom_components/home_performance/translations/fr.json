@@ -73,10 +73,14 @@
           "heater_power": "Puissance nominale en Watts (pour BTU/h : diviser par 3.41, ex: 60 000 BTU/h ≈ 17 600W)",
           "surface": "Surface au sol pour calculer le coefficient K par m²",
           "volume": "Volume pour calculer le coefficient K par m³",
-          "power_sensor": "Capteur de puissance instantanée (>50W = chauffe)",
+          "power_sensor": "Capteur de puissance instantanée (puissance > seuil = chauffe)",
           "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire)"
         }
       }
+    },
+    "error": {
+      "entity_not_found": "Entité introuvable ou indisponible",
+      "invalid_power": "Puissance invalide"
     }
   },
   "entity": {

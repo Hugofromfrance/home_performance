@@ -73,10 +73,14 @@
           "heater_power": "Nominal heater power in Watts (for BTU/h: divide by 3.41, e.g. 60,000 BTU/h ≈ 17,600W)",
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
-          "power_sensor": "Instantaneous power sensor (>50W = heating)",
+          "power_sensor": "Instantaneous power sensor (power > 50W = heating)",
           "energy_sensor": "Existing Home Assistant energy meter (takes priority)"
         }
       }
+    },
+    "error": {
+      "entity_not_found": "Entity not found or unavailable",
+      "invalid_power": "Invalid heater power"
     }
   },
   "entity": {
