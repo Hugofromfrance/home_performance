@@ -17,7 +17,7 @@
           "indoor_temp_sensor": "Temperature sensor inside the zone",
           "outdoor_temp_sensor": "Temperature sensor outside (can be shared across zones)",
           "heating_entity": "The entity that controls heating in this zone",
-          "heat_source_type": "Type of heating system (electric requires power, others require energy sensor)",
+          "heat_source_type": "Type of heating system",
           "heater_power": "Declared power of the heater in Watts (required for electric, optional for others)"
         }
       },
@@ -35,8 +35,8 @@
           "surface": "Floor surface area of the zone",
           "volume": "Volume of the zone (surface × ceiling height)",
           "power_threshold": "Power above which heating is considered active (default: 50W)",
-          "power_sensor": "Instantaneous power sensor for precise heating detection",
-          "energy_sensor": "Energy meter (required for heat pump/gas/district heating)"
+          "power_sensor": "Real-time power sensor (W) for precise heating detection and energy calculation",
+          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Optional: falls back to power_sensor or heater_power if not set"
         }
       }
     },
@@ -68,7 +68,8 @@
           "heat_source_type": "Type of heating system",
           "heater_power": "Declared power of the heater in Watts",
           "power_threshold": "Power above which heating is considered active (default: 50W)",
-          "energy_sensor": "Energy meter (required for heat pump/gas/district heating)"
+          "power_sensor": "Real-time power sensor (W) for precise heating detection",
+          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Optional: falls back to power_sensor or heater_power"
         }
       }
     }

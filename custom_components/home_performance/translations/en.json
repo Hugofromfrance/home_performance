@@ -29,26 +29,26 @@
           "indoor_temp_sensor": "Sensor measuring the room temperature",
           "outdoor_temp_sensor": "Sensor measuring the outdoor temperature",
           "heating_entity": "Switch, thermostat or climate controlling the heating",
-          "heat_source_type": "Type of heating system (electric requires power, others require energy sensor)",
+          "heat_source_type": "Type of heating system",
           "heater_power": "Nominal heater power in Watts (required for electric, optional for others)"
         }
       },
       "dimensions": {
         "title": "Dimensions and optional sensors",
-        "description": "These parameters are optional but allow for more precise analysis. Energy sensor is required for non-electric heat sources.",
+        "description": "These parameters are optional but improve accuracy. Energy source priority: energy_sensor > power_sensor > heater_power.",
         "data": {
           "surface": "Room surface area",
           "volume": "Room volume",
           "power_sensor": "Power sensor (optional)",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "Energy meter"
+          "energy_sensor": "Energy meter (optional)"
         },
         "data_description": {
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
-          "power_sensor": "Instantaneous power sensor to measure actual heating time and consumption",
+          "power_sensor": "Real-time power sensor (W) for precise heating detection and energy integration",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Energy meter (required for heat pump/gas/district heating, optional for electric)"
+          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Falls back to power_sensor or heater_power if not set"
         }
       }
     },
@@ -81,9 +81,9 @@
           "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
-          "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
+          "power_sensor": "Real-time power sensor (W) for precise heating detection",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Energy meter (required for heat pump/gas/district heating)"
+          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Falls back to power_sensor or heater_power"
         }
       }
     }
