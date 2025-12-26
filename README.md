@@ -102,16 +102,29 @@ You have a heating system and wonder:
 
 ### Supported Heat Source Types
 
-The integration supports **4 heat source types** with different configuration requirements:
+The integration supports **4 heat source types**:
 
 | Heat Source | `heater_power` | `energy_sensor` | Best for |
 |-------------|----------------|-----------------|----------|
 | **Electric** (default) | Required | Optional | Radiators, convectors, underfloor heating |
-| **Heat pump** | Optional | **Required** | PAC, air-to-air, air-to-water |
-| **Gas** | Optional | **Required** | Gas boilers, central heating |
-| **District heating** | Optional | **Required** | Stadsverwarming, urban heating networks |
+| **Heat pump** | Optional | Optional | PAC, air-to-air, air-to-water |
+| **Gas** | Optional | Optional | Gas boilers, central heating |
+| **District heating** | Optional | Optional | Stadsverwarming, urban heating networks |
 
-> **💡 Tip**: For non-electric sources, use [PowerCalc](https://github.com/bramstroker/homeassistant-powercalc) or your heating system's native energy sensor to create the required `energy_sensor`.
+### ⚡ Energy Source Priority
+
+The K coefficient calculation uses energy data from the most accurate available source:
+
+| Priority | Source | Accuracy | Use case |
+|----------|--------|----------|----------|
+| 1️⃣ | `energy_sensor` | ⭐⭐⭐ Best | Smart energy meter (kWh) - actual consumption |
+| 2️⃣ | `power_sensor` | ⭐⭐ Good | Real-time power (W) integrated over time |
+| 3️⃣ | `heater_power` | ⭐ Basic | Declared power × heating time (estimation) |
+
+> **💡 Tips**:
+> - For **best accuracy**, use an energy meter (smart plug with energy tracking, smart gas meter, etc.)
+> - For **gas/heat pump without smart meter**, you can use [PowerCalc](https://github.com/bramstroker/homeassistant-powercalc) to create an energy sensor from a power estimate
+> - If you only have `heater_power`, the integration will still work but with estimated energy
 
 ### Heating System Compatibility
 
@@ -120,10 +133,10 @@ The integration supports **4 heat source types** with different configuration re
 | Radiator + smart plug | ✅ | Electric - ideal with power measurement |
 | Radiator + pilot wire | ✅ | Electric - NodOn, Qubino, etc. |
 | Convector with thermostat | ✅ | Electric - via switch or climate |
-| Heat pump / AC | ✅ | Heat pump - requires energy sensor |
+| Heat pump / AC | ✅ | Heat pump - energy sensor recommended |
 | Electric underfloor heating | ✅ | Electric - with power sensor |
-| Gas boiler | ✅ | Gas - requires energy sensor |
-| District heating | ✅ | District - requires energy sensor |
+| Gas boiler | ✅ | Gas - energy sensor recommended |
+| District heating | ✅ | District - energy sensor recommended |
 
 ## 🎯 Concept
 
@@ -562,7 +575,7 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Volume | m³ (for K/m³ and insulation rating) |
 | Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
 | Power threshold | Detection threshold in Watts (default: 50W) |
-| Energy sensor | sensor.xxx_energy (**required** for heat pump/gas/district, optional for electric) |
+| Energy sensor | sensor.xxx_energy (optional - most accurate for K calculation) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
 | Weather entity | weather.xxx (for wind data display - shared between zones) |
 | Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
@@ -579,15 +592,15 @@ Energy sensor: (optional - for measured vs estimated energy)
 #### Heat Pump
 ```
 Heat source type: Heat pump
-Heater power: (optional - for performance thresholds reference)
-Energy sensor: sensor.heatpump_energy  (required)
+Heater power: 17600  (optional - declared power for estimation fallback)
+Energy sensor: sensor.heatpump_energy  (optional but recommended for accuracy)
 ```
 
 #### Gas / District Heating
 ```
 Heat source type: Gas (or District heating)
-Heater power: (optional)
-Energy sensor: sensor.gas_energy  (required)
+Heater power: 17600  (optional - declared power in Watts, e.g., 60,000 BTU/h = 17,600W)
+Energy sensor: sensor.gas_energy  (optional but recommended for accuracy)
 ```
 
 > **Notes**:

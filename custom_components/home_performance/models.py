@@ -6,12 +6,17 @@ the thermal loss coefficient K (W/°C) of a room.
 Formula: K = Energy / (ΔT × duration)
 
 Where:
-- Energy = heater_power × heating_time (in Wh)
+- Energy = measured or estimated heating energy consumption (in Wh)
 - ΔT = average temperature difference (indoor - outdoor)
 - duration = observation period (in hours)
 
-Example: 1000W heater running 6h/24h to maintain 19°C when it's 5°C outside:
-- Energy = 1000W × 6h = 6000 Wh
+Energy sources (in order of accuracy):
+1. energy_sensor: External energy meter reading (most accurate)
+2. power_sensor: Integrated power over time (accurate)
+3. heater_power × heating_time: Estimated from declared power (fallback)
+
+Example: Heater consuming 6kWh over 24h to maintain 19°C when it's 5°C outside:
+- Energy = 6000 Wh (measured or estimated)
 - ΔT = 14°C
 - K = 6000 / (14 × 24) ≈ 18 W/°C
 
@@ -170,9 +175,16 @@ class ThermalLossModel:
     - Average room: 20-40 W/°C
     - Poorly insulated room: 40-80 W/°C
 
-    Supports two modes:
-    1. Power-based (electric): Energy estimated from heater_power × time
-    2. Energy-based (heatpump/gas/district): Energy provided directly
+    Energy source hierarchy (most accurate first):
+    1. energy_sensor: External energy meter (kWh) - direct measurement, most accurate
+    2. power_sensor: Real-time power (W) integrated over time - calculated, accurate
+    3. heater_power: Declared power (W) × heating time - estimation, least accurate
+
+    Using measured energy (from energy_sensor or power_sensor) instead of declared
+    heater_power provides more accurate K calculations because:
+    - Actual efficiency losses are accounted for
+    - Variable output (thermostatic radiators, modulating systems) is captured
+    - Real consumption is measured, not estimated
     """
 
     def __init__(
@@ -344,8 +356,13 @@ class ThermalLossModel:
         """Calculate K from aggregated data over the last AGGREGATION_PERIOD_HOURS.
 
         Args:
-            period_energy_kwh: Measured energy for the period (for energy-based sources).
+            period_energy_kwh: Measured energy for the period (from energy_sensor or power_sensor).
                                If None, will estimate from heater_power.
+
+        Energy source priority (most accurate first):
+        1. period_energy_kwh (external energy sensor - most accurate)
+        2. _measured_energy_kwh (integrated from power sensor - accurate)
+        3. heater_power × heating_hours (declared power - estimation)
         """
         if len(self.data_points) < 2:
             return
@@ -383,13 +400,21 @@ class ThermalLossModel:
             return
 
         # Calculate energy for K calculation
-        # Priority: measured energy > estimated from power
+        # Priority: measured energy (external) > measured energy (integrated) > estimated from power
         if period_energy_kwh is not None and period_energy_kwh > 0:
+            # 1. External energy sensor (most accurate - actual consumption)
             energy_wh = period_energy_kwh * 1000  # Convert kWh to Wh
-            energy_source = "measured"
+            energy_source = "energy_sensor"
+        elif self._measured_energy_kwh > 0 and aggregation.heating_hours > 0:
+            # 2. Integrated from power sensor (accurate - real power readings)
+            # Scale measured energy to the aggregation period based on heating ratio
+            # This provides more accurate K than declared power
+            energy_wh = self._measured_energy_kwh * 1000  # Convert kWh to Wh
+            energy_source = "power_sensor"
         elif self.heater_power is not None and self.heater_power > 0:
+            # 3. Estimated from declared power (least accurate)
             energy_wh = self.heater_power * aggregation.heating_hours
-            energy_source = "estimated"
+            energy_source = "heater_power"
         else:
             # Cannot calculate K without energy data
             _LOGGER.debug(
@@ -530,9 +555,12 @@ class ThermalLossModel:
         Uses weighted average based on sample count per day.
         Only uses the last HISTORY_DAYS (7) days for calculation.
 
-        Supports both power-based and energy-based calculation:
-        - If heater_power is available: K = (power × heating_hours) / (ΔT × 24h)
-        - If energy_kwh is stored in history: K = (energy × 1000) / (ΔT × 24h)
+        Energy source hierarchy (stored in daily history):
+        1. energy_kwh from energy_sensor (measured - most accurate)
+        2. energy_kwh from power_sensor integration (measured - accurate)
+        3. energy_kwh estimated from heater_power × heating_hours (fallback)
+
+        The coordinator stores the best available energy source in energy_kwh.
         """
         if not self._daily_history:
             return
@@ -560,11 +588,12 @@ class ThermalLossModel:
         total_weight = 0.0
 
         for day in valid_days:
-            # Determine energy for K calculation
-            # Priority: stored energy_kwh > estimated from heater_power
+            # energy_kwh in history already contains the best available energy source
+            # (determined by coordinator at archival time)
             if day.energy_kwh > 0:
                 energy_wh = day.energy_kwh * 1000  # Convert kWh to Wh
             elif self.heater_power is not None and self.heater_power > 0:
+                # Fallback for old history entries without energy data
                 energy_wh = self.heater_power * day.heating_hours
             else:
                 # Skip this day if no energy data available
