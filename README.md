@@ -247,9 +247,9 @@ data:
 | **Energy performance** | Comparison to national average (excellent/standard/needs optimization) |
 | **Heating time (24h)** | Operating duration (format: `Xh Ymin`) |
 | **Heating ratio** | % of time heating is active |
-| **Avg ΔT (24h)** | Average indoor/outdoor difference |
+| **Avg ΔT (24h)** | Average indoor/outdoor difference (rolling 24h window) |
 
-The `source` attribute on Time/Ratio indicates: `measured` (via power sensor > 50W) or `estimated` (via switch state).
+The `source` attribute on Time/Ratio indicates: `measured` (via power sensor > configured threshold) or `estimated` (via switch state).
 
 ### Status
 
@@ -481,11 +481,12 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Surface | m² (for K/m²) |
 | Volume | m³ (for K/m³ and insulation rating) |
 | Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
+| Power threshold | Detection threshold in Watts (default: 50W) |
 | External energy counter | sensor.xxx_energy (your own HA Utility Meter) |
 
 > **Notes**:
 > - If you provide an external energy counter AND a power sensor, the external counter is used as priority for energy.
-> - The power sensor also enables **precise heat detection** (power > 50W), ideal for heaters with internal thermostat or pilot wire.
+> - The power sensor also enables **precise heat detection** (power > threshold), ideal for heaters with internal thermostat or pilot wire. The threshold is configurable (default: 50W).
 > - Options are **modifiable afterwards** and the integration reloads automatically.
 
 ## 💾 Data Persistence
