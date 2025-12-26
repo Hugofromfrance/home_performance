@@ -92,7 +92,7 @@ class WindowOpenSensor(HomePerformanceBaseBinarySensor):
         """Return extra state attributes."""
         return {
             "detection_method": "rapid_temperature_drop",
-            "description": "Détecté via une chute rapide de température",
+            "description": "Detected via rapid temperature drop",
         }
 
 
@@ -131,7 +131,7 @@ class DataReadySensor(HomePerformanceBaseBinarySensor):
                 "min_hours_required": MIN_DATA_HOURS,
                 "samples_count": self.coordinator.data.get("samples_count", 0),
                 "storage_loaded": storage_loaded,
-                "description": f"Nécessite au moins {MIN_DATA_HOURS}h de données",
+                "description": f"Requires at least {MIN_DATA_HOURS}h of data",
             }
         # Storage not yet loaded - return loading state
         return {
@@ -139,5 +139,5 @@ class DataReadySensor(HomePerformanceBaseBinarySensor):
             "min_hours_required": MIN_DATA_HOURS,
             "samples_count": 0,
             "storage_loaded": False,
-            "description": "Chargement des données...",
+            "description": "Loading data...",
         }
