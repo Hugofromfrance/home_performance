@@ -37,16 +37,28 @@ def format_duration(hours: float | None) -> str | None:
     return f"{h}h {m}min"
 
 
-def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> dict[str, Any]:
+def get_energy_performance(
+    daily_kwh: float | None,
+    heater_power_w: float | None,
+    derived_power_w: float | None = None,
+) -> dict[str, Any]:
     """
     Evaluate energy performance based on French national statistics.
 
-    Thresholds based on heater power:
+    Thresholds based on heater power (or derived power for energy-based sources):
     - Excellent: < (power/1000) * 4 kWh/day (-40% vs national average)
     - Standard: between excellent and (power/1000) * 6 kWh/day
     - To optimize: > (power/1000) * 6 kWh/day
+
+    Args:
+        daily_kwh: Daily energy consumption in kWh
+        heater_power_w: Declared heater power in Watts (may be None for energy-based sources)
+        derived_power_w: Calculated average power from energy/time (fallback for energy-based sources)
     """
-    if daily_kwh is None or heater_power_w <= 0:
+    # Use heater_power if available, otherwise use derived_power
+    effective_power = heater_power_w if heater_power_w and heater_power_w > 0 else derived_power_w
+
+    if daily_kwh is None or effective_power is None or effective_power <= 0:
         return {
             "level": None,
             "icon": "mdi:help-circle",
@@ -56,9 +68,9 @@ def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> di
             "standard_threshold": None,
         }
 
-    # Thresholds based on heater power
-    excellent_threshold = (heater_power_w / 1000) * 4
-    standard_threshold = (heater_power_w / 1000) * 6
+    # Thresholds based on effective power
+    excellent_threshold = (effective_power / 1000) * 4
+    standard_threshold = (effective_power / 1000) * 6
 
     if daily_kwh < excellent_threshold:
         saving = round((1 - daily_kwh / standard_threshold) * 100)
@@ -235,8 +247,16 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                     k_value = entry.k_7d
                 elif entry.avg_delta_t >= 5 and entry.heating_hours >= 0.5:
                     # Fallback for old data without k_7d: calculate daily K
-                    energy_wh = heater_power * entry.heating_hours
-                    k_value = energy_wh / (entry.avg_delta_t * 24)
+                    # Use stored energy if available, otherwise estimate from power
+                    if entry.energy_kwh > 0:
+                        energy_wh = entry.energy_kwh * 1000
+                    elif heater_power is not None and heater_power > 0:
+                        energy_wh = heater_power * entry.heating_hours
+                    else:
+                        energy_wh = None
+
+                    if energy_wh is not None:
+                        k_value = energy_wh / (entry.avg_delta_t * 24)
 
             days_data.append(
                 {
@@ -495,8 +515,9 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         """Return energy performance level."""
         if self.coordinator.data:
             daily_kwh = self.coordinator.data.get("daily_energy_kwh")
-            heater_power = self.coordinator.data.get("heater_power", 0)
-            perf = get_energy_performance(daily_kwh, heater_power)
+            heater_power = self.coordinator.data.get("heater_power")
+            derived_power = self.coordinator.data.get("derived_power")
+            perf = get_energy_performance(daily_kwh, heater_power, derived_power)
             return perf.get("level")
         return None
 
@@ -505,8 +526,9 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         """Return dynamic icon based on performance level."""
         if self.coordinator.data:
             daily_kwh = self.coordinator.data.get("daily_energy_kwh")
-            heater_power = self.coordinator.data.get("heater_power", 0)
-            perf = get_energy_performance(daily_kwh, heater_power)
+            heater_power = self.coordinator.data.get("heater_power")
+            derived_power = self.coordinator.data.get("derived_power")
+            perf = get_energy_performance(daily_kwh, heater_power, derived_power)
             return perf.get("icon", "mdi:help-circle")
         return "mdi:help-circle"
 
@@ -515,8 +537,9 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         daily_kwh = data.get("daily_energy_kwh")
-        heater_power = data.get("heater_power", 0)
-        perf = get_energy_performance(daily_kwh, heater_power)
+        heater_power = data.get("heater_power")
+        derived_power = data.get("derived_power")
+        perf = get_energy_performance(daily_kwh, heater_power, derived_power)
 
         level_descriptions = {
             "excellent": "🟢 Excellent",
@@ -536,7 +559,12 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
             ),
             "daily_energy_kwh": round(daily_kwh, 2) if daily_kwh is not None else None,
             "heater_power_w": heater_power,
-            "description": ("Evaluation based on national statistics. " "Thresholds calculated based on heater power."),
+            "derived_power_w": round(derived_power, 0) if derived_power else None,
+            "effective_power_w": heater_power if heater_power else (round(derived_power, 0) if derived_power else None),
+            "description": (
+                "Evaluation based on national statistics. "
+                "Thresholds calculated based on heater power (or derived power for energy-based sources)."
+            ),
         }
 
 

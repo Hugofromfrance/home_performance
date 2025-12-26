@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Configure Zone",
-        "description": "Set up a thermal performance analysis zone. You'll need temperature sensors, a heating entity, and the heater's declared power.",
+        "description": "Set up a thermal performance analysis zone. You'll need temperature sensors and a heating entity.",
         "data": {
           "zone_name": "Zone Name",
           "indoor_temp_sensor": "Indoor Temperature Sensor",
@@ -18,7 +18,7 @@
           "indoor_temp_sensor": "Temperature sensor inside the zone",
           "outdoor_temp_sensor": "Temperature sensor outside (can be shared across zones)",
           "heating_entity": "The entity that controls heating in this zone",
-          "heat_source_type": "Type of heating system",
+          "heat_source_type": "Type of heating system (electric requires power, others require energy sensor)",
           "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
           "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90"
         }
@@ -29,7 +29,9 @@
         "data": {
           "surface": "Floor Area (m²)",
           "volume": "Volume (m³)",
+          "power_sensor": "Power Sensor",
           "power_threshold": "Power Threshold (W)",
+          "energy_sensor": "Energy Sensor",
           "window_sensor": "Window/Door Sensor",
           "weather_entity": "Weather Entity",
           "room_orientation": "Room Orientation"
@@ -37,7 +39,9 @@
         "data_description": {
           "surface": "Floor surface area of the zone",
           "volume": "Volume of the zone (surface × ceiling height)",
+          "power_sensor": "Instantaneous power sensor for precise heating detection",
           "power_threshold": "Power above which heating is considered active (default: 50W)",
+          "energy_sensor": "Energy meter (required for heat pump/gas/district heating, optional for electric)",
           "window_sensor": "Optional: physical window/door contact sensor for accurate open detection",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
@@ -48,7 +52,8 @@
       "entity_not_found": "Entity not found or unavailable",
       "invalid_temperature": "Invalid temperature sensor",
       "invalid_power": "Invalid heater power",
-      "already_configured": "This zone is already configured"
+      "already_configured": "This zone is already configured",
+      "energy_sensor_required": "Energy sensor is required for this heat source type"
     },
     "abort": {
       "already_configured": "This zone is already configured"
@@ -80,7 +85,7 @@
           "volume": "Volume to calculate K coefficient per m³",
           "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority)",
+          "energy_sensor": "Energy meter (required for heat pump/gas/district heating, takes priority)",
           "window_sensor": "Optional: physical window/door contact sensor for accurate open detection",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"

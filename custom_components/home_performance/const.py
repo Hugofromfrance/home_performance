@@ -47,6 +47,16 @@ CONF_SURFACE = "surface"  # m²
 CONF_VOLUME = "volume"  # m³
 CONF_POWER_THRESHOLD = "power_threshold"  # Seuil de puissance pour détection chauffe (W)
 CONF_WINDOW_SENSOR = "window_sensor"  # Capteur d'ouverture de fenêtre (optionnel)
+CONF_HEAT_SOURCE_TYPE = "heat_source_type"  # Type de source de chaleur
+
+# Heat source types
+HEAT_SOURCE_ELECTRIC = "electric"
+HEAT_SOURCE_HEATPUMP = "heatpump"
+HEAT_SOURCE_GAS = "gas"
+HEAT_SOURCE_DISTRICT = "district"
+
+# Heat sources that require an energy sensor (cannot estimate from power)
+HEAT_SOURCES_REQUIRING_ENERGY = [HEAT_SOURCE_HEATPUMP, HEAT_SOURCE_GAS, HEAT_SOURCE_DISTRICT]
 
 # Weather settings
 CONF_WEATHER_ENTITY = "weather_entity"  # Entité météo pour vent (partagée)
@@ -62,6 +72,7 @@ CONF_NOTIFICATION_DELAY = "notification_delay"
 
 # Default values
 DEFAULT_NOTIFICATION_DELAY = 2  # minutes
+DEFAULT_HEAT_SOURCE_TYPE = HEAT_SOURCE_ELECTRIC
 DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
 
 # Timing

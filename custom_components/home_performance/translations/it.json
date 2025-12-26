@@ -87,6 +87,7 @@
     "error": {
       "entity_not_found": "Entità non trovata",
       "invalid_power": "Potenza non valida",
+      "energy_sensor_required": "Il sensore di energia è richiesto per questo tipo di fonte di calore",
       "unknown": "Errore imprevisto"
     },
     "abort": {
