@@ -36,13 +36,13 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 
 ## 🤔 Why Home Performance?
 
-You use electric heating and wonder:
+You have a heating system and wonder:
 - **"Is my room well insulated?"** → Measured K coefficient
 - **"How much do I actually consume?"** → Daily energy
 - **"Did I forget to close a window?"** → Automatic detection
 - **"Which room costs the most?"** → Multi-zone comparison
 
-**Home Performance** answers these questions by analyzing your **real** heating data, without theoretical calculations.
+**Home Performance** answers these questions by analyzing your **real** heating data, without theoretical calculations. Works with electric heaters, heat pumps, gas boilers, and district heating!
 
 ### 💡 Use Cases
 
@@ -100,16 +100,30 @@ You use electric heating and wonder:
 | Instant power | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | Precise heating time |
 | Energy counter | HA Utility Meter, native counter | Measured vs estimated energy |
 
-### Supported Heating Types
+### Supported Heat Source Types
+
+The integration supports **4 heat source types** with different configuration requirements:
+
+| Heat Source | `heater_power` | `energy_sensor` | Best for |
+|-------------|----------------|-----------------|----------|
+| **Electric** (default) | Required | Optional | Radiators, convectors, underfloor heating |
+| **Heat pump** | Optional | **Required** | PAC, air-to-air, air-to-water |
+| **Gas** | Optional | **Required** | Gas boilers, central heating |
+| **District heating** | Optional | **Required** | Stadsverwarming, urban heating networks |
+
+> **💡 Tip**: For non-electric sources, use [PowerCalc](https://github.com/bramstroker/homeassistant-powercalc) or your heating system's native energy sensor to create the required `energy_sensor`.
+
+### Heating System Compatibility
 
 | Type | Compatible? | Notes |
 |------|-------------|-------|
-| Radiator + smart plug | ✅ | Ideal with power measurement |
-| Radiator + pilot wire | ✅ | NodOn, Qubino, etc. |
-| Convector with thermostat | ✅ | Via switch or climate |
-| Heat pump / AC | ✅ | Via climate entity |
-| Electric underfloor heating | ✅ | With power sensor |
-| Central gas/oil heating | ⚠️ | Possible but less precise (no individual power measurement) |
+| Radiator + smart plug | ✅ | Electric - ideal with power measurement |
+| Radiator + pilot wire | ✅ | Electric - NodOn, Qubino, etc. |
+| Convector with thermostat | ✅ | Electric - via switch or climate |
+| Heat pump / AC | ✅ | Heat pump - requires energy sensor |
+| Electric underfloor heating | ✅ | Electric - with power sensor |
+| Gas boiler | ✅ | Gas - requires energy sensor |
+| District heating | ✅ | District - requires energy sensor |
 
 ## 🎯 Concept
 
@@ -537,7 +551,8 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
 | Heating entity | climate.xxx or switch.xxx |
-| Heater power | Declared power in Watts (up to 100kW). For BTU/h: divide by 3.41 |
+| Heat source type | Electric, Heat pump, Gas, or District heating |
+| Heater power | Declared power in Watts (required for Electric, optional for others) |
 
 ### Optional Parameters
 
@@ -547,12 +562,37 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Volume | m³ (for K/m³ and insulation rating) |
 | Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
 | Power threshold | Detection threshold in Watts (default: 50W) |
-| External energy counter | sensor.xxx_energy (your own HA Utility Meter) |
+| Energy sensor | sensor.xxx_energy (**required** for heat pump/gas/district, optional for electric) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
 | Weather entity | weather.xxx (for wind data display - shared between zones) |
 | Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
 
+### Configuration by Heat Source Type
+
+#### Electric (default)
+```
+Heat source type: Electric
+Heater power: 1500  (required - your heater's rated power in Watts)
+Energy sensor: (optional - for measured vs estimated energy)
+```
+
+#### Heat Pump
+```
+Heat source type: Heat pump
+Heater power: (optional - for performance thresholds reference)
+Energy sensor: sensor.heatpump_energy  (required)
+```
+
+#### Gas / District Heating
+```
+Heat source type: Gas (or District heating)
+Heater power: (optional)
+Energy sensor: sensor.gas_energy  (required)
+```
+
 > **Notes**:
+> - For non-electric sources, the K coefficient is calculated directly from the measured energy.
+> - If `heater_power` is not provided, performance thresholds are derived from observed energy/time ratio.
 > - If you provide an external energy counter AND a power sensor, the external counter is used as priority for energy.
 > - The power sensor also enables **precise heat detection** (power > threshold), ideal for heaters with internal thermostat or pilot wire. The threshold is configurable (default: 50W).
 > - The **Window/Door sensor** allows using a physical contact sensor (window, door, opening) for accurate open detection instead of relying on temperature-based detection. If the sensor is unavailable, it falls back to temperature detection automatically.
@@ -654,13 +694,15 @@ The performance sensor compares your consumption to the French national average:
 
 ### Calculation Formula
 
-Thresholds are dynamically calculated based on heater power:
+Thresholds are dynamically calculated based on heater power (or derived power for non-electric sources):
 
 ```
 Excellent      : < (Power_W / 1000) × 4 kWh/day
 Standard       : < (Power_W / 1000) × 6 kWh/day
 Needs optimization : beyond
 ```
+
+> **For non-electric sources**: If `heater_power` is not configured, the system derives an average power from observed `energy / heating_hours`. This allows performance evaluation even for heat pumps, gas, or district heating.
 
 ### Thresholds by Power
 
@@ -709,7 +751,8 @@ Needs optimization : beyond
 - [x] **Physical window/door sensor** support
 - [x] **Multi-zone card** - All zones in one card with List/Compare views
 - [x] **Long-term history** - 5 years of daily data storage
-- [x] **Wind data display** - Weather entity integration with wind exposure 🆕
+- [x] **Wind data display** - Weather entity integration with wind exposure
+- [x] **Multiple heat source types** (electric, heat pump, gas, district heating) 🔥
 
 ### 🔜 Next - Alerts & Notifications
 
