@@ -210,10 +210,37 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-            # Clean up None values from optional fields
-            cleaned_input = {k: v for k, v in user_input.items() if v is not None}
-            return self.async_create_entry(title="", data=cleaned_input)
+            # Validate heater power
+            heater_power = user_input.get(CONF_HEATER_POWER)
+            if not heater_power or heater_power <= 0:
+                errors[CONF_HEATER_POWER] = "invalid_power"
+
+            # Validate power sensor if provided
+            power_sensor = user_input.get(CONF_POWER_SENSOR)
+            if power_sensor and not self.hass.states.get(power_sensor):
+                errors[CONF_POWER_SENSOR] = "entity_not_found"
+
+            # Validate energy sensor if provided
+            energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
+            if energy_sensor and not self.hass.states.get(energy_sensor):
+                errors[CONF_ENERGY_SENSOR] = "entity_not_found"
+
+            if not errors:
+                # Keep None values to allow removing sensors (override data with options)
+                # But remove keys that are None AND not in current config (truly optional)
+                current = {**self._config_entry.data, **self._config_entry.options}
+                cleaned_input = {}
+                for k, v in user_input.items():
+                    if v is not None:
+                        cleaned_input[k] = v
+                    elif k in current and current[k] is not None:
+                        # User cleared a previously set value - explicitly set to None
+                        # This allows removing a power_sensor or energy_sensor
+                        cleaned_input[k] = None
+                return self.async_create_entry(title="", data=cleaned_input)
 
         # Get current values from data or options
         current = {**self._config_entry.data, **self._config_entry.options}
@@ -264,29 +291,42 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 )
             )
 
-        # Power sensor - EntitySelector handles None gracefully
-        schema_dict[vol.Optional(
-            CONF_POWER_SENSOR,
-            default=current.get(CONF_POWER_SENSOR),
-        )] = selector.EntitySelector(
-            selector.EntitySelectorConfig(
-                domain="sensor",
-                device_class="power",
+        # Power sensor - only set default if value exists (EntitySelector doesn't handle None)
+        power_sensor_value = current.get(CONF_POWER_SENSOR)
+        if power_sensor_value is not None:
+            schema_dict[vol.Optional(CONF_POWER_SENSOR, default=power_sensor_value)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="power",
+                )
             )
-        )
+        else:
+            schema_dict[vol.Optional(CONF_POWER_SENSOR)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="power",
+                )
+            )
 
-        # Energy sensor - EntitySelector handles None gracefully
-        schema_dict[vol.Optional(
-            CONF_ENERGY_SENSOR,
-            default=current.get(CONF_ENERGY_SENSOR),
-        )] = selector.EntitySelector(
-            selector.EntitySelectorConfig(
-                domain="sensor",
-                device_class="energy",
+        # Energy sensor - only set default if value exists (EntitySelector doesn't handle None)
+        energy_sensor_value = current.get(CONF_ENERGY_SENSOR)
+        if energy_sensor_value is not None:
+            schema_dict[vol.Optional(CONF_ENERGY_SENSOR, default=energy_sensor_value)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="energy",
+                )
             )
-        )
+        else:
+            schema_dict[vol.Optional(CONF_ENERGY_SENSOR)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="energy",
+                )
+            )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_dict),
+            errors=errors,
         )
