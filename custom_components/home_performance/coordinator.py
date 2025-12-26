@@ -108,6 +108,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_temp_value: float | None = None  # Last temperature value
         self._last_temp_time: float | None = None  # Last temperature timestamp
         self._window_open_realtime: bool = False  # Real-time window open state
+        self._window_open_since: float | None = None  # Timestamp when window was detected open
+        self._consecutive_drops: int = 0  # Count of consecutive temperature drops
 
         # Persistence
         self._store = Store(
@@ -224,36 +226,52 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             now = time.time()
 
             # Check for rapid temperature drop (window open detection)
+            # Improved algorithm to reduce false positives with fast-cycling systems (e.g., US furnaces)
             if self._last_temp_value is not None and self._last_temp_time is not None:
                 time_delta = now - self._last_temp_time
                 if time_delta > 0:
                     temp_change = new_temp - self._last_temp_value
                     rate_per_minute = (temp_change / time_delta) * 60
 
-                    # Window open: rapid temperature drop
-                    # - More than 0.5°C/min drop while heating
-                    # - More than 1°C/min drop regardless of heating
-                    was_window_open = self._window_open_realtime
+                    # Thresholds (in °C/min):
+                    # - 0.7°C/min while heating (was 0.5, more tolerant for fast-cycling systems)
+                    # - 1.2°C/min regardless (was 1.0, accounts for natural cooling after furnace off)
+                    DROP_THRESHOLD_HEATING = -0.7
+                    DROP_THRESHOLD_ANY = -1.2
+                    CONSECUTIVE_DROPS_REQUIRED = 2  # Need 2+ consecutive readings to confirm
 
-                    if self._is_heating_realtime and rate_per_minute < -0.5:
-                        self._window_open_realtime = True
-                        if not was_window_open:
-                            _LOGGER.warning(
-                                "[%s] 🪟 Window OPEN detected (real-time)! Temp drop: %.2f°C/min while heating",
-                                self.zone_name, abs(rate_per_minute)
-                            )
-                    elif rate_per_minute < -1.0:
-                        self._window_open_realtime = True
-                        if not was_window_open:
-                            _LOGGER.warning(
-                                "[%s] 🪟 Window OPEN detected (real-time)! Rapid temp drop: %.2f°C/min",
-                                self.zone_name, abs(rate_per_minute)
-                            )
+                    was_window_open = self._window_open_realtime
+                    is_rapid_drop = (
+                        (self._is_heating_realtime and rate_per_minute < DROP_THRESHOLD_HEATING)
+                        or rate_per_minute < DROP_THRESHOLD_ANY
+                    )
+
+                    if is_rapid_drop:
+                        self._consecutive_drops += 1
+                        if self._consecutive_drops >= CONSECUTIVE_DROPS_REQUIRED:
+                            if not was_window_open:
+                                self._window_open_realtime = True
+                                self._window_open_since = now
+                                _LOGGER.warning(
+                                    "[%s] 🪟 Window OPEN detected! Temp drop: %.2f°C/min (heating: %s)",
+                                    self.zone_name, abs(rate_per_minute), self._is_heating_realtime
+                                )
                     elif rate_per_minute > 0.1:
                         # Temperature rising = window likely closed
+                        self._consecutive_drops = 0
                         if was_window_open:
                             _LOGGER.info("[%s] 🪟 Window CLOSED (temperature rising)", self.zone_name)
                         self._window_open_realtime = False
+                        self._window_open_since = None
+                    elif abs(rate_per_minute) < 0.2:
+                        # Temperature stable (not dropping fast) - close window after 5 min
+                        self._consecutive_drops = 0
+                        if was_window_open and self._window_open_since:
+                            minutes_open = (now - self._window_open_since) / 60
+                            if minutes_open > 5:
+                                _LOGGER.info("[%s] 🪟 Window CLOSED (temperature stabilized after %.1f min)", self.zone_name, minutes_open)
+                                self._window_open_realtime = False
+                                self._window_open_since = None
 
             # Update tracking values
             self._last_temp_value = new_temp
@@ -817,7 +835,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return is_on
 
     def _detect_window_open(self, current_temp: float, now: float) -> bool:
-        """Detect if window is likely open based on rapid temperature drop."""
+        """Detect if window is likely open based on rapid temperature drop.
+        
+        This is the polling fallback - real-time detection is preferred.
+        Uses same thresholds as real-time detection for consistency.
+        """
         if self._last_indoor_temp is None or self._last_update is None:
             return False
 
@@ -829,11 +851,14 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         temp_change = current_temp - self._last_indoor_temp
         rate_per_minute = (temp_change / time_delta) * 60
 
-        # If temperature drops more than 0.5°C per minute while heating is on
-        # or more than 1°C per minute regardless, likely window open
-        if self._last_heating_state and rate_per_minute < -0.5:
+        # Thresholds aligned with real-time detection:
+        # - 0.7°C/min while heating
+        # - 1.2°C/min regardless
+        # Note: This is polling fallback, real-time detection with consecutive
+        # readings is more accurate and less prone to false positives
+        if self._last_heating_state and rate_per_minute < -0.7:
             return True
-        if rate_per_minute < -1.0:
+        if rate_per_minute < -1.2:
             return True
 
         return False

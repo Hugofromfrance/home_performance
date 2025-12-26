@@ -17,6 +17,7 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 - [Created Sensors](#-created-sensors-per-zone)
 - [Multi-zones](#-multi-zones)
 - [Lovelace Card](#-built-in-lovelace-card)
+- [Clearing Card Cache](#clearing-the-card-cache)
 - [Temperature Units](#️-temperature-units-celsiusfahrenheit)
 - [Prerequisites](#-prerequisites)
 - [Configuration](#️-configuration)
@@ -355,6 +356,35 @@ A slim horizontal bar showing score, zone name, K coefficient, and ΔT. Ideal fo
 - ⏳ **Progress** - Progress bar during initial analysis
 - 🎨 **Adaptive design** - Adapts to light/dark theme
 - 🎛️ **Visual editor** - Choose layout directly in the UI
+
+### Clearing the Card Cache
+
+After updating the integration, your browser may still display the old card version due to caching. Here's how to force a refresh:
+
+#### Method 1: Hard Refresh (Quick)
+- **Windows/Linux**: `Ctrl + Shift + R` or `Ctrl + F5`
+- **Mac**: `Cmd + Shift + R`
+
+#### Method 2: Clear Browser Cache
+1. Open Developer Tools (`F12`)
+2. Right-click the refresh button → "Empty Cache and Hard Reload"
+
+#### Method 3: Version Parameter (Permanent Fix)
+Add a version parameter to your resource URL in **Settings → Dashboards → ⋮ → Resources**:
+
+```
+/home_performance/home-performance-card.js?v=1.2.0
+```
+
+Update the version number after each integration update.
+
+#### Verify Card Version
+Open the browser console (`F12` → Console tab) and look for:
+```
+HOME-PERFORMANCE v1.2.0
+```
+
+If you see an older version, the cache hasn't been cleared yet.
 
 ## 🌡️ Temperature Units (Celsius/Fahrenheit)
 
