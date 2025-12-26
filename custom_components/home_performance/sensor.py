@@ -504,7 +504,7 @@ class DeltaTSensor(HomePerformanceBaseSensor):
                 if data.get("outdoor_temp") is not None
                 else None
             ),
-            "unit_note": "Temperature delta (not absolute) - converted correctly for your unit system",
+            "unit_note": "Delta de température (pas absolu) - converti correctement pour votre système d'unités",
         }
 
 
