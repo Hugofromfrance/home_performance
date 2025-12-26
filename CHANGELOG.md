@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/Hugofromfrance/home_performance/compare/v1.2.1...v1.2.2) (2025-12-26)
+
+
+### 🐛 Corrections de bugs
+
+* Form edit validation errors ([c394b8d](https://github.com/Hugofromfrance/home_performance/commit/c394b8d4fecd65d26e11b988bfa9669b97ac4925))
+
 ## [1.2.1](https://github.com/Hugofromfrance/home_performance/compare/v1.2.0...v1.2.1) (2025-12-26)
 
 
