@@ -9,6 +9,12 @@ SOURCE_DIR="$SCRIPT_DIR/custom_components/home_performance"
 
 echo "🚀 Déploiement de Home Performance vers Home Assistant..."
 
+# Synchroniser la version du manifest vers la card JS
+VERSION=$(grep '"version"' "$SOURCE_DIR/manifest.json" | sed 's/.*"version": "\([^"]*\)".*/\1/')
+echo "📌 Version: $VERSION"
+sed -i.bak "s/const CARD_VERSION = \"[^\"]*\"/const CARD_VERSION = \"$VERSION\"/" "$SOURCE_DIR/www/home-performance-card.js"
+rm -f "$SOURCE_DIR/www/home-performance-card.js.bak"
+
 # Créer les dossiers si nécessaire
 ssh ha "mkdir -p /config/custom_components/home_performance/translations"
 ssh ha "mkdir -p /config/custom_components/home_performance/www"
