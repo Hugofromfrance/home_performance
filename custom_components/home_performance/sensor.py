@@ -436,10 +436,16 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
 
 
 class DeltaTSensor(HomePerformanceBaseSensor):
-    """Sensor for average temperature difference."""
+    """Sensor for average temperature difference.
 
-    _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    Note: No device_class=TEMPERATURE because this is a temperature DIFFERENCE,
+    not an absolute temperature. HA's conversion formula (°F = °C × 9/5 + 32)
+    would give wrong results for deltas (should be Δ°F = Δ°C × 9/5, no +32).
+
+    We handle the conversion manually based on the user's unit system.
+    """
+
+    # No device_class - this is a temperature delta, not absolute temperature
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:thermometer"
     _attr_translation_key = "dt_moyen_24h"
@@ -448,24 +454,44 @@ class DeltaTSensor(HomePerformanceBaseSensor):
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "avg_delta_t")
 
+    def _is_imperial(self) -> bool:
+        """Check if user's HA is configured for imperial (Fahrenheit)."""
+        return self.hass.config.units.temperature_unit == UnitOfTemperature.FAHRENHEIT
+
+    def _convert_delta(self, value_celsius: float) -> float:
+        """Convert temperature delta to user's unit system.
+
+        For deltas: Δ°F = Δ°C × 9/5 (no +32 offset!)
+        """
+        if self._is_imperial():
+            return value_celsius * 9 / 5
+        return value_celsius
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit based on user's system."""
+        return "°F" if self._is_imperial() else "°C"
+
     @property
     def native_value(self) -> float | None:
-        """Return average ΔT."""
+        """Return average ΔT in user's unit system."""
         if self.coordinator.data:
             value = self.coordinator.data.get("avg_delta_t")
             if value is not None:
-                return round(value, 1)
+                return round(self._convert_delta(value), 1)
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         data = self.coordinator.data or {}
+        current_dt = data.get("delta_t")
+
         return {
             "description": "Écart moyen entre température intérieure et extérieure sur 24h",
             "current_delta_t": (
-                round(data.get("delta_t"), 1)
-                if data.get("delta_t") is not None
+                round(self._convert_delta(current_dt), 1)
+                if current_dt is not None
                 else None
             ),
             "indoor_temp": (
@@ -478,6 +504,7 @@ class DeltaTSensor(HomePerformanceBaseSensor):
                 if data.get("outdoor_temp") is not None
                 else None
             ),
+            "unit_note": "Temperature delta (not absolute) - converted correctly for your unit system",
         }
 
 
