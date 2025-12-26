@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1](https://github.com/Hugofromfrance/home_performance/compare/v1.2.0...v1.2.1) (2025-12-26)
+
+
+### 🐛 Corrections de bugs
+
+* default unit_note translation ([a0ff955](https://github.com/Hugofromfrance/home_performance/commit/a0ff955be8872e08cc6ab0416d154f2347d6ac4f))
+* Increase temeprature threshold and display delta in right temperature ([44d5f52](https://github.com/Hugofromfrance/home_performance/commit/44d5f520e140c7de869b5df50612971bcc03a543))
+* Lovelace card conversion to °F is now correct ([9dd342d](https://github.com/Hugofromfrance/home_performance/commit/9dd342d9a6626c9e9aebc15b0c8a9190fd4835cb))
+
 ## [1.2.0](https://github.com/Hugofromfrance/home_performance/compare/v1.1.3...v1.2.0) (2025-12-23)
 
 
