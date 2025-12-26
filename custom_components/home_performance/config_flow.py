@@ -23,7 +23,14 @@ from .const import (
     CONF_SURFACE,
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
+    CONF_HEAT_SOURCE_TYPE,
     DEFAULT_POWER_THRESHOLD,
+    DEFAULT_HEAT_SOURCE_TYPE,
+    HEAT_SOURCE_ELECTRIC,
+    HEAT_SOURCE_HEATPUMP,
+    HEAT_SOURCE_GAS,
+    HEAT_SOURCE_DISTRICT,
+    HEAT_SOURCES_REQUIRING_ENERGY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,7 +45,11 @@ def get_last_outdoor_temp_sensor(hass: HomeAssistant) -> str | None:
     return None
 
 
-def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None) -> vol.Schema:
+def get_schema_step_zone(
+    hass: HomeAssistant,
+    default_outdoor: str | None = None,
+    heat_source_type: str = HEAT_SOURCE_ELECTRIC,
+) -> vol.Schema:
     """Return schema for zone configuration step."""
     # Build outdoor temp field with or without default
     if default_outdoor:
@@ -46,80 +57,128 @@ def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None
     else:
         outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR)
 
-    return vol.Schema(
-        {
-            vol.Required(CONF_ZONE_NAME): selector.TextSelector(
-                selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
-            ),
-            vol.Required(CONF_INDOOR_TEMP_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-            ),
-            outdoor_field: selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-            ),
-            vol.Required(CONF_HEATING_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean", "binary_sensor"])
-            ),
-            vol.Required(CONF_HEATER_POWER): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=100,
-                    max=100000,
-                    step=50,
-                    unit_of_measurement="W",
-                    mode="box",
-                )
-            ),
-        }
-    )
+    # Heat source type selector
+    heat_source_options = [
+        selector.SelectOptionDict(value=HEAT_SOURCE_ELECTRIC, label="Electric"),
+        selector.SelectOptionDict(value=HEAT_SOURCE_HEATPUMP, label="Heat pump"),
+        selector.SelectOptionDict(value=HEAT_SOURCE_GAS, label="Gas"),
+        selector.SelectOptionDict(value=HEAT_SOURCE_DISTRICT, label="District heating"),
+    ]
+
+    schema_dict = {
+        vol.Required(CONF_ZONE_NAME): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+        ),
+        vol.Required(CONF_INDOOR_TEMP_SENSOR): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+        ),
+        outdoor_field: selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+        ),
+        vol.Required(CONF_HEATING_ENTITY): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean", "binary_sensor"])
+        ),
+        vol.Required(
+            CONF_HEAT_SOURCE_TYPE, default=DEFAULT_HEAT_SOURCE_TYPE
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=heat_source_options,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+    }
+
+    # Heater power: required for electric, optional for others
+    if heat_source_type == HEAT_SOURCE_ELECTRIC:
+        schema_dict[vol.Required(CONF_HEATER_POWER)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=100,
+                max=100000,
+                step=50,
+                unit_of_measurement="W",
+                mode="box",
+            )
+        )
+    else:
+        schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=100,
+                max=100000,
+                step=50,
+                unit_of_measurement="W",
+                mode="box",
+            )
+        )
+
+    return vol.Schema(schema_dict)
 
 
-def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
-    """Return schema for room dimensions and optional power sensor configuration."""
-    return vol.Schema(
-        {
-            vol.Optional(CONF_SURFACE): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1,
-                    max=500,
-                    step=0.5,
-                    unit_of_measurement="m²",
-                    mode="box",
-                )
-            ),
-            vol.Optional(CONF_VOLUME): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1,
-                    max=1500,
-                    step=0.5,
-                    unit_of_measurement="m³",
-                    mode="box",
-                )
-            ),
-            vol.Optional(CONF_POWER_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="power",
-                )
-            ),
-            vol.Optional(
-                CONF_POWER_THRESHOLD, default=DEFAULT_POWER_THRESHOLD
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1,
-                    max=1000,
-                    step=1,
-                    unit_of_measurement="W",
-                    mode="box",
-                )
-            ),
-            vol.Optional(CONF_ENERGY_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="energy",
-                )
-            ),
-        }
-    )
+def get_schema_step_dimensions(
+    hass: HomeAssistant,
+    heat_source_type: str = HEAT_SOURCE_ELECTRIC,
+) -> vol.Schema:
+    """Return schema for room dimensions and optional power sensor configuration.
+
+    For non-electric heat sources (heatpump, gas, district), energy_sensor is required.
+    """
+    # Energy sensor: required for non-electric sources, optional for electric
+    requires_energy = heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY
+
+    schema_dict: dict[Any, Any] = {
+        vol.Optional(CONF_SURFACE): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1,
+                max=500,
+                step=0.5,
+                unit_of_measurement="m²",
+                mode="box",
+            )
+        ),
+        vol.Optional(CONF_VOLUME): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1,
+                max=1500,
+                step=0.5,
+                unit_of_measurement="m³",
+                mode="box",
+            )
+        ),
+        vol.Optional(CONF_POWER_SENSOR): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="power",
+            )
+        ),
+        vol.Optional(
+            CONF_POWER_THRESHOLD, default=DEFAULT_POWER_THRESHOLD
+        ): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1,
+                max=1000,
+                step=1,
+                unit_of_measurement="W",
+                mode="box",
+            )
+        ),
+    }
+
+    # Energy sensor field: required for non-electric, optional for electric
+    if requires_energy:
+        schema_dict[vol.Required(CONF_ENERGY_SENSOR)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="energy",
+            )
+        )
+    else:
+        schema_dict[vol.Optional(CONF_ENERGY_SENSOR)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor",
+                device_class="energy",
+            )
+        )
+
+    return vol.Schema(schema_dict)
 
 
 class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -151,9 +210,16 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not self.hass.states.get(heating):
                 errors[CONF_HEATING_ENTITY] = "entity_not_found"
 
-            # Validate heater power
+            # Get heat source type (default to electric for backward compat)
+            heat_source_type = user_input.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
+
+            # Validate heater power - required only for electric
             heater_power = user_input.get(CONF_HEATER_POWER)
-            if not heater_power or heater_power <= 0:
+            if heat_source_type == HEAT_SOURCE_ELECTRIC:
+                if not heater_power or heater_power <= 0:
+                    errors[CONF_HEATER_POWER] = "invalid_power"
+            elif heater_power is not None and heater_power <= 0:
+                # Optional but if provided must be valid
                 errors[CONF_HEATER_POWER] = "invalid_power"
 
             # Check if zone name is already used
@@ -172,9 +238,12 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Get outdoor temp sensor from existing zones (for pre-filling)
         default_outdoor = get_last_outdoor_temp_sensor(self.hass)
 
+        # Get heat source type from current data (for re-display after error)
+        current_heat_source = self._data.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
+
         return self.async_show_form(
             step_id="user",
-            data_schema=get_schema_step_zone(self.hass, default_outdoor),
+            data_schema=get_schema_step_zone(self.hass, default_outdoor, current_heat_source),
             errors=errors,
             description_placeholders={"name": "Home Performance"},
         )
@@ -183,24 +252,37 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the room dimensions configuration step."""
+        errors: dict[str, str] = {}
+        heat_source_type = self._data.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
+
         if user_input is not None:
-            self._data.update(user_input)
+            # Validate energy sensor for non-electric sources
+            if heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY:
+                energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
+                if not energy_sensor:
+                    errors[CONF_ENERGY_SENSOR] = "energy_sensor_required"
+                elif not self.hass.states.get(energy_sensor):
+                    errors[CONF_ENERGY_SENSOR] = "entity_not_found"
 
-            # Create unique ID based on zone name
-            zone_name = self._data[CONF_ZONE_NAME]
-            await self.async_set_unique_id(
-                f"home_performance_{zone_name.lower().replace(' ', '_')}"
-            )
-            self._abort_if_unique_id_configured()
+            if not errors:
+                self._data.update(user_input)
 
-            return self.async_create_entry(
-                title=f"Home Performance - {zone_name}",
-                data=self._data,
-            )
+                # Create unique ID based on zone name
+                zone_name = self._data[CONF_ZONE_NAME]
+                await self.async_set_unique_id(
+                    f"home_performance_{zone_name.lower().replace(' ', '_')}"
+                )
+                self._abort_if_unique_id_configured()
+
+                return self.async_create_entry(
+                    title=f"Home Performance - {zone_name}",
+                    data=self._data,
+                )
 
         return self.async_show_form(
             step_id="dimensions",
-            data_schema=get_schema_step_dimensions(self.hass),
+            data_schema=get_schema_step_dimensions(self.hass, heat_source_type),
+            errors=errors,
         )
 
     @staticmethod
@@ -223,20 +305,61 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
-        if user_input is not None:
-            # Clean up None values from optional fields
-            cleaned_input = {k: v for k, v in user_input.items() if v is not None}
-            return self.async_create_entry(title="", data=cleaned_input)
+        errors: dict[str, str] = {}
 
         # Get current values from data or options
         current = {**self._config_entry.data, **self._config_entry.options}
+        heat_source_type = current.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
 
-        # Build schema dynamically to avoid None defaults for NumberSelector
+        if user_input is not None:
+            # Validate based on heat source type
+            new_heat_source = user_input.get(CONF_HEAT_SOURCE_TYPE, heat_source_type)
+
+            # Validate heater power for electric
+            if new_heat_source == HEAT_SOURCE_ELECTRIC:
+                heater_power = user_input.get(CONF_HEATER_POWER)
+                if not heater_power or heater_power <= 0:
+                    errors[CONF_HEATER_POWER] = "invalid_power"
+
+            # Validate energy sensor for non-electric
+            if new_heat_source in HEAT_SOURCES_REQUIRING_ENERGY:
+                energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
+                if not energy_sensor:
+                    errors[CONF_ENERGY_SENSOR] = "energy_sensor_required"
+
+            if not errors:
+                # Clean up None values from optional fields
+                cleaned_input = {k: v for k, v in user_input.items() if v is not None}
+                return self.async_create_entry(title="", data=cleaned_input)
+
+        # Heat source type selector
+        heat_source_options = [
+            selector.SelectOptionDict(value=HEAT_SOURCE_ELECTRIC, label="Electric"),
+            selector.SelectOptionDict(value=HEAT_SOURCE_HEATPUMP, label="Heat pump"),
+            selector.SelectOptionDict(value=HEAT_SOURCE_GAS, label="Gas"),
+            selector.SelectOptionDict(value=HEAT_SOURCE_DISTRICT, label="District heating"),
+        ]
+
+        # Build schema dynamically
         schema_dict: dict[Any, Any] = {
             vol.Required(
+                CONF_HEAT_SOURCE_TYPE,
+                default=heat_source_type,
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=heat_source_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+
+        # Heater power - required for electric, optional for others
+        heater_power_value = current.get(CONF_HEATER_POWER)
+        if heat_source_type == HEAT_SOURCE_ELECTRIC:
+            schema_dict[vol.Required(
                 CONF_HEATER_POWER,
-                default=current.get(CONF_HEATER_POWER, 1000),
-            ): selector.NumberSelector(
+                default=heater_power_value or 1000,
+            )] = selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=100,
                     max=100000,
@@ -244,8 +367,20 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                     unit_of_measurement="W",
                     mode="box",
                 )
-            ),
-        }
+            )
+        else:
+            if heater_power_value is not None:
+                schema_dict[vol.Optional(CONF_HEATER_POWER, default=heater_power_value)] = selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=100, max=100000, step=50, unit_of_measurement="W", mode="box"
+                    )
+                )
+            else:
+                schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=100, max=100000, step=50, unit_of_measurement="W", mode="box"
+                    )
+                )
 
         # Surface - only set default if value exists (NumberSelector doesn't support None)
         surface_value = current.get(CONF_SURFACE)
@@ -277,7 +412,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 )
             )
 
-        # Power sensor - only set default if value exists (EntitySelector may not handle None in all HA versions)
+        # Power sensor - only set default if value exists
         power_sensor_value = current.get(CONF_POWER_SENSOR)
         if power_sensor_value is not None:
             schema_dict[vol.Optional(CONF_POWER_SENSOR, default=power_sensor_value)] = selector.EntitySelector(
@@ -294,9 +429,19 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 )
             )
 
-        # Energy sensor - only set default if value exists
+        # Energy sensor - required for non-electric, optional for electric
         energy_sensor_value = current.get(CONF_ENERGY_SENSOR)
-        if energy_sensor_value is not None:
+        if heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY:
+            schema_dict[vol.Required(
+                CONF_ENERGY_SENSOR,
+                default=energy_sensor_value,
+            )] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor",
+                    device_class="energy",
+                )
+            )
+        elif energy_sensor_value is not None:
             schema_dict[vol.Optional(CONF_ENERGY_SENSOR, default=energy_sensor_value)] = selector.EntitySelector(
                 selector.EntitySelectorConfig(
                     domain="sensor",
@@ -326,4 +471,5 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema_dict),
+            errors=errors,
         )
