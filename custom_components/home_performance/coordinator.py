@@ -26,6 +26,8 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_SURFACE,
     CONF_VOLUME,
+    CONF_POWER_THRESHOLD,
+    DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
 )
 from .models import ThermalLossModel, ThermalDataPoint
@@ -57,6 +59,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.volume: float | None = config.get(CONF_VOLUME)
         self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
+        self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
 
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
@@ -161,8 +164,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 old_power = 0.0
 
             now = time.time()
-            is_heating_now = new_power > 50
-            was_heating = old_power > 50
+            is_heating_now = new_power > self.power_threshold
+            was_heating = old_power > self.power_threshold
 
             _LOGGER.debug(
                 "[%s] Power sensor changed: %.1fW -> %.1fW (heating: %s -> %s)",
@@ -499,6 +502,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heater_power": self.heater_power,
                 "surface": self.surface,
                 "volume": self.volume,
+                "power_threshold": self.power_threshold,
                 # Insulation rating (with season/inference support)
                 "insulation_rating": self.thermal_model.get_insulation_rating(),
                 "insulation_status": self.thermal_model.get_insulation_status(),
@@ -538,6 +542,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heater_power": self.heater_power,
             "surface": self.surface,
             "volume": self.volume,
+            "power_threshold": self.power_threshold,
             "insulation_rating": None,
             "insulation_status": {
                 "status": "waiting_data",
@@ -605,6 +610,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heater_power": self.heater_power,
             "surface": self.surface,
             "volume": self.volume,
+            "power_threshold": self.power_threshold,
             # Restored insulation rating (with season/inference support)
             "insulation_rating": self.thermal_model.get_insulation_rating(),
             "insulation_status": self.thermal_model.get_insulation_status(),
@@ -792,10 +798,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if power_state and power_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
                     power_w = float(power_state.state)
-                    is_heating = power_w > 50
+                    is_heating = power_w > self.power_threshold
                     _LOGGER.debug(
-                        "[%s] Heating detection via power sensor %s: %.1fW -> heating=%s",
-                        self.zone_name, self.power_sensor, power_w, is_heating
+                        "[%s] Heating detection via power sensor %s: %.1fW (threshold: %.0fW) -> heating=%s",
+                        self.zone_name, self.power_sensor, power_w, self.power_threshold, is_heating
                     )
                     return is_heating
                 except (ValueError, TypeError) as err:

@@ -405,10 +405,12 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         hours = data.get("heating_hours")
         # Source: power sensor (measured) or switch/climate state (estimated)
         has_power_sensor = self.coordinator.power_sensor is not None
+        power_threshold = self.coordinator.power_threshold
         return {
             "hours_decimal": round(hours, 2) if hours is not None else None,
             "source": "measured" if has_power_sensor else "estimated",
-            "detection": f"power > 50W ({self.coordinator.power_sensor})" if has_power_sensor else f"état {self.coordinator.heating_entity}",
+            "detection": f"power > {power_threshold}W ({self.coordinator.power_sensor})" if has_power_sensor else f"état {self.coordinator.heating_entity}",
+            "power_threshold_w": power_threshold if has_power_sensor else None,
             "description": "Temps cumulé de chauffe sur les dernières 24h",
         }
 
@@ -438,9 +440,11 @@ class HeatingRatioSensor(HomePerformanceBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         has_power_sensor = self.coordinator.power_sensor is not None
+        power_threshold = self.coordinator.power_threshold
         return {
             "description": "Pourcentage du temps où le chauffage est actif sur 24h",
             "source": "measured" if has_power_sensor else "estimated",
+            "power_threshold_w": power_threshold if has_power_sensor else None,
         }
 
 

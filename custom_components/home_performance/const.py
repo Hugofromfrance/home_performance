@@ -29,6 +29,10 @@ CONF_ENERGY_SENSOR = "energy_sensor"  # Compteur d'énergie journalier externe (
 CONF_ZONE_NAME = "zone_name"
 CONF_SURFACE = "surface"  # m²
 CONF_VOLUME = "volume"  # m³
+CONF_POWER_THRESHOLD = "power_threshold"  # Seuil de puissance pour détection chauffe (W)
+
+# Default values
+DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
 
 # Timing
 DEFAULT_SCAN_INTERVAL = 60  # seconds
