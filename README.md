@@ -224,6 +224,22 @@ data:
 - ❌ Does NOT delete current day's data (no 12h wait)
 - ❌ Does NOT lose last valid K (kept as reference)
 
+#### Complete Data Reset
+
+For a **complete reset** (after major changes like new heating equipment, insulation renovation, or to clear all anomalous data):
+
+```yaml
+# Developer Tools > Services
+service: home_performance.reset_all
+data:
+  zone_name: "Living Room"
+```
+
+**What the complete reset does:**
+- ✅ Clears ALL data (history, coefficients, energy counters)
+- ✅ Resets to initial state (like a fresh install)
+- ⚠️ Requires 12h of new data collection
+
 **Timeline after reset:**
 
 | Delay | What you see |
@@ -483,10 +499,12 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
 | Power threshold | Detection threshold in Watts (default: 50W) |
 | External energy counter | sensor.xxx_energy (your own HA Utility Meter) |
+| Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
 
 > **Notes**:
 > - If you provide an external energy counter AND a power sensor, the external counter is used as priority for energy.
 > - The power sensor also enables **precise heat detection** (power > threshold), ideal for heaters with internal thermostat or pilot wire. The threshold is configurable (default: 50W).
+> - The **Window/Door sensor** allows using a physical contact sensor (window, door, opening) for accurate open detection instead of relying on temperature-based detection. If the sensor is unavailable, it falls back to temperature detection automatically.
 > - Options are **modifiable afterwards** and the integration reloads automatically.
 
 ## 💾 Data Persistence
