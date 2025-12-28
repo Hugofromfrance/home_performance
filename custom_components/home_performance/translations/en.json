@@ -9,6 +9,16 @@
           "description": "The name of the zone to reset (case insensitive)"
         }
       }
+    },
+    "reset_all": {
+      "name": "Reset All Data",
+      "description": "Completely reset ALL calibration data for a zone. Use when measurements were taken during unusual conditions (many guests, oven running, etc.) or to start fresh calibration.",
+      "fields": {
+        "zone_name": {
+          "name": "Zone Name",
+          "description": "The name of the zone to completely reset (case insensitive)"
+        }
+      }
     }
   },
   "config": {

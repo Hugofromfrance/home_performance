@@ -491,7 +491,7 @@ class ThermalLossModel:
             )
 
     def clear_history(self) -> None:
-        """Clear all history data for manual reset.
+        """Clear 7-day history data for manual reset.
 
         Use this when:
         - User completed insulation work and wants fresh measurement
@@ -506,6 +506,39 @@ class ThermalLossModel:
         _LOGGER.info(
             "[%s] 🔄 History cleared (%d days removed). Last valid K preserved: %.1f W/°C",
             self.zone_name, old_count, self._last_valid_k or 0
+        )
+
+    def clear_all(self) -> None:
+        """Clear ALL calibration data for complete reset.
+
+        Use this when:
+        - Measurements were taken during unusual conditions
+        - User changed heating equipment
+        - User wants to start fresh calibration from scratch
+
+        This resets everything including:
+        - 7-day rolling history
+        - 24h rolling data points
+        - All K coefficients
+        - Energy counters
+        - Last valid K reference
+        """
+        history_count = len(self._daily_history)
+        points_count = len(self.data_points)
+
+        # Clear all data
+        self._daily_history.clear()
+        self.data_points.clear()
+        self._k_coefficient = None
+        self._k_coefficient_7d = None
+        self._last_valid_k = None
+        self._last_aggregation = None
+        self._total_energy_kwh = 0.0
+        self._last_point = None
+
+        _LOGGER.info(
+            "[%s] 🗑️ COMPLETE RESET: Cleared %d history days, %d data points, all K coefficients",
+            self.zone_name, history_count, points_count
         )
 
     def get_analysis(self) -> dict[str, Any]:

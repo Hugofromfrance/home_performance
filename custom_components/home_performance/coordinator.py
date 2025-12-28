@@ -729,6 +729,43 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.info("[%s] 🔄 Manual history reset requested", self.zone_name)
         self.thermal_model.clear_history()
 
+    def reset_all_data(self) -> None:
+        """Reset ALL calibration data for complete fresh start.
+
+        Use this when measurements were taken during unusual conditions,
+        or when user wants to completely recalibrate from scratch.
+        """
+        _LOGGER.info("[%s] 🗑️ Complete data reset requested", self.zone_name)
+
+        # Reset thermal model (history, data points, K coefficients)
+        self.thermal_model.clear_all()
+
+        # Reset coordinator's daily counters
+        self._heating_seconds_daily = 0.0
+        self._delta_t_sum_daily = 0.0
+        self._delta_t_count_daily = 0
+        self._estimated_energy_daily_kwh = 0.0
+
+        # Reset measured energy counters
+        self._measured_energy_daily_kwh = 0.0
+        self._measured_energy_total_kwh = 0.0
+        self._last_power_value = None
+        self._last_power_update = None
+
+        # Reset real-time tracking
+        self._last_indoor_temp = None
+        self._last_heating_state = None
+        self._last_update = None
+
+        # Reset window detection
+        self._window_open_realtime = False
+        self._window_open_since = None
+        self._consecutive_drops = 0
+        self._last_temp_value = None
+        self._last_temp_time = None
+
+        _LOGGER.info("[%s] ✅ Complete reset finished - zone ready for fresh calibration", self.zone_name)
+
     def _update_daily_counters(self, now: float, heating_on: bool, delta_t: float) -> None:
         """Update daily counters (minuit-minuit)."""
         if self._last_update is not None:

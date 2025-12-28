@@ -9,6 +9,16 @@
           "description": "Le nom de la zone à réinitialiser (insensible à la casse)"
         }
       }
+    },
+    "reset_all": {
+      "name": "Réinitialiser toutes les données",
+      "description": "Réinitialise TOUTES les données de calibration d'une zone. Utilisez ceci quand les mesures ont été prises dans des conditions inhabituelles (nombreux invités, four allumé, etc.) ou pour repartir de zéro.",
+      "fields": {
+        "zone_name": {
+          "name": "Nom de la zone",
+          "description": "Le nom de la zone à réinitialiser complètement (insensible à la casse)"
+        }
+      }
     }
   },
   "config": {
