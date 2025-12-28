@@ -189,7 +189,7 @@ The rating automatically adapts to all situations:
 | K calculated | **A to G** | Rating based on K/m³ coefficient |
 | Low heating + stable T° | **🏆 Excellent (inferred)** | Excellent insulation automatically inferred |
 | Summer mode (T° out > T° in) | **☀️ Summer mode** | Measurement impossible + last K conserved |
-| Off-season (ΔT < 5°C) | **🌤️ Off-season** | Insufficient ΔT + last K conserved |
+| Shoulder season (ΔT < 5°C) | **🌤️ Shoulder season** | Insufficient ΔT + last K conserved |
 | Data collection | **Waiting** | < 12h of data |
 
 #### Automatically Inferred Insulation 🏆
@@ -205,7 +205,7 @@ If after **24h** of observation:
 
 #### Last Valid K Conservation
 
-In summer or off-season, the integration **keeps the last calculated K coefficient** and displays it with the appropriate season message. You thus keep a useful reference all year round.
+In summer or shoulder season, the integration **keeps the last calculated K coefficient** and displays it with the appropriate season message. You thus keep a useful reference all year round.
 
 #### 🔄 Reset After Insulation Work
 
@@ -583,9 +583,9 @@ Needs optimization : beyond
 - [x] Smart insulation rating (calculated, inferred, or conserved)
 - [x] 7-day rolling history for stable insulation rating
 - [x] Manual reset service (`home_performance.reset_history`)
-- [x] Season management (summer, off-season, heating season)
+- [x] Season management (summer, shoulder season, heating season)
 - [x] Automatically inferred excellent insulation (low heating + stable T°)
-- [x] Last valid K conservation (off-season)
+- [x] Last valid K conservation (shoulder season)
 - [x] Daily energy (estimated and measured)
 - [x] External HA energy counter support
 - [x] Precise heat detection via power sensor (event-driven)

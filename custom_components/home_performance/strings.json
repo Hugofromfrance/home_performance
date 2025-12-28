@@ -23,7 +23,7 @@
         "title": "Room Dimensions",
         "description": "Optional: Add room dimensions to get normalized K values (K/m² and K/m³) for comparison between rooms.",
         "data": {
-          "surface": "Surface Area (m²)",
+          "surface": "Floor Area (m²)",
           "volume": "Volume (m³)",
           "power_threshold": "Power Threshold (W)",
           "window_sensor": "Window/Door Sensor"
@@ -53,7 +53,7 @@
         "description": "Modify this zone's parameters.",
         "data": {
           "heater_power": "Heater Power",
-          "surface": "Room surface area",
+          "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",

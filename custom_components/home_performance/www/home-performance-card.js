@@ -50,7 +50,7 @@ class HomePerformanceCard extends LitElement {
       excellent_inferred_desc: "Minimal heating needed",
       summer_mode: "☀️ Summer mode",
       summer_mode_desc: "Measurement not possible",
-      off_season: "🌤️ Off-season",
+      off_season: "🌤️ Shoulder season",
       off_season_desc: "ΔT insufficient",
       waiting: "Waiting",
       waiting_desc: "Heating required",

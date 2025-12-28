@@ -800,7 +800,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
 
         season_descriptions = {
             "summer": "☀️ Summer mode",
-            "off_season": "🌤️ Off-season",
+            "off_season": "🌤️ Shoulder season",
             "heating_season": "❄️ Heating season",
         }
 

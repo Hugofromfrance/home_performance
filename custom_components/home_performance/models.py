@@ -737,7 +737,7 @@ class ThermalLossModel:
                 "k_value": self._last_valid_k,
                 "k_source": "last_valid" if self._last_valid_k else None,
                 "season": season,
-                "message": "Off-season - ΔT insufficient",
+                "message": "Shoulder season - ΔT insufficient",
                 "temp_stable": stability["stable"],
             }
 

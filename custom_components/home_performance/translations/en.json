@@ -45,7 +45,7 @@
         "title": "Dimensions and optional sensors",
         "description": "These parameters are optional but allow for more precise analysis.",
         "data": {
-          "surface": "Room surface area",
+          "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor (optional)",
           "power_threshold": "Heating detection threshold",
@@ -78,7 +78,7 @@
         "description": "Modify this zone's parameters.",
         "data": {
           "heater_power": "Heater power",
-          "surface": "Room surface area",
+          "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
