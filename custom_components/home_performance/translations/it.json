@@ -1,0 +1,148 @@
+{
+  "services": {
+    "reset_history": {
+      "name": "Reset Cronologia",
+      "description": "Reimposta la cronologia mobile di 7 giorni per una zona. Usalo dopo lavori di isolamento o per cancellare dati anomali. La valutazione dell'isolamento verrà ricalcolata da zero.",
+      "fields": {
+        "zone_name": {
+          "name": "Nome Zona",
+          "description": "Il nome della zona da reimpostare (non sensibile alle maiuscole)"
+        }
+      }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurazione Zona",
+        "description": "Configura una zona da analizzare. Puoi aggiungere più zone aggiungendo nuovamente l'integrazione.",
+        "data": {
+          "zone_name": "Nome zona",
+          "indoor_temp_sensor": "Sensore temperatura interna",
+          "outdoor_temp_sensor": "Sensore temperatura esterna",
+          "heating_entity": "Entità di riscaldamento",
+          "heater_power": "Potenza riscaldatore"
+        },
+        "data_description": {
+          "zone_name": "Nome univoco per identificare questa stanza (es. Camera da letto, Soggiorno)",
+          "indoor_temp_sensor": "Sensore che misura la temperatura della stanza",
+          "outdoor_temp_sensor": "Sensore che misura la temperatura esterna",
+          "heating_entity": "Interruttore, termostato o climate che controlla il riscaldamento",
+          "heater_power": "Potenza nominale del riscaldatore in Watt (per BTU/h: dividere per 3,41, es. 60.000 BTU/h ≈ 17.600W)"
+        }
+      },
+      "dimensions": {
+        "title": "Dimensioni e sensori opzionali",
+        "description": "Questi parametri sono opzionali ma permettono un'analisi più precisa.",
+        "data": {
+          "surface": "Superficie stanza",
+          "volume": "Volume stanza",
+          "power_sensor": "Sensore di potenza (opzionale)",
+          "power_threshold": "Soglia rilevamento riscaldamento",
+          "energy_sensor": "Contatore energia esterno (opzionale)"
+        },
+        "data_description": {
+          "surface": "Superficie del pavimento per calcolare il coefficiente K per m²",
+          "volume": "Volume per calcolare il coefficiente K per m³",
+          "power_sensor": "Sensore di potenza istantanea per misurare tempo e consumo reali di riscaldamento",
+          "power_threshold": "Potenza in Watt oltre la quale il riscaldamento è considerato attivo (predefinito: 50W)",
+          "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità sul calcolo integrato)"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "Entità non trovata",
+      "invalid_power": "Potenza non valida",
+      "unknown": "Errore imprevisto"
+    },
+    "abort": {
+      "already_configured": "Questa zona è già configurata"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni Zona",
+        "description": "Modifica i parametri di questa zona.",
+        "data": {
+          "heater_power": "Potenza riscaldatore",
+          "surface": "Superficie stanza",
+          "volume": "Volume stanza",
+          "power_sensor": "Sensore di potenza",
+          "power_threshold": "Soglia rilevamento riscaldamento",
+          "energy_sensor": "Contatore energia esterno"
+        },
+        "data_description": {
+          "heater_power": "Potenza nominale del riscaldatore in Watt (per BTU/h: dividere per 3,41, es. 60.000 BTU/h ≈ 17.600W)",
+          "surface": "Superficie del pavimento per calcolare il coefficiente K per m²",
+          "volume": "Volume per calcolare il coefficiente K per m³",
+          "power_sensor": "Sensore di potenza istantanea (potenza > soglia = riscaldamento attivo)",
+          "power_threshold": "Potenza in Watt oltre la quale il riscaldamento è considerato attivo (predefinito: 50W)",
+          "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità)"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "Entità non trovata o non disponibile",
+      "invalid_power": "Potenza riscaldatore non valida"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "coefficient_k": {
+        "name": "Coefficiente K"
+      },
+      "k_par_m2": {
+        "name": "K per m²"
+      },
+      "k_par_m3": {
+        "name": "K per m³"
+      },
+      "energie_estimee_totale": {
+        "name": "Energia stimata totale"
+      },
+      "energie_estimee_journaliere": {
+        "name": "Energia stimata giornaliera"
+      },
+      "energie_mesuree_journaliere": {
+        "name": "Energia misurata giornaliera"
+      },
+      "energie_mesuree_totale": {
+        "name": "Energia misurata totale"
+      },
+      "temps_de_chauffe_24h": {
+        "name": "Tempo di riscaldamento / 24h"
+      },
+      "taux_de_chauffe_24h": {
+        "name": "Rapporto di riscaldamento / 24h"
+      },
+      "performance_energetique": {
+        "name": "Prestazione energetica"
+      },
+      "dt_moyen_24h": {
+        "name": "ΔT medio 24h"
+      },
+      "heures_de_donnees": {
+        "name": "Ore di dati"
+      },
+      "temps_d_analyse_restant": {
+        "name": "Tempo di analisi rimanente"
+      },
+      "progression_analyse": {
+        "name": "Avanzamento analisi"
+      },
+      "note_d_isolation": {
+        "name": "Valutazione isolamento"
+      }
+    },
+    "binary_sensor": {
+      "fenetre_ouverte": {
+        "name": "Finestra aperta"
+      },
+      "donnees_pretes": {
+        "name": "Dati pronti"
+      }
+    }
+  }
+}
+
