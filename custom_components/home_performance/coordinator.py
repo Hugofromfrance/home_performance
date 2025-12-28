@@ -12,6 +12,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.util.slugify import slugify
 from homeassistant.util.unit_conversion import TemperatureConverter
 import time
 
@@ -114,11 +115,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._window_open_since: float | None = None  # Timestamp when window was detected open
         self._consecutive_drops: int = 0  # Count of consecutive temperature drops
 
-        # Persistence
+        # Persistence - use slugify for consistent handling of special characters
+        zone_slug = slugify(self.zone_name, separator="_")
         self._store = Store(
             hass,
             STORAGE_VERSION,
-            f"{DOMAIN}.{self.zone_name.lower().replace(' ', '_')}",
+            f"{DOMAIN}.{zone_slug}",
         )
         self._last_save_time: float = 0
         self._data_loaded: bool = False

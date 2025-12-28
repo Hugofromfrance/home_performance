@@ -14,6 +14,7 @@ from homeassistant.const import UnitOfTime, UnitOfTemperature, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.slugify import slugify
 
 from .const import DOMAIN, CONF_ZONE_NAME, VERSION
 from .coordinator import HomePerformanceCoordinator
@@ -142,9 +143,9 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
         super().__init__(coordinator)
         self._zone_name = zone_name
         self._sensor_type = sensor_type
-        self._attr_unique_id = (
-            f"home_performance_{zone_name}_{sensor_type}".lower().replace(" ", "_")
-        )
+        # Use slugify for consistent handling of special characters (ü, é, ç, etc.)
+        zone_slug = slugify(zone_name, separator="_")
+        self._attr_unique_id = f"home_performance_{zone_slug}_{sensor_type}"
 
     @property
     def device_info(self) -> dict[str, Any]:
