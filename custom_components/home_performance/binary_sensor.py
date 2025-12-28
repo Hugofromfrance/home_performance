@@ -91,10 +91,22 @@ class WindowOpenSensor(HomePerformanceBaseBinarySensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
-        return {
-            "detection_method": "rapid_temperature_drop",
-            "description": "Detected via rapid temperature drop",
-        }
+        # Get detection method from coordinator data
+        detection_method = "temperature"
+        if self.coordinator.data:
+            detection_method = self.coordinator.data.get("window_detection_method", "temperature")
+
+        if detection_method == "sensor":
+            return {
+                "detection_method": "sensor",
+                "sensor_entity": self.coordinator.window_sensor,
+                "description": "Using physical window/door contact sensor",
+            }
+        else:
+            return {
+                "detection_method": "temperature",
+                "description": "Detected via rapid temperature drop",
+            }
 
 
 class DataReadySensor(HomePerformanceBaseBinarySensor):

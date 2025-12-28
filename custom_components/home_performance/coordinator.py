@@ -28,6 +28,7 @@ from .const import (
     CONF_SURFACE,
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
+    CONF_WINDOW_SENSOR,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
 )
@@ -61,18 +62,20 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
         self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
+        self.window_sensor: str | None = config.get(CONF_WINDOW_SENSOR)
 
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
             "indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
-            "power_sensor=%s, energy_sensor=%s, heater_power=%sW",
+            "power_sensor=%s, energy_sensor=%s, heater_power=%sW, window_sensor=%s",
             self.zone_name,
             self.indoor_temp_sensor,
             self.outdoor_temp_sensor,
             self.heating_entity,
             self.power_sensor,
             self.energy_sensor,
-            self.heater_power
+            self.heater_power,
+            self.window_sensor
         )
 
         # Thermal model
@@ -427,8 +430,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self.thermal_model.add_data_point(data_point)
 
-            # Detect window open (combine real-time detection with polling fallback)
-            window_open = self._window_open_realtime or self._detect_window_open(indoor_temp, now)
+            # Detect window open (real sensor if configured, else temperature-based detection)
+            window_open, window_detection_method = self._get_window_open_state(indoor_temp, now)
 
             # Update daily counters (minuit-minuit)
             delta_t = indoor_temp - outdoor_temp
@@ -470,6 +473,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_on": heating_on,
                 "delta_t": delta_t,
                 "window_open": window_open,
+                "window_detection_method": window_detection_method,
                 # Calculated coefficients
                 "k_coefficient": analysis.get("k_coefficient"),  # Prefers 7-day stable K
                 "k_coefficient_24h": analysis.get("k_coefficient_24h"),  # Real-time 24h K
@@ -523,6 +527,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heating_on": self._is_heating_realtime,
             "delta_t": None,
             "window_open": self._window_open_realtime,
+            "window_detection_method": "sensor" if self.window_sensor else "temperature",
             "k_coefficient": None,
             "k_coefficient_24h": None,
             "k_coefficient_7d": None,
@@ -845,6 +850,32 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.debug("[%s] Heating via switch %s: state=%s -> heating=%s",
                       self.zone_name, self.heating_entity, state.state, is_on)
         return is_on
+
+    def _get_window_open_state(self, current_temp: float, now: float) -> tuple[bool, str]:
+        """Get window open state and detection method.
+
+        Returns:
+            Tuple of (is_window_open: bool, detection_method: str)
+
+        Detection method:
+        - "sensor": Using configured binary_sensor (window/door contact sensor)
+        - "temperature": Using temperature-based detection (real-time + polling fallback)
+        """
+        # Priority 1: Use real window/door sensor if configured
+        if self.window_sensor:
+            state = self.hass.states.get(self.window_sensor)
+            if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                is_open = state.state == STATE_ON
+                return (is_open, "sensor")
+            # Sensor unavailable - fall back to temperature detection
+            _LOGGER.debug(
+                "[%s] Window sensor %s unavailable, using temperature detection",
+                self.zone_name, self.window_sensor
+            )
+
+        # Priority 2: Temperature-based detection (real-time + polling fallback)
+        is_open = self._window_open_realtime or self._detect_window_open(current_temp, now)
+        return (is_open, "temperature")
 
     def _detect_window_open(self, current_temp: float, now: float) -> bool:
         """Detect if window is likely open based on rapid temperature drop.

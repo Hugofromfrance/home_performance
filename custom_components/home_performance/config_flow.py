@@ -24,6 +24,7 @@ from .const import (
     CONF_SURFACE,
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
+    CONF_WINDOW_SENSOR,
     DEFAULT_POWER_THRESHOLD,
 )
 
@@ -117,6 +118,12 @@ def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
                 selector.EntitySelectorConfig(
                     domain="sensor",
                     device_class="energy",
+                )
+            ),
+            vol.Optional(CONF_WINDOW_SENSOR): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="binary_sensor",
+                    device_class=["window", "door", "opening"],
                 )
             ),
         }
@@ -241,6 +248,11 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             if energy_sensor and not self.hass.states.get(energy_sensor):
                 errors[CONF_ENERGY_SENSOR] = "entity_not_found"
 
+            # Validate window sensor if provided
+            window_sensor = user_input.get(CONF_WINDOW_SENSOR)
+            if window_sensor and not self.hass.states.get(window_sensor):
+                errors[CONF_WINDOW_SENSOR] = "entity_not_found"
+
             if not errors:
                 # Keep None values to allow removing sensors (override data with options)
                 # But remove keys that are None AND not in current config (truly optional)
@@ -347,6 +359,23 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 selector.EntitySelectorConfig(
                     domain="sensor",
                     device_class="energy",
+                )
+            )
+
+        # Window sensor - only set default if value exists
+        window_sensor_value = current.get(CONF_WINDOW_SENSOR)
+        if window_sensor_value is not None:
+            schema_dict[vol.Optional(CONF_WINDOW_SENSOR, default=window_sensor_value)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="binary_sensor",
+                    device_class=["window", "door", "opening"],
+                )
+            )
+        else:
+            schema_dict[vol.Optional(CONF_WINDOW_SENSOR)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="binary_sensor",
+                    device_class=["window", "door", "opening"],
                 )
             )
 

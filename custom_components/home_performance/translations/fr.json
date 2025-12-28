@@ -39,14 +39,16 @@
           "volume": "Volume de la pièce",
           "power_sensor": "Capteur de puissance (optionnel)",
           "power_threshold": "Seuil de détection chauffe",
-          "energy_sensor": "Compteur d'énergie externe (optionnel)"
+          "energy_sensor": "Compteur d'énergie externe (optionnel)",
+          "window_sensor": "Capteur d'ouverture fenêtre/porte (optionnel)"
         },
         "data_description": {
           "surface": "Surface au sol pour calculer le coefficient K par m²",
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée pour mesurer le temps de chauffe réel et la consommation",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
-          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire sur le calcul intégré)"
+          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire sur le calcul intégré)",
+          "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise (remplace la détection par température)"
         }
       }
     },
@@ -70,7 +72,8 @@
           "volume": "Volume de la pièce",
           "power_sensor": "Capteur de puissance",
           "power_threshold": "Seuil de détection chauffe",
-          "energy_sensor": "Compteur d'énergie externe"
+          "energy_sensor": "Compteur d'énergie externe",
+          "window_sensor": "Capteur d'ouverture fenêtre/porte"
         },
         "data_description": {
           "heater_power": "Puissance nominale en Watts (pour BTU/h : diviser par 3.41, ex: 60 000 BTU/h ≈ 17 600W)",
@@ -78,7 +81,8 @@
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée (puissance > seuil = chauffe)",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
-          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire)"
+          "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire)",
+          "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise"
         }
       }
     },

@@ -25,12 +25,14 @@
         "data": {
           "surface": "Surface Area (m²)",
           "volume": "Volume (m³)",
-          "power_threshold": "Power Threshold (W)"
+          "power_threshold": "Power Threshold (W)",
+          "window_sensor": "Window/Door Sensor"
         },
         "data_description": {
           "surface": "Floor surface area of the zone",
           "volume": "Volume of the zone (surface × ceiling height)",
-          "power_threshold": "Power above which heating is considered active (default: 50W)"
+          "power_threshold": "Power above which heating is considered active (default: 50W)",
+          "window_sensor": "Optional: physical window/door contact sensor for accurate open detection"
         }
       }
     },
@@ -55,7 +57,8 @@
           "volume": "Room volume",
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "External energy meter"
+          "energy_sensor": "External energy meter",
+          "window_sensor": "Window/Door Sensor"
         },
         "data_description": {
           "heater_power": "Nominal heater power in Watts (for BTU/h: divide by 3.41, e.g. 60,000 BTU/h ≈ 17,600W)",
@@ -63,7 +66,8 @@
           "volume": "Volume to calculate K coefficient per m³",
           "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority)"
+          "energy_sensor": "Existing Home Assistant energy meter (takes priority)",
+          "window_sensor": "Optional: physical window/door contact sensor for accurate open detection"
         }
       }
     },
