@@ -31,14 +31,18 @@
           "indoor_temp_sensor": "Capteur de température intérieure",
           "outdoor_temp_sensor": "Capteur de température extérieure",
           "heating_entity": "Entité de chauffage",
-          "heater_power": "Puissance du radiateur"
+          "heat_source_type": "Type de source de chaleur",
+          "heater_power": "Puissance du radiateur",
+          "efficiency_factor": "Facteur d'efficacité"
         },
         "data_description": {
           "zone_name": "Nom unique pour identifier cette pièce (ex: Chambre, Salon)",
           "indoor_temp_sensor": "Capteur mesurant la température dans la pièce",
           "outdoor_temp_sensor": "Capteur mesurant la température extérieure",
           "heating_entity": "Interrupteur, thermostat ou climate contrôlant le chauffage",
-          "heater_power": "Puissance nominale en Watts (pour BTU/h : diviser par 3.41, ex: 60 000 BTU/h ≈ 17 600W)"
+          "heat_source_type": "Type de système de chauffage",
+          "heater_power": "Puissance nominale en Watts (obligatoire pour électrique, optionnel pour autres)",
+          "efficiency_factor": "Convertit l'énergie consommée en chaleur. Électrique: 1.0, PAC: 2.5-4.0 (COP), Chaudière gaz: 0.85-0.95, Fournaise gaz: 0.78-0.90"
         }
       },
       "dimensions": {
@@ -77,7 +81,9 @@
         "title": "Options de la zone",
         "description": "Modifiez les paramètres de cette zone.",
         "data": {
+          "heat_source_type": "Type de source de chaleur",
           "heater_power": "Puissance du radiateur",
+          "efficiency_factor": "Facteur d'efficacité",
           "surface": "Surface de la pièce",
           "volume": "Volume de la pièce",
           "power_sensor": "Capteur de puissance",
@@ -86,7 +92,9 @@
           "window_sensor": "Capteur d'ouverture fenêtre/porte"
         },
         "data_description": {
-          "heater_power": "Puissance nominale en Watts (pour BTU/h : diviser par 3.41, ex: 60 000 BTU/h ≈ 17 600W)",
+          "heat_source_type": "Type de système de chauffage",
+          "heater_power": "Puissance nominale en Watts (obligatoire pour électrique, optionnel pour autres)",
+          "efficiency_factor": "Convertit l'énergie consommée en chaleur. Électrique: 1.0, PAC: 2.5-4.0 (COP), Chaudière gaz: 0.85-0.95, Fournaise gaz: 0.78-0.90",
           "surface": "Surface au sol pour calculer le coefficient K par m²",
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée (puissance > seuil = chauffe)",

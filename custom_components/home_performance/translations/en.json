@@ -31,14 +31,18 @@
           "indoor_temp_sensor": "Indoor temperature sensor",
           "outdoor_temp_sensor": "Outdoor temperature sensor",
           "heating_entity": "Heating entity",
-          "heater_power": "Heater power"
+          "heat_source_type": "Heat source type",
+          "heater_power": "Heater power",
+          "efficiency_factor": "Efficiency factor"
         },
         "data_description": {
           "zone_name": "Unique name to identify this room (e.g., Bedroom, Living Room)",
           "indoor_temp_sensor": "Sensor measuring the room temperature",
           "outdoor_temp_sensor": "Sensor measuring the outdoor temperature",
           "heating_entity": "Switch, thermostat or climate controlling the heating",
-          "heater_power": "Nominal heater power in Watts (for BTU/h: divide by 3.41, e.g. 60,000 BTU/h ≈ 17,600W)"
+          "heat_source_type": "Type of heating system",
+          "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
+          "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90"
         }
       },
       "dimensions": {
@@ -77,7 +81,9 @@
         "title": "Zone Options",
         "description": "Modify this zone's parameters.",
         "data": {
+          "heat_source_type": "Heat source type",
           "heater_power": "Heater power",
+          "efficiency_factor": "Efficiency factor",
           "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor",
@@ -86,7 +92,9 @@
           "window_sensor": "Window/Door sensor"
         },
         "data_description": {
-          "heater_power": "Nominal heater power in Watts (for BTU/h: divide by 3.41, e.g. 60,000 BTU/h ≈ 17,600W)",
+          "heat_source_type": "Type of heating system",
+          "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
+          "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90",
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
           "power_sensor": "Instantaneous power sensor (power > threshold = heating)",

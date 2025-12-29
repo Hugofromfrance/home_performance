@@ -9,6 +9,16 @@
           "description": "Il nome della zona da reimpostare (non sensibile alle maiuscole)"
         }
       }
+    },
+    "reset_all": {
+      "name": "Reset Tutti i Dati",
+      "description": "Reimposta completamente TUTTI i dati di calibrazione per una zona. Usalo quando le misure sono state prese in condizioni insolite (molti ospiti, forno acceso, ecc.) o per ricominciare la calibrazione.",
+      "fields": {
+        "zone_name": {
+          "name": "Nome Zona",
+          "description": "Il nome della zona da reimpostare completamente (non sensibile alle maiuscole)"
+        }
+      }
     }
   },
   "config": {
@@ -21,14 +31,18 @@
           "indoor_temp_sensor": "Sensore temperatura interna",
           "outdoor_temp_sensor": "Sensore temperatura esterna",
           "heating_entity": "Entità di riscaldamento",
-          "heater_power": "Potenza riscaldatore"
+          "heat_source_type": "Tipo di fonte di calore",
+          "heater_power": "Potenza riscaldatore",
+          "efficiency_factor": "Fattore di efficienza"
         },
         "data_description": {
           "zone_name": "Nome univoco per identificare questa stanza (es. Camera da letto, Soggiorno)",
           "indoor_temp_sensor": "Sensore che misura la temperatura della stanza",
           "outdoor_temp_sensor": "Sensore che misura la temperatura esterna",
           "heating_entity": "Interruttore, termostato o climate che controlla il riscaldamento",
-          "heater_power": "Potenza nominale del riscaldatore in Watt (per BTU/h: dividere per 3,41, es. 60.000 BTU/h ≈ 17.600W)"
+          "heat_source_type": "Tipo di sistema di riscaldamento",
+          "heater_power": "Potenza nominale in Watt (obbligatorio per elettrico, opzionale per altri)",
+          "efficiency_factor": "Converte energia consumata in calore. Elettrico: 1.0, Pompa di calore: 2.5-4.0 (COP), Caldaia a gas: 0.85-0.95, Forno a gas: 0.78-0.90"
         }
       },
       "dimensions": {
@@ -39,14 +53,16 @@
           "volume": "Volume stanza",
           "power_sensor": "Sensore di potenza (opzionale)",
           "power_threshold": "Soglia rilevamento riscaldamento",
-          "energy_sensor": "Contatore energia esterno (opzionale)"
+          "energy_sensor": "Contatore energia esterno (opzionale)",
+          "window_sensor": "Sensore finestra/porta (opzionale)"
         },
         "data_description": {
           "surface": "Superficie del pavimento per calcolare il coefficiente K per m²",
           "volume": "Volume per calcolare il coefficiente K per m³",
           "power_sensor": "Sensore di potenza istantanea per misurare tempo e consumo reali di riscaldamento",
           "power_threshold": "Potenza in Watt oltre la quale il riscaldamento è considerato attivo (predefinito: 50W)",
-          "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità sul calcolo integrato)"
+          "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità sul calcolo integrato)",
+          "window_sensor": "Sensore fisico finestra/porta per rilevamento apertura preciso (invece del rilevamento basato sulla temperatura)"
         }
       }
     },
@@ -65,20 +81,26 @@
         "title": "Opzioni Zona",
         "description": "Modifica i parametri di questa zona.",
         "data": {
+          "heat_source_type": "Tipo di fonte di calore",
           "heater_power": "Potenza riscaldatore",
+          "efficiency_factor": "Fattore di efficienza",
           "surface": "Superficie stanza",
           "volume": "Volume stanza",
           "power_sensor": "Sensore di potenza",
           "power_threshold": "Soglia rilevamento riscaldamento",
-          "energy_sensor": "Contatore energia esterno"
+          "energy_sensor": "Contatore energia esterno",
+          "window_sensor": "Sensore finestra/porta"
         },
         "data_description": {
-          "heater_power": "Potenza nominale del riscaldatore in Watt (per BTU/h: dividere per 3,41, es. 60.000 BTU/h ≈ 17.600W)",
+          "heat_source_type": "Tipo di sistema di riscaldamento",
+          "heater_power": "Potenza nominale in Watt (obbligatorio per elettrico, opzionale per altri)",
+          "efficiency_factor": "Converte energia consumata in calore. Elettrico: 1.0, Pompa di calore: 2.5-4.0 (COP), Caldaia a gas: 0.85-0.95, Forno a gas: 0.78-0.90",
           "surface": "Superficie del pavimento per calcolare il coefficiente K per m²",
           "volume": "Volume per calcolare il coefficiente K per m³",
           "power_sensor": "Sensore di potenza istantanea (potenza > soglia = riscaldamento attivo)",
           "power_threshold": "Potenza in Watt oltre la quale il riscaldamento è considerato attivo (predefinito: 50W)",
-          "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità)"
+          "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità)",
+          "window_sensor": "Sensore fisico finestra/porta per rilevamento apertura preciso"
         }
       }
     },
@@ -145,4 +167,3 @@
     }
   }
 }
-
