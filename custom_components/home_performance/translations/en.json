@@ -9,6 +9,16 @@
           "description": "The name of the zone to reset (case insensitive)"
         }
       }
+    },
+    "reset_all": {
+      "name": "Reset All Data",
+      "description": "Completely reset ALL calibration data for a zone. Use when measurements were taken during unusual conditions (many guests, oven running, etc.) or to start fresh calibration.",
+      "fields": {
+        "zone_name": {
+          "name": "Zone Name",
+          "description": "The name of the zone to completely reset (case insensitive)"
+        }
+      }
     }
   },
   "config": {
@@ -35,18 +45,20 @@
         "title": "Dimensions and optional sensors",
         "description": "These parameters are optional but allow for more precise analysis.",
         "data": {
-          "surface": "Room surface area",
+          "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor (optional)",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "External energy meter (optional)"
+          "energy_sensor": "External energy meter (optional)",
+          "window_sensor": "Window/Door sensor (optional)"
         },
         "data_description": {
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
           "power_sensor": "Instantaneous power sensor to measure actual heating time and consumption",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority over integrated calculation)"
+          "energy_sensor": "Existing Home Assistant energy meter (takes priority over integrated calculation)",
+          "window_sensor": "Physical window/door contact sensor for accurate open detection (instead of temperature-based)"
         }
       }
     },
@@ -66,11 +78,12 @@
         "description": "Modify this zone's parameters.",
         "data": {
           "heater_power": "Heater power",
-          "surface": "Room surface area",
+          "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "External energy meter"
+          "energy_sensor": "External energy meter",
+          "window_sensor": "Window/Door sensor"
         },
         "data_description": {
           "heater_power": "Nominal heater power in Watts (for BTU/h: divide by 3.41, e.g. 60,000 BTU/h ≈ 17,600W)",
@@ -78,7 +91,8 @@
           "volume": "Volume to calculate K coefficient per m³",
           "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority)"
+          "energy_sensor": "Existing Home Assistant energy meter (takes priority)",
+          "window_sensor": "Physical window/door contact sensor for accurate open detection"
         }
       }
     },

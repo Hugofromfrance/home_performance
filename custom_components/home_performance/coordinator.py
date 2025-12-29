@@ -12,6 +12,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.util.slugify import slugify
 from homeassistant.util.unit_conversion import TemperatureConverter
 import time
 
@@ -27,6 +28,7 @@ from .const import (
     CONF_SURFACE,
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
+    CONF_WINDOW_SENSOR,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
 )
@@ -60,18 +62,20 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
         self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
+        self.window_sensor: str | None = config.get(CONF_WINDOW_SENSOR)
 
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
             "indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
-            "power_sensor=%s, energy_sensor=%s, heater_power=%sW",
+            "power_sensor=%s, energy_sensor=%s, heater_power=%sW, window_sensor=%s",
             self.zone_name,
             self.indoor_temp_sensor,
             self.outdoor_temp_sensor,
             self.heating_entity,
             self.power_sensor,
             self.energy_sensor,
-            self.heater_power
+            self.heater_power,
+            self.window_sensor
         )
 
         # Thermal model
@@ -114,11 +118,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._window_open_since: float | None = None  # Timestamp when window was detected open
         self._consecutive_drops: int = 0  # Count of consecutive temperature drops
 
-        # Persistence
+        # Persistence - use slugify for consistent handling of special characters
+        zone_slug = slugify(self.zone_name, separator="_")
         self._store = Store(
             hass,
             STORAGE_VERSION,
-            f"{DOMAIN}.{self.zone_name.lower().replace(' ', '_')}",
+            f"{DOMAIN}.{zone_slug}",
         )
         self._last_save_time: float = 0
         self._data_loaded: bool = False
@@ -425,8 +430,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self.thermal_model.add_data_point(data_point)
 
-            # Detect window open (combine real-time detection with polling fallback)
-            window_open = self._window_open_realtime or self._detect_window_open(indoor_temp, now)
+            # Detect window open (real sensor if configured, else temperature-based detection)
+            window_open, window_detection_method = self._get_window_open_state(indoor_temp, now)
 
             # Update daily counters (minuit-minuit)
             delta_t = indoor_temp - outdoor_temp
@@ -468,6 +473,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_on": heating_on,
                 "delta_t": delta_t,
                 "window_open": window_open,
+                "window_detection_method": window_detection_method,
                 # Calculated coefficients
                 "k_coefficient": analysis.get("k_coefficient"),  # Prefers 7-day stable K
                 "k_coefficient_24h": analysis.get("k_coefficient_24h"),  # Real-time 24h K
@@ -521,6 +527,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heating_on": self._is_heating_realtime,
             "delta_t": None,
             "window_open": self._window_open_realtime,
+            "window_detection_method": "sensor" if self.window_sensor else "temperature",
             "k_coefficient": None,
             "k_coefficient_24h": None,
             "k_coefficient_7d": None,
@@ -722,6 +729,43 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.info("[%s] 🔄 Manual history reset requested", self.zone_name)
         self.thermal_model.clear_history()
 
+    def reset_all_data(self) -> None:
+        """Reset ALL calibration data for complete fresh start.
+
+        Use this when measurements were taken during unusual conditions,
+        or when user wants to completely recalibrate from scratch.
+        """
+        _LOGGER.info("[%s] 🗑️ Complete data reset requested", self.zone_name)
+
+        # Reset thermal model (history, data points, K coefficients)
+        self.thermal_model.clear_all()
+
+        # Reset coordinator's daily counters
+        self._heating_seconds_daily = 0.0
+        self._delta_t_sum_daily = 0.0
+        self._delta_t_count_daily = 0
+        self._estimated_energy_daily_kwh = 0.0
+
+        # Reset measured energy counters
+        self._measured_energy_daily_kwh = 0.0
+        self._measured_energy_total_kwh = 0.0
+        self._last_power_value = None
+        self._last_power_update = None
+
+        # Reset real-time tracking
+        self._last_indoor_temp = None
+        self._last_heating_state = None
+        self._last_update = None
+
+        # Reset window detection
+        self._window_open_realtime = False
+        self._window_open_since = None
+        self._consecutive_drops = 0
+        self._last_temp_value = None
+        self._last_temp_time = None
+
+        _LOGGER.info("[%s] ✅ Complete reset finished - zone ready for fresh calibration", self.zone_name)
+
     def _update_daily_counters(self, now: float, heating_on: bool, delta_t: float) -> None:
         """Update daily counters (minuit-minuit)."""
         if self._last_update is not None:
@@ -843,6 +887,32 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.debug("[%s] Heating via switch %s: state=%s -> heating=%s",
                       self.zone_name, self.heating_entity, state.state, is_on)
         return is_on
+
+    def _get_window_open_state(self, current_temp: float, now: float) -> tuple[bool, str]:
+        """Get window open state and detection method.
+
+        Returns:
+            Tuple of (is_window_open: bool, detection_method: str)
+
+        Detection method:
+        - "sensor": Using configured binary_sensor (window/door contact sensor)
+        - "temperature": Using temperature-based detection (real-time + polling fallback)
+        """
+        # Priority 1: Use real window/door sensor if configured
+        if self.window_sensor:
+            state = self.hass.states.get(self.window_sensor)
+            if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                is_open = state.state == STATE_ON
+                return (is_open, "sensor")
+            # Sensor unavailable - fall back to temperature detection
+            _LOGGER.debug(
+                "[%s] Window sensor %s unavailable, using temperature detection",
+                self.zone_name, self.window_sensor
+            )
+
+        # Priority 2: Temperature-based detection (real-time + polling fallback)
+        is_open = self._window_open_realtime or self._detect_window_open(current_temp, now)
+        return (is_open, "temperature")
 
     def _detect_window_open(self, current_temp: float, now: float) -> bool:
         """Detect if window is likely open based on rapid temperature drop.

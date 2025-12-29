@@ -50,7 +50,7 @@ class HomePerformanceCard extends LitElement {
       excellent_inferred_desc: "Minimal heating needed",
       summer_mode: "☀️ Summer mode",
       summer_mode_desc: "Measurement not possible",
-      off_season: "🌤️ Off-season",
+      off_season: "🌤️ Shoulder season",
       off_season_desc: "ΔT insufficient",
       waiting: "Waiting",
       waiting_desc: "Heating required",
@@ -227,6 +227,20 @@ class HomePerformanceCard extends LitElement {
     }
   }
 
+  // Slugify zone name to match Home Assistant entity_id format
+  // Handles special characters like ü, é, ç, etc.
+  _slugifyZone(zone) {
+    return zone
+      .toLowerCase()
+      // Normalize Unicode characters (é → e, ü → u, ç → c, etc.)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      // Replace spaces and special chars with underscores
+      .replace(/[^a-z0-9]+/g, '_')
+      // Remove leading/trailing underscores
+      .replace(/^_+|_+$/g, '');
+  }
+
   // Entity name mappings: French (primary) -> English (fallback)
   // This handles systems where HA generates entity IDs from translated names
   _entityMappings = {
@@ -248,7 +262,7 @@ class HomePerformanceCard extends LitElement {
   };
 
   _getEntityId(suffix) {
-    const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
+    const zone = this._slugifyZone(this.config.zone);
     const variants = this._entityMappings[suffix] || [suffix];
 
     // Try each variant and return the first one that exists
@@ -263,7 +277,7 @@ class HomePerformanceCard extends LitElement {
   }
 
   _getBinaryEntityId(suffix) {
-    const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
+    const zone = this._slugifyZone(this.config.zone);
     const variants = this._entityMappings[suffix] || [suffix];
 
     // Try each variant and return the first one that exists
@@ -356,7 +370,7 @@ class HomePerformanceCard extends LitElement {
     if (this.config.demo) return true;
 
     // Try to find any entity for this zone to confirm integration is loaded
-    const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
+    const zone = this._slugifyZone(this.config.zone);
     const possibleEntities = [
       `binary_sensor.home_performance_${zone}_donnees_pretes`,
       `binary_sensor.home_performance_${zone}_data_ready`,
@@ -848,7 +862,7 @@ class HomePerformanceCard extends LitElement {
   }
 
   _renderLoading() {
-    const zone = this.config.zone.toLowerCase().replace(/\s+/g, "_");
+    const zone = this._slugifyZone(this.config.zone);
     const expectedEntity = `binary_sensor.home_performance_${zone}_donnees_pretes`;
 
     return html`

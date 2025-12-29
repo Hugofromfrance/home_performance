@@ -28,9 +28,14 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 # Service names
 SERVICE_RESET_HISTORY = "reset_history"
+SERVICE_RESET_ALL = "reset_all"
 
 # Service schemas
 RESET_HISTORY_SCHEMA = vol.Schema({
+    vol.Required("zone_name"): cv.string,
+})
+
+RESET_ALL_SCHEMA = vol.Schema({
     vol.Required("zone_name"): cv.string,
 })
 
@@ -105,6 +110,39 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         handle_reset_history,
         schema=RESET_HISTORY_SCHEMA,
     )
+
+    async def handle_reset_all(call: ServiceCall) -> None:
+        """Handle the reset_all service call.
+        
+        Completely resets ALL calibration data for a zone.
+        Use when measurements were taken during unusual conditions.
+        """
+        zone_name = call.data["zone_name"]
+        _LOGGER.info("Reset all data service called for zone: %s", zone_name)
+        
+        # Find the coordinator for this zone
+        found = False
+        for entry_id, coordinator in hass.data[DOMAIN].items():
+            if entry_id in ("frontend_registered", "services_registered", "last_outdoor_temp_sensor"):
+                continue
+            if isinstance(coordinator, HomePerformanceCoordinator):
+                if coordinator.zone_name.lower() == zone_name.lower():
+                    coordinator.reset_all_data()
+                    found = True
+                    _LOGGER.info("Complete data reset completed for zone: %s", zone_name)
+                    break
+        
+        if not found:
+            _LOGGER.warning("Zone not found for reset: %s", zone_name)
+            raise ValueError(f"Zone '{zone_name}' not found")
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET_ALL,
+        handle_reset_all,
+        schema=RESET_ALL_SCHEMA,
+    )
+
     _LOGGER.info("Home Performance services registered")
 
 

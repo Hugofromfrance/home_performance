@@ -10,3 +10,15 @@ reset_history:
       selector:
         text:
 
+reset_all:
+  name: Reset All Data
+  description: Completely reset ALL calibration data for a zone. Use when measurements were taken during unusual conditions (many guests, oven running, etc.) or when you want to start fresh calibration from scratch.
+  fields:
+    zone_name:
+      name: Zone Name
+      description: The name of the zone to completely reset (case insensitive).
+      required: true
+      example: "Living Room"
+      selector:
+        text:
+

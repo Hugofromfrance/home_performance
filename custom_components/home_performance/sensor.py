@@ -14,6 +14,7 @@ from homeassistant.const import UnitOfTime, UnitOfTemperature, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.slugify import slugify
 
 from .const import DOMAIN, CONF_ZONE_NAME, VERSION
 from .coordinator import HomePerformanceCoordinator
@@ -142,9 +143,9 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
         super().__init__(coordinator)
         self._zone_name = zone_name
         self._sensor_type = sensor_type
-        self._attr_unique_id = (
-            f"home_performance_{zone_name}_{sensor_type}".lower().replace(" ", "_")
-        )
+        # Use slugify for consistent handling of special characters (ü, é, ç, etc.)
+        zone_slug = slugify(zone_name, separator="_")
+        self._attr_unique_id = f"home_performance_{zone_slug}_{sensor_type}"
 
     @property
     def device_info(self) -> dict[str, Any]:
@@ -382,7 +383,9 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
 class HeatingTimeSensor(HomePerformanceBaseSensor):
     """Sensor for heating time over 24h."""
 
-    _attr_state_class = None  # Text format, no state class
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:clock-outline"
     _attr_translation_key = "temps_de_chauffe_24h"
 
@@ -391,11 +394,12 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         super().__init__(coordinator, zone_name, "heating_time")
 
     @property
-    def native_value(self) -> str | None:
-        """Return heating time in human readable format."""
+    def native_value(self) -> float | None:
+        """Return heating time in hours (decimal)."""
         if self.coordinator.data:
             value = self.coordinator.data.get("heating_hours")
-            return format_duration(value)
+            if value is not None:
+                return round(value, 2)
         return None
 
     @property
@@ -407,7 +411,7 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         has_power_sensor = self.coordinator.power_sensor is not None
         power_threshold = self.coordinator.power_threshold
         return {
-            "hours_decimal": round(hours, 2) if hours is not None else None,
+            "formatted": format_duration(hours),
             "source": "measured" if has_power_sensor else "estimated",
             "detection": f"power > {power_threshold}W ({self.coordinator.power_sensor})" if has_power_sensor else f"state of {self.coordinator.heating_entity}",
             "power_threshold_w": power_threshold if has_power_sensor else None,
@@ -592,7 +596,9 @@ class DeltaTSensor(HomePerformanceBaseSensor):
 class DataHoursSensor(HomePerformanceBaseSensor):
     """Sensor for hours of data collected."""
 
-    _attr_state_class = None  # Text format, no state class
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:database-clock"
     _attr_translation_key = "heures_de_donnees"
 
@@ -601,11 +607,12 @@ class DataHoursSensor(HomePerformanceBaseSensor):
         super().__init__(coordinator, zone_name, "data_hours")
 
     @property
-    def native_value(self) -> str | None:
-        """Return hours of data in human readable format."""
+    def native_value(self) -> float | None:
+        """Return hours of data collected (decimal)."""
         if self.coordinator.data:
             value = self.coordinator.data.get("data_hours")
-            return format_duration(value)
+            if value is not None:
+                return round(value, 2)
         return None
 
     @property
@@ -614,7 +621,7 @@ class DataHoursSensor(HomePerformanceBaseSensor):
         data = self.coordinator.data or {}
         hours = data.get("data_hours")
         return {
-            "hours_decimal": round(hours, 2) if hours is not None else None,
+            "formatted": format_duration(hours),
             "samples_count": data.get("samples_count"),
             "data_ready": data.get("data_ready"),
             "min_hours_required": 12,
@@ -624,7 +631,9 @@ class DataHoursSensor(HomePerformanceBaseSensor):
 class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
     """Sensor for remaining time before data is ready."""
 
-    _attr_state_class = None  # Text format, no state class
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:timer-sand"
     _attr_translation_key = "temps_d_analyse_restant"
 
@@ -633,8 +642,8 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
         super().__init__(coordinator, zone_name, "analysis_remaining")
 
     @property
-    def native_value(self) -> str | None:
-        """Return remaining time in human readable format."""
+    def native_value(self) -> float:
+        """Return remaining time in hours (decimal). Returns 0 when ready."""
         data_hours = 0
         data_ready = False
 
@@ -643,10 +652,10 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
             data_ready = self.coordinator.data.get("data_ready", False)
 
         if data_ready:
-            return "Ready"
+            return 0.0
 
         remaining = max(0, 12 - data_hours)
-        return format_duration(remaining)
+        return round(remaining, 2)
 
     @property
     def icon(self) -> str:
@@ -665,7 +674,7 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
         progress_pct = min(100, round((data_hours / 12) * 100))
 
         return {
-            "remaining_hours": round(remaining, 2) if not data_ready else 0,
+            "formatted": format_duration(remaining) if not data_ready else "Ready",
             "remaining_minutes": round(remaining * 60) if not data_ready else 0,
             "progress_percent": 100 if data_ready else progress_pct,
             "data_ready": data_ready,
@@ -791,7 +800,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
 
         season_descriptions = {
             "summer": "☀️ Summer mode",
-            "off_season": "🌤️ Off-season",
+            "off_season": "🌤️ Shoulder season",
             "heating_season": "❄️ Heating season",
         }
 

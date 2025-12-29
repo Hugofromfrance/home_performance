@@ -10,6 +10,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.util.slugify import slugify
 
 from .const import (
     DOMAIN,
@@ -23,6 +24,7 @@ from .const import (
     CONF_SURFACE,
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
+    CONF_WINDOW_SENSOR,
     DEFAULT_POWER_THRESHOLD,
 )
 
@@ -118,6 +120,12 @@ def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
                     device_class="energy",
                 )
             ),
+            vol.Optional(CONF_WINDOW_SENSOR): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="binary_sensor",
+                    device_class=["window", "door", "opening"],
+                )
+            ),
         }
     )
 
@@ -156,12 +164,12 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not heater_power or heater_power <= 0:
                 errors[CONF_HEATER_POWER] = "invalid_power"
 
-            # Check if zone name is already used
+            # Check if zone name is already used (use slugify for consistent comparison)
             zone_name = user_input.get(CONF_ZONE_NAME, "").strip()
-            zone_slug = zone_name.lower().replace(" ", "_")
+            zone_slug = slugify(zone_name, separator="_")
             for entry in self.hass.config_entries.async_entries(DOMAIN):
                 existing_name = entry.data.get(CONF_ZONE_NAME, "")
-                if existing_name.lower().replace(" ", "_") == zone_slug:
+                if slugify(existing_name, separator="_") == zone_slug:
                     errors[CONF_ZONE_NAME] = "already_configured"
                     break
 
@@ -186,11 +194,10 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
 
-            # Create unique ID based on zone name
+            # Create unique ID based on zone name (use slugify for special characters)
             zone_name = self._data[CONF_ZONE_NAME]
-            await self.async_set_unique_id(
-                f"home_performance_{zone_name.lower().replace(' ', '_')}"
-            )
+            zone_slug = slugify(zone_name, separator="_")
+            await self.async_set_unique_id(f"home_performance_{zone_slug}")
             self._abort_if_unique_id_configured()
 
             return self.async_create_entry(
@@ -240,6 +247,11 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
             if energy_sensor and not self.hass.states.get(energy_sensor):
                 errors[CONF_ENERGY_SENSOR] = "entity_not_found"
+
+            # Validate window sensor if provided
+            window_sensor = user_input.get(CONF_WINDOW_SENSOR)
+            if window_sensor and not self.hass.states.get(window_sensor):
+                errors[CONF_WINDOW_SENSOR] = "entity_not_found"
 
             if not errors:
                 # Keep None values to allow removing sensors (override data with options)
@@ -347,6 +359,23 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 selector.EntitySelectorConfig(
                     domain="sensor",
                     device_class="energy",
+                )
+            )
+
+        # Window sensor - only set default if value exists
+        window_sensor_value = current.get(CONF_WINDOW_SENSOR)
+        if window_sensor_value is not None:
+            schema_dict[vol.Optional(CONF_WINDOW_SENSOR, default=window_sensor_value)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="binary_sensor",
+                    device_class=["window", "door", "opening"],
+                )
+            )
+        else:
+            schema_dict[vol.Optional(CONF_WINDOW_SENSOR)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="binary_sensor",
+                    device_class=["window", "door", "opening"],
                 )
             )
 
