@@ -20,6 +20,7 @@ from homeassistant.util import slugify
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
+    CONF_EFFICIENCY_FACTOR,
     CONF_ENERGY_SENSOR,
     CONF_HEAT_SOURCE_TYPE,
     CONF_HEATER_POWER,
@@ -37,11 +38,13 @@ from .const import (
     CONF_WINDOW_NOTIFICATION_ENABLED,
     CONF_WINDOW_SENSOR,
     CONF_ZONE_NAME,
+    DEFAULT_EFFICIENCY_FACTORS,
     DEFAULT_HEAT_SOURCE_TYPE,
     DEFAULT_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    HEAT_SOURCE_MIGRATION,
     HEAT_SOURCES_REQUIRING_ENERGY,
 )
 from .models import ThermalDataPoint, ThermalLossModel
@@ -68,7 +71,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.indoor_temp_sensor: str = config[CONF_INDOOR_TEMP_SENSOR]
         self.outdoor_temp_sensor: str = config[CONF_OUTDOOR_TEMP_SENSOR]
         self.heating_entity: str = config[CONF_HEATING_ENTITY]
-        self.heat_source_type: str = config.get(CONF_HEAT_SOURCE_TYPE, DEFAULT_HEAT_SOURCE_TYPE)
+
+        # Heat source type - migrate legacy types if needed
+        raw_heat_source = config.get(CONF_HEAT_SOURCE_TYPE, DEFAULT_HEAT_SOURCE_TYPE)
+        self.heat_source_type: str = HEAT_SOURCE_MIGRATION.get(raw_heat_source, raw_heat_source)
+        if raw_heat_source != self.heat_source_type:
+            _LOGGER.info(
+                "[%s] Migrated heat source type: %s → %s", self.zone_name, raw_heat_source, self.heat_source_type
+            )
+
         self.heater_power: float | None = config.get(CONF_HEATER_POWER)
         self.surface: float | None = config.get(CONF_SURFACE)
         self.volume: float | None = config.get(CONF_VOLUME)
@@ -88,6 +99,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.notify_device: str | None = config.get(CONF_NOTIFY_DEVICE)
         self.notification_delay: int = config.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
 
+        # Efficiency factor - use configured value or default based on heat source type
+        self.efficiency_factor: float = config.get(
+            CONF_EFFICIENCY_FACTOR, DEFAULT_EFFICIENCY_FACTORS.get(self.heat_source_type, 1.0)
+        )
+
         # For energy-based sources, energy_sensor should be used for K calculation
         self._uses_energy_based_calculation = (
             self.heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY and self.energy_sensor is not None
@@ -95,10 +111,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
-            "heat_source=%s, indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
+            "heat_source=%s, efficiency_factor=%.2f, indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
             "power_sensor=%s, energy_sensor=%s, heater_power=%s, window_sensor=%s",
             self.zone_name,
             self.heat_source_type,
+            self.efficiency_factor,
             self.indoor_temp_sensor,
             self.outdoor_temp_sensor,
             self.heating_entity,
@@ -114,6 +131,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             heater_power=self.heater_power,
             surface=self.surface,
             volume=self.volume,
+            efficiency_factor=self.efficiency_factor,
         )
 
         # Track for window detection
@@ -719,6 +737,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "effective_power": analysis.get("effective_power"),
                 "derived_power": analysis.get("derived_power"),
                 "heat_source_type": self.heat_source_type,
+                "efficiency_factor": self.efficiency_factor,
                 "surface": self.surface,
                 "volume": self.volume,
                 "power_threshold": self.power_threshold,
@@ -771,6 +790,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "effective_power": self.heater_power,
             "derived_power": None,
             "heat_source_type": self.heat_source_type,
+            "efficiency_factor": self.efficiency_factor,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
@@ -849,6 +869,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "effective_power": analysis.get("effective_power"),
             "derived_power": analysis.get("derived_power"),
             "heat_source_type": self.heat_source_type,
+            "efficiency_factor": self.efficiency_factor,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,

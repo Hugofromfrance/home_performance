@@ -52,11 +52,49 @@ CONF_HEAT_SOURCE_TYPE = "heat_source_type"  # Type de source de chaleur
 # Heat source types
 HEAT_SOURCE_ELECTRIC = "electric"
 HEAT_SOURCE_HEATPUMP = "heatpump"
-HEAT_SOURCE_GAS = "gas"
-HEAT_SOURCE_DISTRICT = "district"
+HEAT_SOURCE_GAS_BOILER = "gas_boiler"  # European-style gas boiler (water heating)
+HEAT_SOURCE_GAS_FURNACE = "gas_furnace"  # US-style gas furnace (forced air)
 
-# Heat sources that require an energy sensor (cannot estimate from power)
-HEAT_SOURCES_REQUIRING_ENERGY = [HEAT_SOURCE_HEATPUMP, HEAT_SOURCE_GAS, HEAT_SOURCE_DISTRICT]
+# Legacy heat source type (for backward compatibility - mapped to new type)
+HEAT_SOURCE_GAS = "gas"  # Legacy: maps to gas_boiler
+
+# Mapping from legacy to new types (for migration)
+HEAT_SOURCE_MIGRATION = {
+    HEAT_SOURCE_GAS: HEAT_SOURCE_GAS_BOILER,
+}
+
+# All valid heat source types (current + legacy for backward compat)
+HEAT_SOURCE_TYPES = [
+    HEAT_SOURCE_ELECTRIC,
+    HEAT_SOURCE_HEATPUMP,
+    HEAT_SOURCE_GAS_BOILER,
+    HEAT_SOURCE_GAS_FURNACE,
+]
+
+# Heat sources that benefit from an energy sensor (for more accurate K calculation)
+# Note: energy_sensor is always optional but recommended for non-electric sources
+HEAT_SOURCES_REQUIRING_ENERGY = [
+    HEAT_SOURCE_HEATPUMP,
+    HEAT_SOURCE_GAS_BOILER,
+    HEAT_SOURCE_GAS_FURNACE,
+]
+
+# Efficiency factor configuration
+CONF_EFFICIENCY_FACTOR = "efficiency_factor"  # Multiplier: electric consumption → heat output
+
+# Default efficiency factors by heat source type
+# - Electric: 1.0 (100% efficient, all electricity becomes heat)
+# - Heat pump: 3.0 (typical COP, 1 kWh electric → 3 kWh heat)
+# - Gas boiler: 0.90 (90% efficiency, condensing boilers)
+# - Gas furnace: 0.85 (85% efficiency, typical US furnace with derating)
+DEFAULT_EFFICIENCY_FACTORS = {
+    HEAT_SOURCE_ELECTRIC: 1.0,
+    HEAT_SOURCE_HEATPUMP: 3.0,
+    HEAT_SOURCE_GAS_BOILER: 0.90,
+    HEAT_SOURCE_GAS_FURNACE: 0.85,
+    # Legacy type
+    HEAT_SOURCE_GAS: 0.90,
+}
 
 # Weather settings
 CONF_WEATHER_ENTITY = "weather_entity"  # Entité météo pour vent (partagée)
@@ -73,6 +111,7 @@ CONF_NOTIFICATION_DELAY = "notification_delay"
 # Default values
 DEFAULT_NOTIFICATION_DELAY = 2  # minutes
 DEFAULT_HEAT_SOURCE_TYPE = HEAT_SOURCE_ELECTRIC
+DEFAULT_EFFICIENCY_FACTOR = 1.0
 DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
 
 # Timing

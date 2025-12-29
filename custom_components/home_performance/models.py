@@ -193,6 +193,7 @@ class ThermalLossModel:
         heater_power: float | None = None,
         surface: float | None = None,
         volume: float | None = None,
+        efficiency_factor: float = 1.0,
     ) -> None:
         """Initialize the thermal loss model.
 
@@ -201,11 +202,13 @@ class ThermalLossModel:
             heater_power: Declared power of the heater in Watts (optional for energy-based sources)
             surface: Room surface in m² (optional, for K/m²)
             volume: Room volume in m³ (optional, for K/m³)
+            efficiency_factor: Multiplier for energy conversion (1.0 for electric, ~3.0 for heat pump, ~0.85 for gas)
         """
         self.zone_name = zone_name
         self.heater_power = heater_power  # W - can be None for energy-based sources
         self.surface = surface  # m²
         self.volume = volume  # m³
+        self.efficiency_factor = efficiency_factor  # Multiplier: consumed energy → heat output
 
         # Data storage
         self.data_points: deque[ThermalDataPoint] = deque(maxlen=MAX_DATA_POINTS)
@@ -401,19 +404,27 @@ class ThermalLossModel:
 
         # Calculate energy for K calculation
         # Priority: measured energy (external) > measured energy (integrated) > estimated from power
+        #
+        # IMPORTANT: efficiency_factor converts consumed energy to thermal output:
+        # - Electric (1.0): 1 kWh consumed = 1 kWh heat
+        # - Heat pump (3.0): 1 kWh consumed = 3 kWh heat (COP)
+        # - Gas boiler (0.9): 1 kWh gas = 0.9 kWh heat (combustion efficiency)
+        # - Gas furnace (0.85): 1 kWh gas = 0.85 kWh heat (combustion + distribution losses)
         if period_energy_kwh is not None and period_energy_kwh > 0:
             # 1. External energy sensor (most accurate - actual consumption)
-            energy_wh = period_energy_kwh * 1000  # Convert kWh to Wh
+            # Apply efficiency_factor to convert to thermal energy
+            energy_wh = period_energy_kwh * 1000 * self.efficiency_factor  # Convert kWh to Wh thermal
             energy_source = "energy_sensor"
         elif self._measured_energy_kwh > 0 and aggregation.heating_hours > 0:
             # 2. Integrated from power sensor (accurate - real power readings)
             # Scale measured energy to the aggregation period based on heating ratio
-            # This provides more accurate K than declared power
-            energy_wh = self._measured_energy_kwh * 1000  # Convert kWh to Wh
+            # Apply efficiency_factor to convert to thermal energy
+            energy_wh = self._measured_energy_kwh * 1000 * self.efficiency_factor  # Convert kWh to Wh thermal
             energy_source = "power_sensor"
         elif self.heater_power is not None and self.heater_power > 0:
             # 3. Estimated from declared power (least accurate)
-            energy_wh = self.heater_power * aggregation.heating_hours
+            # Apply efficiency_factor to convert to thermal energy
+            energy_wh = self.heater_power * aggregation.heating_hours * self.efficiency_factor
             energy_source = "heater_power"
         else:
             # Cannot calculate K without energy data
@@ -423,7 +434,8 @@ class ThermalLossModel:
             )
             return
 
-        # K = Energy / (ΔT × duration)
+        # K = Thermal Energy / (ΔT × duration)
+        # K represents heat loss in W/°C (thermal watts, not electric watts)
         k = energy_wh / (aggregation.delta_t * aggregation.duration_hours)
 
         self._k_coefficient = k
@@ -588,19 +600,19 @@ class ThermalLossModel:
         total_weight = 0.0
 
         for day in valid_days:
-            # energy_kwh in history already contains the best available energy source
-            # (determined by coordinator at archival time)
+            # energy_kwh in history is consumed energy (electric/gas)
+            # Apply efficiency_factor to convert to thermal energy
             if day.energy_kwh > 0:
-                energy_wh = day.energy_kwh * 1000  # Convert kWh to Wh
+                energy_wh = day.energy_kwh * 1000 * self.efficiency_factor  # Convert to Wh thermal
             elif self.heater_power is not None and self.heater_power > 0:
                 # Fallback for old history entries without energy data
-                energy_wh = self.heater_power * day.heating_hours
+                energy_wh = self.heater_power * day.heating_hours * self.efficiency_factor
             else:
                 # Skip this day if no energy data available
                 _LOGGER.debug("[%s] Day %s: skipped (no energy data)", self.zone_name, day.date)
                 continue
 
-            # K = Energy / (ΔT × 24h)
+            # K = Thermal Energy / (ΔT × 24h)
             k_day = energy_wh / (day.avg_delta_t * 24)  # Normalize to 24h period
 
             weight = day.sample_count
@@ -728,6 +740,7 @@ class ThermalLossModel:
             "heater_power": self.heater_power,
             "effective_power": self.effective_power,
             "derived_power": self.derived_power,
+            "efficiency_factor": self.efficiency_factor,
             "surface": self.surface,
             "volume": self.volume,
         }

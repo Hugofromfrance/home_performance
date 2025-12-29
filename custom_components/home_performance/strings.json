@@ -66,7 +66,7 @@
         "description": "Modify this zone's parameters.",
         "data": {
           "heat_source_type": "Heat Source Type",
-          "heater_power": "Heater Power",
+          "heater_power": "Heater Power (W)",
           "efficiency_factor": "Efficiency Factor",
           "surface": "Floor Area",
           "volume": "Room volume",
