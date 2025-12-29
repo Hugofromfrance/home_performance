@@ -32,13 +32,18 @@ from .const import (
     CONF_NOTIFY_DEVICE,
     CONF_NOTIFICATION_DELAY,
     CONF_HEAT_SOURCE_TYPE,
+    CONF_EFFICIENCY_FACTOR,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_NOTIFICATION_DELAY,
     DEFAULT_HEAT_SOURCE_TYPE,
+    DEFAULT_EFFICIENCY_FACTORS,
     HEAT_SOURCE_ELECTRIC,
     HEAT_SOURCE_HEATPUMP,
+    HEAT_SOURCE_GAS_BOILER,
+    HEAT_SOURCE_GAS_FURNACE,
+    # Legacy type for backward compatibility
     HEAT_SOURCE_GAS,
-    HEAT_SOURCE_DISTRICT,
+    HEAT_SOURCE_MIGRATION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,13 +80,16 @@ def get_schema_step_zone(
     else:
         outdoor_field = vol.Required(CONF_OUTDOOR_TEMP_SENSOR)
 
-    # Heat source type selector
+    # Heat source type selector (new types only, legacy types handled via migration)
     heat_source_options = [
-        selector.SelectOptionDict(value=HEAT_SOURCE_ELECTRIC, label="Electric"),
-        selector.SelectOptionDict(value=HEAT_SOURCE_HEATPUMP, label="Heat pump"),
-        selector.SelectOptionDict(value=HEAT_SOURCE_GAS, label="Gas"),
-        selector.SelectOptionDict(value=HEAT_SOURCE_DISTRICT, label="District heating"),
+        selector.SelectOptionDict(value=HEAT_SOURCE_ELECTRIC, label="Electric (radiator, convector)"),
+        selector.SelectOptionDict(value=HEAT_SOURCE_HEATPUMP, label="Heat Pump (air/water)"),
+        selector.SelectOptionDict(value=HEAT_SOURCE_GAS_BOILER, label="Gas Boiler (water heating)"),
+        selector.SelectOptionDict(value=HEAT_SOURCE_GAS_FURNACE, label="Gas Furnace (forced air)"),
     ]
+
+    # Get default efficiency factor for the heat source type
+    default_efficiency = DEFAULT_EFFICIENCY_FACTORS.get(heat_source_type, 1.0)
 
     schema_dict = {
         vol.Required(CONF_ZONE_NAME): selector.TextSelector(
@@ -127,6 +135,18 @@ def get_schema_step_zone(
                 mode="box",
             )
         )
+
+    # Efficiency factor with default based on heat source type
+    schema_dict[vol.Optional(
+        CONF_EFFICIENCY_FACTOR, default=default_efficiency
+    )] = selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=0.5,
+            max=6.0,
+            step=0.05,
+            mode="box",
+        )
+    )
 
     return vol.Schema(schema_dict)
 
@@ -405,19 +425,25 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                         cleaned_input[k] = None
                 return self.async_create_entry(title="", data=cleaned_input)
 
-        # Heat source type selector
+        # Migrate legacy heat source types to new ones for display
+        # (the actual migration happens in coordinator on load)
+        display_heat_source = heat_source_type
+        if heat_source_type in HEAT_SOURCE_MIGRATION:
+            display_heat_source = HEAT_SOURCE_MIGRATION[heat_source_type]
+
+        # Heat source type selector (new types only)
         heat_source_options = [
-            selector.SelectOptionDict(value=HEAT_SOURCE_ELECTRIC, label="Electric"),
-            selector.SelectOptionDict(value=HEAT_SOURCE_HEATPUMP, label="Heat pump"),
-            selector.SelectOptionDict(value=HEAT_SOURCE_GAS, label="Gas"),
-            selector.SelectOptionDict(value=HEAT_SOURCE_DISTRICT, label="District heating"),
+            selector.SelectOptionDict(value=HEAT_SOURCE_ELECTRIC, label="Electric (radiator, convector)"),
+            selector.SelectOptionDict(value=HEAT_SOURCE_HEATPUMP, label="Heat Pump (air/water)"),
+            selector.SelectOptionDict(value=HEAT_SOURCE_GAS_BOILER, label="Gas Boiler (water heating)"),
+            selector.SelectOptionDict(value=HEAT_SOURCE_GAS_FURNACE, label="Gas Furnace (forced air)"),
         ]
 
         # Build schema dynamically
         schema_dict: dict[Any, Any] = {
             vol.Required(
                 CONF_HEAT_SOURCE_TYPE,
-                default=heat_source_type,
+                default=display_heat_source,
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=heat_source_options,
@@ -428,7 +454,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
 
         # Heater power - required for electric, optional for others
         heater_power_value = current.get(CONF_HEATER_POWER)
-        if heat_source_type == HEAT_SOURCE_ELECTRIC:
+        if display_heat_source == HEAT_SOURCE_ELECTRIC:
             schema_dict[vol.Required(
                 CONF_HEATER_POWER,
                 default=heater_power_value or 1000,
@@ -530,6 +556,20 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                     device_class="energy",
                 )
             )
+
+        # Efficiency factor - default based on heat source type
+        efficiency_value = current.get(CONF_EFFICIENCY_FACTOR)
+        if efficiency_value is None:
+            # Use default for the heat source type
+            efficiency_value = DEFAULT_EFFICIENCY_FACTORS.get(display_heat_source, 1.0)
+        schema_dict[vol.Optional(CONF_EFFICIENCY_FACTOR, default=efficiency_value)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0.5,
+                max=6.0,
+                step=0.05,
+                mode="box",
+            )
+        )
 
         # Window sensor - only set default if value exists
         window_sensor_value = current.get(CONF_WINDOW_SENSOR)
