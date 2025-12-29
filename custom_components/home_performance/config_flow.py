@@ -10,7 +10,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.util.slugify import slugify
+from homeassistant.util import slugify
 
 from .const import (
     DOMAIN,

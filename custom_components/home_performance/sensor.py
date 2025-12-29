@@ -14,7 +14,7 @@ from homeassistant.const import UnitOfTime, UnitOfTemperature, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util.slugify import slugify
+from homeassistant.util import slugify
 
 from .const import DOMAIN, CONF_ZONE_NAME, VERSION
 from .coordinator import HomePerformanceCoordinator

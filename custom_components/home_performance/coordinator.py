@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
-from homeassistant.util.slugify import slugify
+from homeassistant.util import slugify
 from homeassistant.util.unit_conversion import TemperatureConverter
 import time
 

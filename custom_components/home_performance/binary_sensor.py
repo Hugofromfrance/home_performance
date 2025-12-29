@@ -12,7 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util.slugify import slugify
+from homeassistant.util import slugify
 
 from .const import DOMAIN, CONF_ZONE_NAME, MIN_DATA_HOURS, VERSION
 from .coordinator import HomePerformanceCoordinator
