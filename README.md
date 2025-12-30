@@ -41,7 +41,7 @@ You have a heating system and wonder:
 - **"Did I forget to close a window?"** → Automatic detection
 - **"Which room costs the most?"** → Multi-zone comparison
 
-**Home Performance** answers these questions by analyzing your **real** heating data, without theoretical calculations. Works with electric heaters, heat pumps, gas boilers, and district heating!
+**Home Performance** answers these questions by analyzing your **real** heating data, without theoretical calculations. Works with electric heaters, heat pumps, gas boilers, and gas furnaces!
 
 ### 💡 Use Cases
 
@@ -107,8 +107,8 @@ The integration supports **4 heat source types**:
 |-------------|----------------|-----------------|----------|
 | **Electric** (default) | Required | Optional | Radiators, convectors, underfloor heating |
 | **Heat pump** | Optional | Optional | PAC, air-to-air, air-to-water |
-| **Gas** | Optional | Optional | Gas boilers, central heating |
-| **District heating** | Optional | Optional | Stadsverwarming, urban heating networks |
+| **Gas Boiler** | Optional | Optional | European-style gas boilers (water heating), central heating |
+| **Gas Furnace** | Optional | Optional | US-style gas furnaces (forced air heating) |
 
 ### ⚡ Energy Source Priority
 
@@ -134,8 +134,8 @@ The K coefficient calculation uses energy data from the most accurate available 
 | Convector with thermostat | ✅ | Electric - via switch or climate |
 | Heat pump / AC | ✅ | Heat pump - energy sensor recommended |
 | Electric underfloor heating | ✅ | Electric - with power sensor |
-| Gas boiler | ✅ | Gas - energy sensor recommended |
-| District heating | ✅ | District - energy sensor recommended |
+| Gas boiler (Europe) | ✅ | Gas Boiler - energy sensor recommended |
+| Gas furnace (US) | ✅ | Gas Furnace - energy sensor recommended |
 
 ## 🎯 Concept
 
@@ -545,7 +545,7 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
 | Heating entity | climate.xxx or switch.xxx |
-| Heat source type | Electric, Heat pump, Gas, or District heating |
+| Heat source type | Electric, Heat pump, Gas Boiler, or Gas Furnace |
 | Heater power | Declared power in Watts (required for Electric, optional for others) |
 
 ### Optional Parameters
@@ -557,9 +557,25 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
 | Power threshold | Detection threshold in Watts (default: 50W) |
 | Energy sensor | sensor.xxx_energy (optional - most accurate for K calculation) |
+| Efficiency factor | Converts consumed energy to thermal output (see below) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
 | Weather entity | weather.xxx (for wind data display - shared between zones) |
 | Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
+
+### Efficiency Factor
+
+The efficiency factor converts consumed energy (electricity, gas) to actual thermal output:
+
+| Heat Source | Default | Typical Range | Description |
+|-------------|---------|---------------|-------------|
+| Electric | 1.0 | 1.0 | 100% efficient (all electricity → heat) |
+| Heat pump | 3.0 | 2.5 - 4.5 | COP (1 kWh electric → 3 kWh heat) |
+| Gas boiler | 0.90 | 0.85 - 0.95 | Condensing boilers are most efficient |
+| Gas furnace | 0.85 | 0.78 - 0.90 | US-style forced air systems |
+
+> **💡 Tips**:
+> - For **heat pumps**, use your unit's actual COP (Coefficient of Performance) if known
+> - For **gas systems**, check your equipment's AFUE rating and convert to decimal (e.g., 92% AFUE = 0.92)
 
 ### Configuration by Heat Source Type
 
@@ -577,11 +593,20 @@ Heater power: 17600  (optional - declared power for estimation fallback)
 Energy sensor: sensor.heatpump_energy  (optional but recommended for accuracy)
 ```
 
-#### Gas / District Heating
+#### Gas Boiler (European)
 ```
-Heat source type: Gas (or District heating)
-Heater power: 17600  (optional - declared power in Watts, e.g., 60,000 BTU/h = 17,600W)
+Heat source type: Gas Boiler
+Heater power: 17600  (optional - declared power in Watts)
 Energy sensor: sensor.gas_energy  (optional but recommended for accuracy)
+Efficiency factor: 0.90  (default, condensing boilers typically 0.85-0.95)
+```
+
+#### Gas Furnace (US)
+```
+Heat source type: Gas Furnace
+Heater power: 17600  (optional - declared power in Watts, e.g., 60,000 BTU/h = 17,600W)
+Energy sensor: sensor.furnace_energy  (optional but recommended for accuracy)
+Efficiency factor: 0.85  (default, typical US furnace 0.78-0.90)
 ```
 
 > **Notes**:
@@ -696,7 +721,7 @@ Standard       : < (Power_W / 1000) × 6 kWh/day
 Needs optimization : beyond
 ```
 
-> **For non-electric sources**: If `heater_power` is not configured, the system derives an average power from observed `energy / heating_hours`. This allows performance evaluation even for heat pumps, gas, or district heating.
+> **For non-electric sources**: If `heater_power` is not configured, the system derives an average power from observed `energy / heating_hours`. This allows performance evaluation even for heat pumps, gas boilers, or gas furnaces.
 
 ### Thresholds by Power
 
