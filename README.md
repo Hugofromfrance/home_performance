@@ -760,7 +760,7 @@ Needs optimization : beyond
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (v1.0.0 - v1.3.0)
+### ✅ Completed
 
 - [x] K Coefficient (W/°C) - empirical thermal loss
 - [x] K/m² and K/m³ normalization
