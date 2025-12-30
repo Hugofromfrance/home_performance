@@ -741,7 +741,7 @@ Needs optimization : beyond
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (v1.0.0 - v1.3.0)
+### ✅ Completed
 
 - [x] K Coefficient (W/°C) - empirical thermal loss
 - [x] K/m² and K/m³ normalization
@@ -756,7 +756,7 @@ Needs optimization : beyond
 - [x] Precise heat detection via power sensor (event-driven)
 - [x] Real-time open window detection (event-driven)
 - [x] Built-in Lovelace card (auto-registered)
-- [x] Multiple card layouts (full, badge, pill) 🎄
+- [x] Multiple card layouts (full, badge, pill)
 - [x] Celsius/Fahrenheit automatic support
 - [x] Data persistence
 - [x] Energy performance vs national average
