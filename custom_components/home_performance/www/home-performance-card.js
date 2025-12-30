@@ -3,7 +3,7 @@
  * Modern dashboard card for Home Performance integration
  */
 
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "1.4.0";
 
 const LitElement = customElements.get("hui-masonry-view")
   ? Object.getPrototypeOf(customElements.get("hui-masonry-view"))
@@ -99,8 +99,25 @@ class HomePerformanceCard extends LitElement {
       editor_full: "Full",
       editor_badge: "Badge",
       editor_pill: "Pill",
+      editor_multi: "Multi-zone",
       editor_demo: "Demo mode (preview)",
       editor_show_graph: "Show history graph",
+
+      // Multi-zone
+      multi_title: "Home Performance",
+      multi_zones_monitored: "zones monitored",
+      multi_avg: "avg",
+      multi_list: "List",
+      multi_compare: "Compare",
+      multi_ref: "REF",
+      multi_k_inst: "K INST.",
+      multi_energy: "ENERGY",
+      multi_heating: "HEATING",
+      multi_delta: "ΔT AVG",
+      multi_no_zones: "No zones found",
+      multi_no_data: "No data available",
+      multi_waiting_data: "Waiting for K/m³ data...",
+      multi_kwh_day: "kWh/day",
     },
     fr: {
       // Config & titles
@@ -180,8 +197,123 @@ class HomePerformanceCard extends LitElement {
       editor_full: "Complète",
       editor_badge: "Badge",
       editor_pill: "Pilule",
+      editor_multi: "Multi-zone",
       editor_demo: "Mode démo (prévisualisation)",
       editor_show_graph: "Afficher le graphique historique",
+
+      // Multi-zone
+      multi_title: "Home Performance",
+      multi_zones_monitored: "zones surveillées",
+      multi_avg: "moy",
+      multi_list: "Liste",
+      multi_compare: "Comparer",
+      multi_ref: "RÉF",
+      multi_k_inst: "K INST.",
+      multi_energy: "ÉNERGIE",
+      multi_heating: "CHAUFFE",
+      multi_delta: "ΔT MOY",
+      multi_no_zones: "Aucune zone trouvée",
+      multi_no_data: "Aucune donnée disponible",
+      multi_waiting_data: "En attente des données K/m³...",
+      multi_kwh_day: "kWh/jour",
+    },
+    it: {
+      // Config & titles
+      default_title: "Performance Termica",
+      error_no_zone: "Specificare una zona",
+      loading: "Caricamento...",
+      loading_integration: "Caricamento integrazione...",
+
+      // Section headers
+      isolation: "ISOLAMENTO",
+      performance: "PRESTAZIONI",
+      temperatures: "TEMPERATURE",
+      technical_details: "DETTAGLI TECNICI",
+      history_title: "STORICO K (7 GIORNI)",
+
+      // Insulation ratings
+      excellent: "Eccellente",
+      excellent_desc: "Molto ben isolato",
+      good: "Buono",
+      good_desc: "Ben isolato",
+      average: "Medio",
+      average_desc: "Isolamento standard",
+      poor: "Scarso",
+      poor_desc: "Da migliorare",
+      very_poor: "Critico",
+      very_poor_desc: "Isolamento insufficiente",
+      excellent_inferred: "🏆 Eccellente",
+      excellent_inferred_desc: "Riscaldamento minimo necessario",
+      summer_mode: "☀️ Modalità estiva",
+      summer_mode_desc: "Misurazione impossibile",
+      off_season: "🌤️ Fuori stagione",
+      off_season_desc: "ΔT insufficiente",
+      waiting: "In attesa",
+      waiting_desc: "Riscaldamento necessario",
+      last_measurement: "Ultima misurazione",
+      last_k: "Ultimo K",
+
+      // Performance ratings
+      perf_excellent: "Eccellente",
+      perf_standard: "Standard",
+      perf_optimize: "Da ottimizzare",
+      vs_average: "vs media",
+
+      // Metrics
+      k_instant: "K istantaneo",
+      energy_day: "Energia/giorno",
+      heating_time: "Tempo risc.",
+      avg_delta: "Delta medio",
+      measured: "misurata",
+      estimated: "stimata",
+      on_24h: "su 24h",
+      rolling_24h: "su 24h mobili",
+      of_time: "del tempo",
+      indoor_outdoor: "Int. - Est.",
+
+      // Tooltips
+      tooltip_estimated: "stimato",
+
+      // Days
+      days: ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"],
+
+      // Loading & analyzing
+      integration_starting: "Home Performance si sta avviando. I dati saranno disponibili tra pochi secondi.",
+      zone_check_hint: "Se questo messaggio persiste, verificare che la zona",
+      exists_in_integration: "esista nell'integrazione Home Performance.",
+      expected_entity: "Entità prevista",
+      analyzing: "Analisi in corso",
+      analysis_in_progress: "Raccolta dati termici per calcolare le prestazioni della stanza. Risultati disponibili dopo 12h di analisi.",
+      remaining_time: "rimanenti",
+      completed: "Completato",
+      ready: "Pronto",
+
+      // Editor
+      editor_zone: "Zona (es: Soggiorno, Camera)",
+      editor_title: "Titolo",
+      editor_card_style: "Stile scheda",
+      editor_full: "Completa",
+      editor_badge: "Badge",
+      editor_pill: "Pillola",
+      editor_multi: "Multi-zona",
+      editor_demo: "Modalità demo (anteprima)",
+      editor_show_graph: "Mostra grafico storico",
+
+      // Multi-zone
+      multi_title: "Home Performance",
+      multi_zones_monitored: "zone monitorate",
+      multi_avg: "media",
+      multi_list: "Lista",
+      multi_compare: "Confronta",
+      multi_ref: "RIF",
+      multi_k_inst: "K IST.",
+      multi_energy: "ENERGIA",
+      multi_heating: "RISC.",
+      multi_delta: "ΔT MEDIO",
+      multi_no_zones: "Nessuna zona trovata",
+      multi_no_data: "Nessun dato disponibile",
+      multi_waiting_data: "In attesa dei dati K/m³...",
+      multi_kwh_day: "kWh/giorno",
     }
   };
 
@@ -206,7 +338,8 @@ class HomePerformanceCard extends LitElement {
   }
 
   setConfig(config) {
-    if (!config.zone) {
+    // Multi layout doesn't require a zone (auto-detects all zones)
+    if (config.layout !== "multi" && !config.zone) {
       throw new Error(HomePerformanceCard._translations.en.error_no_zone);
     }
     this.config = {
@@ -214,8 +347,16 @@ class HomePerformanceCard extends LitElement {
       layout: "full",
       show_graph: true,
       demo: false,
+      // Multi-zone specific options
+      default_view: "list",      // "list" or "compare"
+      show_sparklines: true,
       ...config,
     };
+    // Initialize multi-zone view state
+    if (this.config.layout === "multi") {
+      this._multiView = this.config.default_view || "list";
+      this._expandedZone = null;
+    }
   }
 
   getCardSize() {
@@ -223,6 +364,7 @@ class HomePerformanceCard extends LitElement {
     switch (this.config?.layout) {
       case "badge": return 2;
       case "pill": return 1;
+      case "multi": return 4;
       default: return 5;
     }
   }
@@ -505,6 +647,23 @@ class HomePerformanceCard extends LitElement {
     return isNaN(num) ? value : num.toFixed(3);
   }
 
+  // Format heating time from decimal hours to "Xh Ymin" format
+  _formatHeatingTime(decimalHours) {
+    if (decimalHours === null || decimalHours === undefined || isNaN(parseFloat(decimalHours))) {
+      return "0min";
+    }
+    const totalMinutes = Math.round(parseFloat(decimalHours) * 60);
+    if (totalMinutes === 0) return "0min";
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h`;
+    }
+    return `${minutes}m`;
+  }
+
   // Demo data
   _getDemoData() {
     return {
@@ -537,6 +696,115 @@ class HomePerformanceCard extends LitElement {
     }
     const kCoefEntityId = this._getEntityId("coefficient_k");
     return this._getAttribute(kCoefEntityId, "k_history_7d") || [];
+  }
+
+  // ==========================================
+  // MULTI-ZONE METHODS
+  // ==========================================
+
+  // Detect all Home Performance zones from entity IDs
+  _getAllZones() {
+    if (!this.hass?.states) return [];
+
+    const zones = new Set();
+    const pattern = /^sensor\.home_performance_(.+?)_(coefficient_k|k_coefficient)$/;
+
+    Object.keys(this.hass.states).forEach(entityId => {
+      const match = entityId.match(pattern);
+      if (match) {
+        // Convert slug back to readable name
+        const slug = match[1];
+        const zoneName = this._unslugifyZone(slug);
+        zones.add(zoneName);
+      }
+    });
+
+    return Array.from(zones).sort();
+  }
+
+  // Convert slug to readable zone name (reverse of _slugifyZone)
+  _unslugifyZone(slug) {
+    return slug
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  // Get all data for a specific zone (for multi-zone view)
+  _getZoneData(zoneName) {
+    const savedZone = this.config.zone;
+    this.config.zone = zoneName;
+
+    const kCoefEntityId = this._getEntityId("coefficient_k");
+    const insulationEntityId = this._getEntityId("note_d_isolation");
+    const energyMeasuredId = this._getEntityId("energie_mesuree_jour");
+    const energyEstimatedId = this._getEntityId("energie_24h_estimee");
+    const heatingTimeId = this._getEntityId("temps_de_chauffe_24h");
+    const deltaTId = this._getEntityId("dt_moyen_24h");
+    const dataReadyId = this._getBinaryEntityId("donnees_pretes");
+
+    const kCoef = this._getState(kCoefEntityId);
+    const kPerM3 = this._getState(this._getEntityId("k_par_m3"));
+    const insulation = this._getState(insulationEntityId);
+    const insulationAttrs = {
+      status: this._getAttribute(insulationEntityId, "status"),
+      season: this._getAttribute(insulationEntityId, "season"),
+      message: this._getAttribute(insulationEntityId, "message"),
+      k_value: this._getAttribute(insulationEntityId, "k_value"),
+      k_source: this._getAttribute(insulationEntityId, "k_source"),
+    };
+
+    // Get energy (prefer measured, fallback to estimated)
+    let dailyEnergy = this._getState(energyMeasuredId);
+    if (!this._isValidValue(dailyEnergy)) {
+      dailyEnergy = this._getState(energyEstimatedId);
+    }
+
+    const heatingTime = this._getState(heatingTimeId);
+    const deltaT = this._getState(deltaTId);
+    const dataReady = this._getState(dataReadyId) === "on";
+
+    // Indoor/outdoor temps
+    const indoorTemp = this._getAttribute(deltaTId, "indoor_temp");
+    const outdoorTemp = this._getAttribute(deltaTId, "outdoor_temp");
+
+    // K history for sparkline
+    const kHistory = this._getAttribute(kCoefEntityId, "k_history_7d") || [];
+
+    // Restore original zone
+    this.config.zone = savedZone;
+
+    const insulationData = this._getInsulationData(insulation, insulationAttrs);
+    const scoreLetter = this._getScoreLetter(insulation);
+
+    return {
+      name: zoneName,
+      dataReady,
+      kCoef: this._isValidValue(kCoef) ? parseFloat(kCoef).toFixed(1) : null,
+      kPerM3: this._isValidValue(kPerM3) ? parseFloat(kPerM3).toFixed(2) : null,
+      dailyEnergy: this._isValidValue(dailyEnergy) ? parseFloat(dailyEnergy).toFixed(3) : null,
+      heatingTime: this._isValidValue(heatingTime) ? this._formatHeatingTime(heatingTime) : null,
+      deltaT: this._isValidValue(deltaT) ? parseFloat(deltaT).toFixed(1) : null,
+      indoorTemp: this._isValidValue(indoorTemp) ? parseFloat(indoorTemp).toFixed(1) : null,
+      outdoorTemp: this._isValidValue(outdoorTemp) ? parseFloat(outdoorTemp).toFixed(1) : null,
+      insulation,
+      insulationData,
+      scoreLetter,
+      kHistory,
+    };
+  }
+
+  // Get color for insulation rating
+  _getInsulationColor(rating) {
+    const colors = {
+      excellent: "#10b981",
+      good: "#22c55e",
+      average: "#eab308",
+      poor: "#f97316",
+      very_poor: "#ef4444",
+      excellent_inferred: "#059669",
+    };
+    return colors[rating] || "#6b7280";
   }
 
   // Render sparkline SVG for pill/badge layouts (simple polyline like HA native)
@@ -652,6 +920,8 @@ class HomePerformanceCard extends LitElement {
         return this._renderBadgeLayout();
       case "pill":
         return this._renderPillLayout();
+      case "multi":
+        return this._renderMultiLayout();
       default:
         return this._renderFullLayout();
     }
@@ -845,6 +1115,258 @@ class HomePerformanceCard extends LitElement {
           </div>
         </div>
       </ha-card>
+    `;
+  }
+
+  // ==========================================
+  // MULTI-ZONE LAYOUT
+  // ==========================================
+
+  _renderMultiLayout() {
+    const zones = this._getAllZones();
+
+    if (zones.length === 0) {
+      return html`
+        <ha-card class="multi-card">
+          <div class="multi-empty">
+            <ha-icon icon="mdi:home-search"></ha-icon>
+            <div>${this._t('multi_no_zones')}</div>
+          </div>
+        </ha-card>
+      `;
+    }
+
+    // Get data for all zones
+    const zonesData = zones.map(zone => this._getZoneData(zone));
+
+    // Filter only zones with data ready
+    const readyZones = zonesData.filter(z => z.dataReady);
+
+    // Calculate average score
+    const avgScore = this._calculateAverageScore(readyZones);
+
+    return html`
+      <ha-card class="multi-card">
+        <!-- Header -->
+        <div class="multi-header">
+          <div class="multi-header-left">
+            <div class="multi-title">${this._t('multi_title')}</div>
+            <div class="multi-subtitle">${zones.length} ${this._t('multi_zones_monitored')}</div>
+          </div>
+          <div class="multi-header-right">
+            <div class="multi-avg-score" style="--accent: ${avgScore.color}">
+              ${avgScore.letter} ${this._t('multi_avg')}
+            </div>
+            <div class="multi-toggle">
+              <button
+                class="multi-toggle-btn ${this._multiView === 'list' ? 'active' : ''}"
+                @click=${() => this._setMultiView('list')}
+              >${this._t('multi_list')}</button>
+              <button
+                class="multi-toggle-btn ${this._multiView === 'compare' ? 'active' : ''}"
+                @click=${() => this._setMultiView('compare')}
+              >${this._t('multi_compare')}</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="multi-content">
+          ${this._multiView === 'list'
+        ? this._renderMultiListView(zonesData)
+        : this._renderMultiCompareView(readyZones)}
+        </div>
+      </ha-card>
+    `;
+  }
+
+  _setMultiView(view) {
+    this._multiView = view;
+    this.requestUpdate();
+  }
+
+  _toggleZoneExpanded(zoneName) {
+    this._expandedZone = this._expandedZone === zoneName ? null : zoneName;
+    this.requestUpdate();
+  }
+
+  _calculateAverageScore(zonesData) {
+    const validRatings = zonesData
+      .filter(z => z.insulation && z.insulation !== 'unknown' && z.insulation !== 'unavailable')
+      .map(z => z.insulation);
+
+    if (validRatings.length === 0) {
+      return { letter: '?', color: '#6b7280' };
+    }
+
+    // Score mapping
+    const scoreMap = { excellent: 5, excellent_inferred: 5, good: 4, average: 3, poor: 2, very_poor: 1 };
+    const avgScore = validRatings.reduce((sum, r) => sum + (scoreMap[r] || 3), 0) / validRatings.length;
+
+    if (avgScore >= 4.5) return { letter: 'A+', color: '#10b981' };
+    if (avgScore >= 3.5) return { letter: 'A', color: '#22c55e' };
+    if (avgScore >= 2.5) return { letter: 'B', color: '#eab308' };
+    if (avgScore >= 1.5) return { letter: 'C', color: '#f97316' };
+    return { letter: 'D', color: '#ef4444' };
+  }
+
+  _renderMultiListView(zonesData) {
+    return html`
+      <div class="multi-zone-list">
+        ${zonesData.map(zone => this._renderMultiZoneRow(zone))}
+      </div>
+    `;
+  }
+
+  _renderMultiZoneRow(zone) {
+    const isExpanded = this._expandedZone === zone.name;
+    const accentColor = zone.insulationData?.color || '#6b7280';
+    const hasSparkline = this.config.show_sparklines && zone.kHistory && zone.kHistory.length >= 2;
+
+    return html`
+      <div
+        class="multi-zone-row ${isExpanded ? 'expanded' : ''}"
+        style="--accent-color: ${accentColor}"
+        @click=${() => this._toggleZoneExpanded(zone.name)}
+      >
+        <div class="multi-zone-row-main">
+          <div class="multi-zone-score">${zone.scoreLetter || '?'}</div>
+          <div class="multi-zone-info">
+            <div class="multi-zone-name">${zone.name}</div>
+            <div class="multi-zone-rating">${zone.insulationData?.label || ''}</div>
+          </div>
+          <div class="multi-zone-stats">
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">${zone.kCoef || '--'}</div>
+              <div class="multi-zone-stat-label">W/°C</div>
+            </div>
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">${zone.dailyEnergy || '--'}</div>
+              <div class="multi-zone-stat-label">kWh</div>
+            </div>
+          </div>
+          ${hasSparkline ? html`
+            <div class="multi-zone-sparkline">
+              ${this._renderSparkline(zone.kHistory, 70, 24, accentColor)}
+            </div>
+          ` : ''}
+          <svg class="multi-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        ${isExpanded ? this._renderMultiZoneDetails(zone) : ''}
+      </div>
+    `;
+  }
+
+  _renderMultiZoneDetails(zone) {
+    const tempUnit = this._getTempUnit();
+
+    return html`
+      <div class="multi-zone-details">
+        <div class="multi-zone-details-inner">
+          <div class="multi-zone-details-grid">
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:thermometer"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_k_inst')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.kCoef || '--'}</div>
+              <div class="multi-zone-detail-sub">W/°C</div>
+            </div>
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:flash"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_energy')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.dailyEnergy || '--'}</div>
+              <div class="multi-zone-detail-sub">${this._t('multi_kwh_day')}</div>
+            </div>
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:clock-outline"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_heating')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.heatingTime || '--'}</div>
+              <div class="multi-zone-detail-sub">${this._t('on_24h')}</div>
+            </div>
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:thermometer-lines"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_delta')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.deltaT ? `${zone.deltaT}°C` : '--'}</div>
+              <div class="multi-zone-detail-sub">${this._t('indoor_outdoor')}</div>
+            </div>
+          </div>
+          <div class="multi-zone-temps">
+            <div class="multi-zone-temp">
+              <ha-icon icon="mdi:home-thermometer"></ha-icon>
+              <strong>${zone.indoorTemp ? `${zone.indoorTemp}${tempUnit}` : '--'}</strong>
+            </div>
+            <div class="multi-zone-temp">
+              <ha-icon icon="mdi:cloud"></ha-icon>
+              <strong>${zone.outdoorTemp ? `${zone.outdoorTemp}${tempUnit}` : '--'}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  _renderMultiCompareView(zonesData) {
+    if (zonesData.length === 0) {
+      return html`<div class="multi-empty-compare">${this._t('multi_no_data')}</div>`;
+    }
+
+    // Sort by K/m³ (best first = lowest)
+    const sorted = [...zonesData]
+      .filter(z => z.kPerM3 !== null)
+      .sort((a, b) => parseFloat(a.kPerM3) - parseFloat(b.kPerM3));
+
+    if (sorted.length === 0) {
+      return html`<div class="multi-empty-compare">${this._t('multi_waiting_data')}</div>`;
+    }
+
+    const bestValue = parseFloat(sorted[0].kPerM3);
+
+    return html`
+      <div class="multi-zone-ranking">
+        ${sorted.map((zone, index) => this._renderMultiRankingItem(zone, index, bestValue))}
+      </div>
+    `;
+  }
+
+  _renderMultiRankingItem(zone, index, bestValue) {
+    const accentColor = zone.insulationData?.color || '#6b7280';
+    const kPerM3 = parseFloat(zone.kPerM3);
+    const barWidth = bestValue / kPerM3 * 100;
+    const deltaPercent = ((kPerM3 - bestValue) / bestValue * 100).toFixed(0);
+    const isRef = index === 0;
+
+    // Delta class based on percentage
+    let deltaClass = 'ref';
+    if (!isRef) {
+      if (deltaPercent < 50) deltaClass = 'warn';
+      else if (deltaPercent < 150) deltaClass = 'bad';
+      else deltaClass = 'worst';
+    }
+
+    return html`
+      <div class="multi-ranking-item" style="--accent-color: ${accentColor}">
+        <div class="multi-ranking-position">${index + 1}</div>
+        <div class="multi-ranking-info">
+          <div class="multi-ranking-name">${zone.name}</div>
+          <div class="multi-ranking-score-label">${zone.scoreLetter} • ${zone.insulationData?.label || ''}</div>
+        </div>
+        <div class="multi-ranking-bar-wrapper">
+          <div class="multi-ranking-bar" style="width: ${barWidth}%; background: ${accentColor};"></div>
+        </div>
+        <div class="multi-ranking-value">${zone.kPerM3} W/m³</div>
+        <div class="multi-ranking-delta ${deltaClass}">
+          ${isRef ? this._t('multi_ref') : `+${deltaPercent}%`}
+        </div>
+      </div>
     `;
   }
 
@@ -1836,6 +2358,410 @@ class HomePerformanceCard extends LitElement {
         border-radius: 2px;
         transition: width 0.5s ease;
       }
+
+      /* ========================================
+         MULTI-ZONE LAYOUT
+         ======================================== */
+      .multi-card {
+        background: var(--bg-primary);
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+      }
+
+      .multi-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-color);
+        background: #1C1C1C;
+      }
+
+      .multi-title {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+      }
+
+      .multi-subtitle {
+        font-size: 0.8em;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+
+      .multi-header-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .multi-avg-score {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: color-mix(in srgb, var(--accent) 15%, transparent);
+        border-radius: 16px;
+        font-size: 0.8em;
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      .multi-toggle {
+        display: flex;
+        background: #2d2d2d;
+        border-radius: 8px;
+        padding: 3px;
+      }
+
+      .multi-toggle-btn {
+        padding: 6px 12px;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 0.75em;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .multi-toggle-btn:hover {
+        color: var(--text-primary);
+      }
+
+      .multi-toggle-btn.active {
+        background: #404040;
+        color: var(--text-primary);
+      }
+
+      .multi-content {
+        padding: 8px;
+      }
+
+      .multi-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        color: var(--text-secondary);
+        gap: 10px;
+      }
+
+      .multi-empty ha-icon {
+        --mdc-icon-size: 40px;
+        opacity: 0.5;
+      }
+
+      .multi-empty-compare {
+        padding: 20px;
+        text-align: center;
+        color: var(--text-secondary);
+      }
+
+      /* Multi Zone List */
+      .multi-zone-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .multi-zone-row {
+        background: #2d2d2d;
+        border-radius: 10px;
+        border-left: 3px solid var(--accent-color);
+        cursor: pointer;
+        transition: background 0.15s ease;
+        overflow: hidden;
+      }
+
+      .multi-zone-row:hover {
+        background: #353535;
+      }
+
+      .multi-zone-row.expanded {
+        background: #282828;
+      }
+
+      .multi-zone-row-main {
+        display: grid;
+        grid-template-columns: 42px 1fr 110px 70px 20px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        min-height: 60px;
+      }
+
+      .multi-zone-score {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--accent-color);
+        background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+      }
+
+      .multi-zone-info {
+        min-width: 0;
+      }
+
+      .multi-zone-name {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .multi-zone-rating {
+        font-size: 0.7em;
+        color: var(--accent-color);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-zone-stats {
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+      }
+
+      .multi-zone-stat {
+        text-align: right;
+      }
+
+      .multi-zone-stat-value {
+        font-size: 0.85em;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .multi-zone-stat-label {
+        font-size: 0.65em;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-zone-sparkline {
+        width: 70px;
+        height: 24px;
+      }
+
+      .multi-zone-sparkline svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .multi-expand-icon {
+        width: 18px;
+        height: 18px;
+        color: var(--text-secondary);
+        transition: transform 0.2s ease;
+      }
+
+      .multi-zone-row.expanded .multi-expand-icon {
+        transform: rotate(180deg);
+      }
+
+      /* Multi Zone Details */
+      .multi-zone-details {
+        border-top: 1px solid var(--border-color);
+      }
+
+      .multi-zone-details-inner {
+        padding: 14px;
+      }
+
+      .multi-zone-details-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+
+      .multi-zone-detail-item {
+        text-align: center;
+        padding: 10px 6px;
+        background: #1f1f1f;
+        border-radius: 8px;
+      }
+
+      .multi-zone-detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        margin-bottom: 6px;
+        color: var(--text-secondary);
+      }
+
+      .multi-zone-detail-header ha-icon {
+        --mdc-icon-size: 12px;
+        opacity: 0.7;
+      }
+
+      .multi-zone-detail-label {
+        font-size: 0.65em;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-zone-detail-value {
+        font-size: 1.05em;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .multi-zone-detail-sub {
+        font-size: 0.65em;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+
+      .multi-zone-temps {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-top: 10px;
+        padding: 10px;
+        background: #1f1f1f;
+        border-radius: 8px;
+      }
+
+      .multi-zone-temp {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9em;
+        color: var(--text-primary);
+      }
+
+      .multi-zone-temp ha-icon {
+        --mdc-icon-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      /* Multi Compare/Ranking View */
+      .multi-zone-ranking {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .multi-ranking-item {
+        display: grid;
+        grid-template-columns: 28px 95px 1fr 75px 50px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        min-height: 60px;
+        background: #2d2d2d;
+        border-radius: 10px;
+        border-left: 3px solid var(--accent-color);
+      }
+
+      .multi-ranking-position {
+        font-size: 1em;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-align: center;
+      }
+
+      .multi-ranking-info {
+        min-width: 0;
+      }
+
+      .multi-ranking-name {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .multi-ranking-score-label {
+        margin-top: 2px;
+        font-size: 0.65em;
+        color: var(--accent-color);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-ranking-bar-wrapper {
+        height: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .multi-ranking-bar {
+        height: 100%;
+        border-radius: 3px;
+      }
+
+      .multi-ranking-value {
+        font-size: 0.75em;
+        font-weight: 600;
+        color: var(--text-primary);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .multi-ranking-delta {
+        font-size: 0.7em;
+        font-weight: 600;
+        text-align: center;
+        padding: 3px 0;
+        border-radius: 4px;
+      }
+
+      .multi-ranking-delta.ref {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+      }
+
+      .multi-ranking-delta.warn {
+        background: rgba(234, 179, 8, 0.15);
+        color: #eab308;
+      }
+
+      .multi-ranking-delta.bad {
+        background: rgba(249, 115, 22, 0.15);
+        color: #f97316;
+      }
+
+      .multi-ranking-delta.worst {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+      }
+
+      @media (max-width: 420px) {
+        .multi-zone-stats {
+          display: none;
+        }
+
+        .multi-zone-row-main {
+          grid-template-columns: 42px 1fr 70px 20px;
+        }
+
+        .multi-zone-details-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .multi-ranking-item {
+          grid-template-columns: 24px 70px 1fr 55px 45px;
+          gap: 8px;
+        }
+      }
     `;
   }
 }
@@ -1944,6 +2870,17 @@ class HomePerformanceCardEditor extends LitElement {
                 <div class="lp-bar"></div>
               </div>
               <span>${this._t('editor_pill')}</span>
+            </div>
+            <div
+              class="layout-option ${this.config.layout === "multi" ? "selected" : ""}"
+              @click=${() => this._setLayout("multi")}
+            >
+              <div class="layout-preview layout-multi">
+                <div class="lp-row"></div>
+                <div class="lp-row"></div>
+                <div class="lp-row"></div>
+              </div>
+              <span>${this._t('editor_multi')}</span>
             </div>
           </div>
         </div>
@@ -2086,6 +3023,49 @@ class HomePerformanceCardEditor extends LitElement {
         height: 6px;
         background: var(--divider-color);
         border-radius: 2px;
+      }
+
+      .layout-multi {
+        justify-content: center;
+        gap: 2px;
+      }
+
+      .layout-multi .lp-row {
+        width: 100%;
+        height: 8px;
+        background: var(--divider-color);
+        border-radius: 2px;
+        border-left: 2px solid var(--primary-color);
+      }
+
+      .layout-multi .lp-row:nth-child(2) {
+        opacity: 0.7;
+      }
+
+      .layout-multi .lp-row:nth-child(3) {
+        opacity: 0.4;
+      }
+
+      /* Responsive: 2x2 grid on small screens */
+      @media (max-width: 400px) {
+        .layout-options {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px;
+        }
+
+        .layout-option {
+          padding: 10px 8px;
+        }
+
+        .layout-preview {
+          width: 44px;
+          height: 36px;
+        }
+
+        .layout-option span {
+          font-size: 10px;
+        }
       }
     `;
   }
