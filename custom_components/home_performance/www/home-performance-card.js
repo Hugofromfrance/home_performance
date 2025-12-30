@@ -3,7 +3,7 @@
  * Modern dashboard card for Home Performance integration
  */
 
-const CARD_VERSION = "1.4.0";
+const CARD_VERSION = "1.2.2";
 
 const LitElement = customElements.get("hui-masonry-view")
   ? Object.getPrototypeOf(customElements.get("hui-masonry-view"))
@@ -2925,16 +2925,19 @@ class HomePerformanceCardEditor extends LitElement {
 
       .layout-options {
         display: flex;
-        gap: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
       }
 
       .layout-option {
-        flex: 1;
+        flex: 1 1 calc(25% - 8px);
+        min-width: 70px;
+        max-width: calc(50% - 4px);
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
-        padding: 12px;
+        gap: 6px;
+        padding: 10px 6px;
         border: 2px solid var(--divider-color);
         border-radius: 12px;
         cursor: pointer;
@@ -2952,20 +2955,22 @@ class HomePerformanceCardEditor extends LitElement {
       }
 
       .layout-option span {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         color: var(--primary-text-color);
+        text-align: center;
+        white-space: nowrap;
       }
 
       .layout-preview {
-        width: 50px;
-        height: 40px;
+        width: 44px;
+        height: 34px;
         background: var(--card-background-color);
         border-radius: 6px;
         display: flex;
         flex-direction: column;
         padding: 4px;
-        gap: 3px;
+        gap: 2px;
       }
 
       .layout-full .lp-header {
@@ -3044,28 +3049,6 @@ class HomePerformanceCardEditor extends LitElement {
 
       .layout-multi .lp-row:nth-child(3) {
         opacity: 0.4;
-      }
-
-      /* Responsive: 2x2 grid on small screens */
-      @media (max-width: 400px) {
-        .layout-options {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 8px;
-        }
-
-        .layout-option {
-          padding: 10px 8px;
-        }
-
-        .layout-preview {
-          width: 44px;
-          height: 36px;
-        }
-
-        .layout-option span {
-          font-size: 10px;
-        }
       }
     `;
   }
