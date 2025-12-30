@@ -30,6 +30,7 @@ from .const import (
     MIN_HEATING_TIME_HOURS,
     MIN_DATA_HOURS,
     HISTORY_DAYS,
+    LONG_TERM_HISTORY_DAYS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -424,9 +425,9 @@ class ThermalLossModel:
         )
         self._daily_history.append(entry)
 
-        # Sort by date and keep only last HISTORY_DAYS days
+        # Sort by date and keep only last LONG_TERM_HISTORY_DAYS days (5 years)
         self._daily_history.sort(key=lambda e: e.date)
-        if len(self._daily_history) > HISTORY_DAYS:
+        if len(self._daily_history) > LONG_TERM_HISTORY_DAYS:
             removed = self._daily_history.pop(0)
             _LOGGER.debug("[%s] Removed oldest history entry: %s", self.zone_name, removed.date)
 
@@ -445,13 +446,17 @@ class ThermalLossModel:
 
         This provides a stable K that doesn't reset at midnight.
         Uses weighted average based on sample count per day.
+        Only uses the last HISTORY_DAYS (7) days for calculation.
         """
         if not self._daily_history:
             return
 
+        # Only use the last HISTORY_DAYS (7) days for K calculation
+        recent_history = self._daily_history[-HISTORY_DAYS:] if len(self._daily_history) > HISTORY_DAYS else self._daily_history
+
         # Filter valid days (sufficient ΔT and heating time)
         valid_days = [
-            d for d in self._daily_history
+            d for d in recent_history
             if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
         ]
 

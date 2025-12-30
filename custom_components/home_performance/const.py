@@ -43,7 +43,8 @@ AGGREGATION_PERIOD_HOURS = 24  # Période d'agrégation pour le calcul de K
 MIN_DELTA_T = 5.0  # ΔT minimum pour calcul fiable (°C)
 MIN_HEATING_TIME_HOURS = 0.5  # Temps de chauffe minimum sur la période (30 min)
 MIN_DATA_HOURS = 12  # Heures minimum de données pour premier calcul
-HISTORY_DAYS = 7  # Nombre de jours d'historique pour le calcul stable de K
+HISTORY_DAYS = 7  # Nombre de jours pour le calcul stable de K_7d
+LONG_TERM_HISTORY_DAYS = 365 * 5  # 5 ans d'historique long terme (1825 jours)
 
 # Sensor types - Thermal
 SENSOR_K_COEFFICIENT = "k_coefficient"  # W/°C
