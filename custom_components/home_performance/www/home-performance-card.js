@@ -744,6 +744,7 @@ class HomePerformanceCard extends LitElement {
     const dataReadyId = this._getBinaryEntityId("donnees_pretes");
 
     const kCoef = this._getState(kCoefEntityId);
+    const kCoef24h = this._getAttribute(kCoefEntityId, "k_24h");  // K instantané (24h)
     const kPerM3 = this._getState(this._getEntityId("k_par_m3"));
     const insulation = this._getState(insulationEntityId);
     const insulationAttrs = {
@@ -781,6 +782,7 @@ class HomePerformanceCard extends LitElement {
       name: zoneName,
       dataReady,
       kCoef: this._isValidValue(kCoef) ? parseFloat(kCoef).toFixed(1) : null,
+      kCoef24h: this._isValidValue(kCoef24h) ? parseFloat(kCoef24h).toFixed(1) : null,  // K instantané
       kPerM3: this._isValidValue(kPerM3) ? parseFloat(kPerM3).toFixed(2) : null,
       dailyEnergy: this._isValidValue(dailyEnergy) ? parseFloat(dailyEnergy).toFixed(3) : null,
       heatingTime: this._isValidValue(heatingTime) ? this._formatHeatingTime(heatingTime) : null,
@@ -1271,7 +1273,7 @@ class HomePerformanceCard extends LitElement {
                 <ha-icon icon="mdi:thermometer"></ha-icon>
                 <span class="multi-zone-detail-label">${this._t('multi_k_inst')}</span>
               </div>
-              <div class="multi-zone-detail-value">${zone.kCoef || '--'}</div>
+              <div class="multi-zone-detail-value">${zone.kCoef24h || '--'}</div>
               <div class="multi-zone-detail-sub">W/°C</div>
             </div>
             <div class="multi-zone-detail-item">
