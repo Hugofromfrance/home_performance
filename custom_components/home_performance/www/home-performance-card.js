@@ -735,7 +735,7 @@ class HomePerformanceCard extends LitElement {
 
   // Format heating time from decimal hours to "Xh Ymin" format
   _formatHeatingTime(decimalHours) {
-    if (decimalHours === null || decimalHours === undefined || isNaN(parseFloat(decimalHours))) {
+    if (decimalHours === null || decimalHours === undefined || decimalHours === "unavailable" || decimalHours === "unknown" || isNaN(parseFloat(decimalHours))) {
       return "0min";
     }
     const totalMinutes = Math.round(parseFloat(decimalHours) * 60);
@@ -756,7 +756,7 @@ class HomePerformanceCard extends LitElement {
       k_coefficient: "45.2",
       k_per_m3: "1.28",
       daily_energy: "3.421",
-      heating_time: "6h 23min",
+      heating_time: "6.38",  // Decimal hours (6h 23min)
       heating_ratio: "27",
       delta_t: "12.5",
       indoor_temp: "21.3",
@@ -1733,7 +1733,7 @@ class HomePerformanceCard extends LitElement {
               <ha-icon icon="mdi:radiator"></ha-icon>
               <span>${this._t('heating_time')}</span>
             </div>
-            <div class="metric-value">${this._isValidValue(heatingTime) ? heatingTime : "0min"}</div>
+            <div class="metric-value">${this._formatHeatingTime(heatingTime)}</div>
             <div class="metric-unit">${this._t('on_24h')}</div>
             ${this._isValidValue(heatingRatio)
         ? html`<div class="metric-sub">${heatingRatio}% ${this._t('of_time')}</div>`
