@@ -427,7 +427,7 @@ class ThermalLossModel:
 
         # Sort by date and keep only last LONG_TERM_HISTORY_DAYS days (5 years)
         self._daily_history.sort(key=lambda e: e.date)
-        if len(self._daily_history) > LONG_TERM_HISTORY_DAYS:
+        while len(self._daily_history) > LONG_TERM_HISTORY_DAYS:
             removed = self._daily_history.pop(0)
             _LOGGER.debug("[%s] Removed oldest history entry: %s", self.zone_name, removed.date)
 
