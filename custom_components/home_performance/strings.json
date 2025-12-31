@@ -121,6 +121,9 @@
       "window_open": {
         "name": "Window Open Detected"
       },
+      "heating_active": {
+        "name": "Heating Active"
+      },
       "data_ready": {
         "name": "Data Ready"
       }

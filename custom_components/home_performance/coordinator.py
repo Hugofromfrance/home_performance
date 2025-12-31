@@ -1,11 +1,13 @@
 """DataUpdateCoordinator for Home Performance."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers import device_registry as dr
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback, Event
 from homeassistant.helpers.event import async_track_state_change_event
@@ -29,8 +31,12 @@ from .const import (
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
     CONF_WINDOW_SENSOR,
+    CONF_WINDOW_NOTIFICATION_ENABLED,
+    CONF_NOTIFY_DEVICE,
+    CONF_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_NOTIFICATION_DELAY,
 )
 from .models import ThermalLossModel, ThermalDataPoint
 
@@ -63,6 +69,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
         self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
         self.window_sensor: str | None = config.get(CONF_WINDOW_SENSOR)
+
+        # Notification settings
+        self.window_notification_enabled: bool = config.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
+        self.notify_device: str | None = config.get(CONF_NOTIFY_DEVICE)
+        self.notification_delay: int = config.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
 
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
@@ -117,6 +128,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._window_open_realtime: bool = False  # Real-time window open state
         self._window_open_since: float | None = None  # Timestamp when window was detected open
         self._consecutive_drops: int = 0  # Count of consecutive temperature drops
+
+        # Notification tracking
+        self._notification_task: asyncio.Task | None = None  # Delayed notification task
+        self._last_notification_time: float | None = None  # Cooldown tracking
 
         # Persistence - use slugify for consistent handling of special characters
         zone_slug = slugify(self.zone_name, separator="_")
@@ -182,6 +197,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._heating_start_time = now
                 self._is_heating_realtime = True
                 _LOGGER.info("[%s] 🔥 Heating started (real-time detection)", self.zone_name)
+                # Trigger notification if window is already open
+                if self._window_open_realtime:
+                    self._schedule_window_notification()
 
             # Heating stopped
             elif not is_heating_now and self._is_heating_realtime:
@@ -197,6 +215,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 self._heating_start_time = None
                 self._is_heating_realtime = False
+                # Cancel any pending window notification
+                self._cancel_window_notification()
 
         # Subscribe to power sensor state changes
         self._power_listener_unsub = async_track_state_change_event(
@@ -264,11 +284,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                                     "[%s] 🪟 Window OPEN detected! Temp drop: %.2f°C/min (heating: %s)",
                                     self.zone_name, abs(rate_per_minute), self._is_heating_realtime
                                 )
+                                # Trigger notification if heating is on and notifications enabled
+                                if self._is_heating_realtime:
+                                    self._schedule_window_notification()
                     elif rate_per_minute > 0.1:
                         # Temperature rising = window likely closed
                         self._consecutive_drops = 0
                         if was_window_open:
                             _LOGGER.info("[%s] 🪟 Window CLOSED (temperature rising)", self.zone_name)
+                            self._cancel_window_notification()
                         self._window_open_realtime = False
                         self._window_open_since = None
                     elif abs(rate_per_minute) < 0.2:
@@ -278,6 +302,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             minutes_open = (now - self._window_open_since) / 60
                             if minutes_open > 5:
                                 _LOGGER.info("[%s] 🪟 Window CLOSED (temperature stabilized after %.1f min)", self.zone_name, minutes_open)
+                                self._cancel_window_notification()
                                 self._window_open_realtime = False
                                 self._window_open_since = None
 
@@ -293,8 +318,109 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         _LOGGER.info("[%s] ✅ Real-time temperature listener set up for %s", self.zone_name, self.indoor_temp_sensor)
 
+    def _schedule_window_notification(self) -> None:
+        """Schedule a window open notification after the configured delay."""
+        if not self.window_notification_enabled or not self.notify_device:
+            return
+
+        # Cancel any existing notification task
+        if self._notification_task and not self._notification_task.done():
+            self._notification_task.cancel()
+
+        # Create a new notification task
+        self._notification_task = self.hass.async_create_task(
+            self._async_send_window_notification()
+        )
+
+    def _cancel_window_notification(self) -> None:
+        """Cancel any pending window notification."""
+        if self._notification_task and not self._notification_task.done():
+            self._notification_task.cancel()
+            self._notification_task = None
+            _LOGGER.debug("[%s] Window notification cancelled", self.zone_name)
+
+    async def _async_send_window_notification(self) -> None:
+        """Send window open notification after delay."""
+        try:
+            # Wait for the configured delay
+            await asyncio.sleep(self.notification_delay * 60)
+
+            # Re-check conditions after delay
+            if not self._window_open_realtime or not self._is_heating_realtime:
+                _LOGGER.debug("[%s] Conditions no longer met, skipping notification", self.zone_name)
+                return
+
+            # Cooldown: don't send notifications more than once per 15 minutes
+            now = time.time()
+            if self._last_notification_time and (now - self._last_notification_time) < 900:
+                _LOGGER.debug("[%s] Notification cooldown active, skipping", self.zone_name)
+                return
+
+            # Get notify service name from device
+            device_registry = dr.async_get(self.hass)
+            device = device_registry.async_get(self.notify_device)
+
+            if not device:
+                _LOGGER.warning("[%s] Notify device not found: %s", self.zone_name, self.notify_device)
+                return
+
+            # Find the mobile_app notify service for this device
+            # The service name is typically notify.mobile_app_<device_name>
+            notify_service = None
+            for identifier in device.identifiers:
+                if identifier[0] == "mobile_app":
+                    # The device ID format is usually the device name
+                    device_name = identifier[1].lower().replace(" ", "_").replace("-", "_")
+                    notify_service = f"mobile_app_{device_name}"
+                    break
+
+            if not notify_service:
+                # Fallback: try using device name directly
+                if device.name:
+                    device_name = device.name.lower().replace(" ", "_").replace("-", "_")
+                    notify_service = f"mobile_app_{device_name}"
+                else:
+                    _LOGGER.warning("[%s] Could not determine notify service for device", self.zone_name)
+                    return
+
+            # Get translated message based on HA language
+            lang = self.hass.config.language or "en"
+            title = f"⚠️ {self.zone_name}"
+            if lang.startswith("fr"):
+                message = "Fenêtre ouverte · Chauffage actif"
+            elif lang.startswith("it"):
+                message = "Finestra aperta · Riscaldamento attivo"
+            else:  # English default
+                message = "Window open · Heating active"
+
+            # Send the notification
+            await self.hass.services.async_call(
+                "notify",
+                notify_service,
+                {
+                    "title": title,
+                    "message": message,
+                    "data": {
+                        "tag": f"home_performance_window_{self.zone_name}",
+                        "group": "home_performance",
+                    },
+                },
+                blocking=False,
+            )
+
+            self._last_notification_time = now
+            _LOGGER.info("[%s] 📱 Window open notification sent", self.zone_name)
+
+        except asyncio.CancelledError:
+            _LOGGER.debug("[%s] Window notification task cancelled", self.zone_name)
+        except Exception as err:
+            _LOGGER.error("[%s] Failed to send window notification: %s", self.zone_name, err)
+
     async def async_shutdown(self) -> None:
         """Clean up when coordinator is shut down."""
+        # Cancel any pending notification
+        self._cancel_window_notification()
+
         # Unsubscribe from power sensor listener
         if self._power_listener_unsub:
             self._power_listener_unsub()

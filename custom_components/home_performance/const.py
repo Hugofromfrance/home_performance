@@ -32,7 +32,13 @@ CONF_VOLUME = "volume"  # m³
 CONF_POWER_THRESHOLD = "power_threshold"  # Seuil de puissance pour détection chauffe (W)
 CONF_WINDOW_SENSOR = "window_sensor"  # Capteur d'ouverture de fenêtre (optionnel)
 
+# Notification settings
+CONF_WINDOW_NOTIFICATION_ENABLED = "window_notification_enabled"
+CONF_NOTIFY_DEVICE = "notify_device"
+CONF_NOTIFICATION_DELAY = "notification_delay"
+
 # Default values
+DEFAULT_NOTIFICATION_DELAY = 2  # minutes
 DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
 
 # Timing

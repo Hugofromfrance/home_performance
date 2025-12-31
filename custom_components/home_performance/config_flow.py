@@ -25,7 +25,11 @@ from .const import (
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
     CONF_WINDOW_SENSOR,
+    CONF_WINDOW_NOTIFICATION_ENABLED,
+    CONF_NOTIFY_DEVICE,
+    CONF_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
+    DEFAULT_NOTIFICATION_DELAY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -378,6 +382,42 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                     device_class=["window", "door", "opening"],
                 )
             )
+
+        # === NOTIFICATION OPTIONS ===
+        # Enable window notifications
+        notification_enabled = current.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
+        schema_dict[vol.Optional(CONF_WINDOW_NOTIFICATION_ENABLED, default=notification_enabled)] = selector.BooleanSelector()
+
+        # Notify device - only show if notifications are or will be enabled
+        notify_device_value = current.get(CONF_NOTIFY_DEVICE)
+        if notify_device_value is not None:
+            schema_dict[vol.Optional(CONF_NOTIFY_DEVICE, default=notify_device_value)] = selector.DeviceSelector(
+                selector.DeviceSelectorConfig(
+                    filter=selector.DeviceFilterSelectorConfig(
+                        integration="mobile_app"
+                    )
+                )
+            )
+        else:
+            schema_dict[vol.Optional(CONF_NOTIFY_DEVICE)] = selector.DeviceSelector(
+                selector.DeviceSelectorConfig(
+                    filter=selector.DeviceFilterSelectorConfig(
+                        integration="mobile_app"
+                    )
+                )
+            )
+
+        # Notification delay
+        notification_delay = current.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
+        schema_dict[vol.Optional(CONF_NOTIFICATION_DELAY, default=notification_delay)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0,
+                max=30,
+                step=1,
+                unit_of_measurement="min",
+                mode="slider",
+            )
+        )
 
         return self.async_show_form(
             step_id="init",
