@@ -247,17 +247,23 @@ class ThermalLossModel:
 
     @property
     def k_per_m2(self) -> float | None:
-        """Get K normalized by surface (W/(°C·m²))."""
-        if self._k_coefficient is None or self.surface is None:
+        """Get K normalized by surface (W/(°C·m²)).
+        
+        Uses stable K (prefers 7-day average) for consistent comparisons.
+        """
+        if self.k_coefficient is None or self.surface is None:
             return None
-        return self._k_coefficient / self.surface
+        return self.k_coefficient / self.surface
 
     @property
     def k_per_m3(self) -> float | None:
-        """Get K normalized by volume (W/(°C·m³))."""
-        if self._k_coefficient is None or self.volume is None:
+        """Get K normalized by volume (W/(°C·m³)).
+        
+        Uses stable K (prefers 7-day average) for consistent comparisons.
+        """
+        if self.k_coefficient is None or self.volume is None:
             return None
-        return self._k_coefficient / self.volume
+        return self.k_coefficient / self.volume
 
     @property
     def total_energy_kwh(self) -> float:
