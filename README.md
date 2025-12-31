@@ -275,7 +275,8 @@ The `source` attribute on Time/Ratio indicates: `measured` (via power sensor > c
 | **Remaining analysis time** | Time before data is ready |
 | **Analysis progress** | Completion percentage (0-100%) |
 | **Data ready** | Binary sensor indicating if analysis is available |
-| **Open window** | Detection by rapid temperature drop |
+| **Heating active** | Binary sensor indicating if heating is currently running |
+| **Open window** | Detection by rapid temperature drop or physical sensor |
 
 ## 🏠 Multi-zones
 
@@ -535,6 +536,22 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 > - The **Window/Door sensor** allows using a physical contact sensor (window, door, opening) for accurate open detection instead of relying on temperature-based detection. If the sensor is unavailable, it falls back to temperature detection automatically.
 > - Options are **modifiable afterwards** and the integration reloads automatically.
 
+### 📱 Window Open Notifications
+
+Get a push notification when a window is detected open while heating is running.
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| Enable alerts | Turn on/off push notifications | Off |
+| Mobile device | Select your phone from mobile_app devices | - |
+| Delay | Minutes to wait before alerting | 2 min |
+
+**Setup**: Settings → Integrations → Home Performance → Configure (⚙️)
+
+The notification is translated (EN/FR/IT) based on your Home Assistant language.
+
+> **Blueprint alternative**: A [Blueprint](blueprints/automation/home_performance/window_open_notification.yaml) is also available for advanced customization (custom messages, TTS, multiple devices...).
+
 ## 💾 Data Persistence
 
 Data is **automatically saved** and restored after a Home Assistant restart:
@@ -672,7 +689,8 @@ Needs optimization : beyond
 
 ### 🔜 Next - Alerts & Notifications
 
-- [ ] Open window notifications (push, TTS)
+- [x] Open window notifications (push) ✅
+- [ ] Open window notifications (TTS)
 - [ ] Poor insulation detected alerts
 - [ ] Weekly consumption report
 
