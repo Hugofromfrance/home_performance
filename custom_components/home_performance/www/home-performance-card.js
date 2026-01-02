@@ -1627,7 +1627,7 @@ class HomePerformanceCard extends LitElement {
         justify-content: space-between;
         align-items: center;
         padding: 12px 14px;
-        background: #1C1C1C;
+        background: var(--bg-secondary);
       }
 
       .header-title {
@@ -2377,7 +2377,7 @@ class HomePerformanceCard extends LitElement {
         align-items: center;
         padding: 14px 16px;
         border-bottom: 1px solid var(--border-color);
-        background: #1C1C1C;
+        background: var(--bg-secondary);
       }
 
       .multi-title {
@@ -2413,7 +2413,7 @@ class HomePerformanceCard extends LitElement {
 
       .multi-toggle {
         display: flex;
-        background: #2d2d2d;
+        background: var(--bg-tertiary, rgba(128,128,128,0.15));
         border-radius: 8px;
         padding: 3px;
       }
@@ -2435,7 +2435,7 @@ class HomePerformanceCard extends LitElement {
       }
 
       .multi-toggle-btn.active {
-        background: #404040;
+        background: var(--bg-active, rgba(128,128,128,0.3));
         color: var(--text-primary);
       }
 
@@ -2472,7 +2472,7 @@ class HomePerformanceCard extends LitElement {
       }
 
       .multi-zone-row {
-        background: #2d2d2d;
+        background: var(--bg-secondary);
         border-radius: 10px;
         border-left: 3px solid var(--accent-color);
         cursor: pointer;
@@ -2481,11 +2481,11 @@ class HomePerformanceCard extends LitElement {
       }
 
       .multi-zone-row:hover {
-        background: #353535;
+        background: var(--bg-hover, rgba(128,128,128,0.12));
       }
 
       .multi-zone-row.expanded {
-        background: #282828;
+        background: var(--bg-expanded, rgba(128,128,128,0.08));
       }
 
       .multi-zone-row-main {
@@ -2591,7 +2591,7 @@ class HomePerformanceCard extends LitElement {
       .multi-zone-detail-item {
         text-align: center;
         padding: 10px 6px;
-        background: #1f1f1f;
+        background: var(--bg-tertiary, rgba(128,128,128,0.1));
         border-radius: 8px;
       }
 
@@ -2633,7 +2633,7 @@ class HomePerformanceCard extends LitElement {
         gap: 40px;
         margin-top: 10px;
         padding: 10px;
-        background: #1f1f1f;
+        background: var(--bg-tertiary, rgba(128,128,128,0.1));
         border-radius: 8px;
       }
 
@@ -2664,7 +2664,7 @@ class HomePerformanceCard extends LitElement {
         gap: 10px;
         padding: 0 14px;
         min-height: 60px;
-        background: #2d2d2d;
+        background: var(--bg-secondary);
         border-radius: 10px;
         border-left: 3px solid var(--accent-color);
       }
@@ -2700,7 +2700,7 @@ class HomePerformanceCard extends LitElement {
 
       .multi-ranking-bar-wrapper {
         height: 6px;
-        background: rgba(255, 255, 255, 0.06);
+        background: var(--bg-tertiary, rgba(128,128,128,0.15));
         border-radius: 3px;
         overflow: hidden;
       }
