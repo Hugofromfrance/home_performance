@@ -36,9 +36,16 @@ from .const import (
     CONF_WINDOW_NOTIFICATION_ENABLED,
     CONF_NOTIFY_DEVICE,
     CONF_NOTIFICATION_DELAY,
+    CONF_HEAT_SOURCE_TYPE,
+    CONF_EFFICIENCY_FACTOR,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_NOTIFICATION_DELAY,
+    DEFAULT_HEAT_SOURCE_TYPE,
+    DEFAULT_EFFICIENCY_FACTORS,
+    HEAT_SOURCE_ELECTRIC,
+    HEAT_SOURCES_REQUIRING_ENERGY,
+    HEAT_SOURCE_MIGRATION,
 )
 from .models import ThermalLossModel, ThermalDataPoint
 
@@ -64,7 +71,17 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.indoor_temp_sensor: str = config[CONF_INDOOR_TEMP_SENSOR]
         self.outdoor_temp_sensor: str = config[CONF_OUTDOOR_TEMP_SENSOR]
         self.heating_entity: str = config[CONF_HEATING_ENTITY]
-        self.heater_power: float = config[CONF_HEATER_POWER]
+
+        # Heat source type - migrate legacy types if needed
+        raw_heat_source = config.get(CONF_HEAT_SOURCE_TYPE, DEFAULT_HEAT_SOURCE_TYPE)
+        self.heat_source_type: str = HEAT_SOURCE_MIGRATION.get(raw_heat_source, raw_heat_source)
+        if raw_heat_source != self.heat_source_type:
+            _LOGGER.info(
+                "[%s] Migrated heat source type: %s → %s",
+                self.zone_name, raw_heat_source, self.heat_source_type
+            )
+
+        self.heater_power: float | None = config.get(CONF_HEATER_POWER)
         self.surface: float | None = config.get(CONF_SURFACE)
         self.volume: float | None = config.get(CONF_VOLUME)
         self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
@@ -81,17 +98,31 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.notify_device: str | None = config.get(CONF_NOTIFY_DEVICE)
         self.notification_delay: int = config.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
 
+        # Efficiency factor - use configured value or default based on heat source type
+        self.efficiency_factor: float = config.get(
+            CONF_EFFICIENCY_FACTOR,
+            DEFAULT_EFFICIENCY_FACTORS.get(self.heat_source_type, 1.0)
+        )
+
+        # For energy-based sources, energy_sensor should be used for K calculation
+        self._uses_energy_based_calculation = (
+            self.heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY
+            and self.energy_sensor is not None
+        )
+
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
-            "indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
-            "power_sensor=%s, energy_sensor=%s, heater_power=%sW, window_sensor=%s",
+            "heat_source=%s, efficiency_factor=%.2f, indoor_temp=%s, outdoor_temp=%s, heating_entity=%s, "
+            "power_sensor=%s, energy_sensor=%s, heater_power=%s, window_sensor=%s",
             self.zone_name,
+            self.heat_source_type,
+            self.efficiency_factor,
             self.indoor_temp_sensor,
             self.outdoor_temp_sensor,
             self.heating_entity,
             self.power_sensor,
             self.energy_sensor,
-            self.heater_power,
+            f"{self.heater_power}W" if self.heater_power else "N/A (energy-based)",
             self.window_sensor
         )
 
@@ -101,6 +132,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             heater_power=self.heater_power,
             surface=self.surface,
             volume=self.volume,
+            efficiency_factor=self.efficiency_factor,
         )
 
         # Track for window detection
@@ -113,6 +145,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_power_value: float | None = None
         self._measured_energy_total_kwh: float = 0.0
         self._measured_energy_daily_kwh: float = 0.0
+        self._last_external_energy: float | None = None  # For energy-based sources
+
+        # Energy sensor tracking (cumulative sensor - need to track start of day value)
+        self._energy_sensor_start_of_day: float | None = None  # Energy at midnight
+        self._energy_sensor_daily_kwh: float = 0.0  # Calculated daily consumption
 
         # Daily counters (reset at midnight) - for minuit-minuit consistency
         self._last_daily_reset_date: str | None = None
@@ -217,13 +254,19 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if self._heating_start_time is not None:
                     duration = now - self._heating_start_time
                     self._heating_seconds_daily += duration
-                    # Also update estimated energy
-                    energy_kwh = (self.heater_power / 1000) * (duration / 3600)
-                    self._estimated_energy_daily_kwh += energy_kwh
-                    _LOGGER.info(
-                        "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min), Energy: %.4f kWh",
-                        self.zone_name, duration, duration / 60, energy_kwh
-                    )
+                    # Update estimated energy (only if heater_power is available)
+                    if self.heater_power is not None and self.heater_power > 0:
+                        energy_kwh = (self.heater_power / 1000) * (duration / 3600)
+                        self._estimated_energy_daily_kwh += energy_kwh
+                        _LOGGER.info(
+                            "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min), Energy: %.4f kWh",
+                            self.zone_name, duration, duration / 60, energy_kwh
+                        )
+                    else:
+                        _LOGGER.info(
+                            "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min)",
+                            self.zone_name, duration, duration / 60
+                        )
                 self._heating_start_time = None
                 self._is_heating_realtime = False
                 # Cancel any pending window notification
@@ -448,8 +491,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._is_heating_realtime and self._heating_start_time is not None:
             duration = time.time() - self._heating_start_time
             self._heating_seconds_daily += duration
-            energy_kwh = (self.heater_power / 1000) * (duration / 3600)
-            self._estimated_energy_daily_kwh += energy_kwh
+            if self.heater_power is not None and self.heater_power > 0:
+                energy_kwh = (self.heater_power / 1000) * (duration / 3600)
+                self._estimated_energy_daily_kwh += energy_kwh
             _LOGGER.info("[%s] Finalized heating session on shutdown: %.1fs", self.zone_name, duration)
 
         # Save data before shutdown
@@ -495,6 +539,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if "delta_t_count_daily" in data:
                     self._delta_t_count_daily = data["delta_t_count_daily"]
 
+                # Restore energy sensor tracking
+                if "energy_sensor_start_of_day" in data:
+                    self._energy_sensor_start_of_day = data["energy_sensor_start_of_day"]
+                if "energy_sensor_daily_kwh" in data:
+                    self._energy_sensor_daily_kwh = data["energy_sensor_daily_kwh"]
+
                 self._data_loaded = True
                 _LOGGER.info(
                     "Restored data for %s: %.1fh of thermal data, %.3f kWh total energy",
@@ -523,6 +573,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_seconds_daily": self._heating_seconds_daily,
                 "delta_t_sum_daily": self._delta_t_sum_daily,
                 "delta_t_count_daily": self._delta_t_count_daily,
+                # Energy sensor tracking
+                "energy_sensor_start_of_day": self._energy_sensor_start_of_day,
+                "energy_sensor_daily_kwh": self._energy_sensor_daily_kwh,
             }
             await self._store.async_save(data)
             self._last_save_time = dt_util.utcnow().timestamp()
@@ -565,7 +618,20 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 outdoor_temp=outdoor_temp,
                 heating_on=heating_on,
             )
-            self.thermal_model.add_data_point(data_point)
+
+            # For energy-based sources, get energy increment to pass to model
+            measured_energy_increment = None
+            if self._uses_energy_based_calculation and heating_on:
+                # Get energy from external sensor and calculate increment
+                external_energy = self._get_external_energy()
+                if external_energy is not None and hasattr(self, '_last_external_energy'):
+                    if self._last_external_energy is not None:
+                        measured_energy_increment = max(0, external_energy - self._last_external_energy)
+                    self._last_external_energy = external_energy
+                elif external_energy is not None:
+                    self._last_external_energy = external_energy
+
+            self.thermal_model.add_data_point(data_point, measured_energy_increment)
 
             # Detect window open (real sensor if configured, else temperature-based detection)
             window_open, window_detection_method = self._get_window_open_state(indoor_temp, now)
@@ -585,8 +651,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Update measured energy from power sensor (if configured)
             measured_power = self._update_measured_energy(now)
 
-            # Get external energy sensor value (if configured)
+            # Get external energy sensor value (if configured) and calculate daily consumption
             external_energy = self._get_external_energy()
+
+            # Update energy sensor daily consumption
+            if external_energy is not None and self._energy_sensor_start_of_day is not None:
+                self._energy_sensor_daily_kwh = max(0, external_energy - self._energy_sensor_start_of_day)
+            elif external_energy is not None and self._energy_sensor_start_of_day is None:
+                # First reading of the day, set start value
+                self._energy_sensor_start_of_day = external_energy
+                self._energy_sensor_daily_kwh = 0.0
 
             # Get weather data (wind)
             weather_data = self._get_weather_data()
@@ -636,8 +710,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "measured_energy_total_kwh": self._measured_energy_total_kwh,
                 "daily_reset_datetime": self._daily_reset_datetime,
                 "power_sensor_configured": self.power_sensor is not None,
-                # External energy sensor (if configured, takes priority)
-                "external_energy_daily_kwh": external_energy,
+                # External energy sensor (if configured, takes priority for K calculation)
+                "external_energy_total_kwh": external_energy,
+                "external_energy_daily_kwh": self._energy_sensor_daily_kwh if self.energy_sensor else None,
                 "energy_sensor_configured": self.energy_sensor is not None,
                 # Status
                 "data_hours": analysis.get("data_hours"),
@@ -649,6 +724,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "history_has_valid_k": analysis.get("history_has_valid_k", False),
                 # Configuration
                 "heater_power": self.heater_power,
+                "effective_power": analysis.get("effective_power"),
+                "derived_power": analysis.get("derived_power"),
+                "heat_source_type": self.heat_source_type,
+                "efficiency_factor": self.efficiency_factor,
                 "surface": self.surface,
                 "volume": self.volume,
                 "power_threshold": self.power_threshold,
@@ -688,6 +767,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "avg_delta_t": None,
             "daily_energy_kwh": None,
             "total_energy_kwh": 0.0,
+            "external_energy_total_kwh": None,
             "external_energy_daily_kwh": None,
             "energy_sensor_configured": self.energy_sensor is not None,
             "data_hours": 0,
@@ -697,6 +777,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "history_days": 0,
             "history_has_valid_k": False,
             "heater_power": self.heater_power,
+            "effective_power": self.heater_power,
+            "derived_power": None,
+            "heat_source_type": self.heat_source_type,
+            "efficiency_factor": self.efficiency_factor,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
@@ -759,7 +843,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "measured_energy_total_kwh": self._measured_energy_total_kwh,
             "daily_reset_datetime": self._daily_reset_datetime,
             "power_sensor_configured": self.power_sensor is not None,
-            "external_energy_daily_kwh": None,
+            "external_energy_total_kwh": None,
+            "external_energy_daily_kwh": self._energy_sensor_daily_kwh if self.energy_sensor else None,
             "energy_sensor_configured": self.energy_sensor is not None,
             # Restored status
             "data_hours": analysis.get("data_hours"),
@@ -771,6 +856,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "history_has_valid_k": analysis.get("history_has_valid_k", False),
             # Configuration
             "heater_power": self.heater_power,
+            "effective_power": analysis.get("effective_power"),
+            "derived_power": analysis.get("derived_power"),
+            "heat_source_type": self.heat_source_type,
+            "efficiency_factor": self.efficiency_factor,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
@@ -824,6 +913,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 hour=0, minute=0, second=0, microsecond=0
             )
 
+            # Capture energy sensor value at start of new day
+            if self.energy_sensor is not None:
+                current_energy = self._get_external_energy()
+                self._energy_sensor_start_of_day = current_energy
+                self._energy_sensor_daily_kwh = 0.0
+                _LOGGER.debug(
+                    "[%s] Energy sensor start of day: %.2f kWh",
+                    self.zone_name, current_energy if current_energy else 0.0
+                )
+
     def _archive_daily_data(self, date: str) -> None:
         """Archive a day's data to the thermal model's 7-day history.
 
@@ -831,6 +930,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         Args:
             date: The date (YYYY-MM-DD) of the data to archive
+
+        Energy source priority (most accurate first):
+        1. energy_sensor (external energy meter - direct measurement)
+        2. measured_energy (integrated from power_sensor - calculated)
+        3. estimated_energy (heater_power × time - estimation)
         """
         # Calculate averages
         avg_delta_t = (
@@ -851,6 +955,24 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         heating_hours = self._heating_seconds_daily / 3600
 
+        # Determine the best energy source for K calculation
+        # Priority: energy_sensor > measured_energy (power_sensor) > estimated_energy
+        energy_kwh = 0.0
+        energy_source = "none"
+
+        # 1. Check for external energy sensor (most accurate - actual metered consumption)
+        if self.energy_sensor is not None and self._energy_sensor_daily_kwh > 0:
+            energy_kwh = self._energy_sensor_daily_kwh
+            energy_source = "energy_sensor"
+        # 2. Check for measured energy from power sensor integration (accurate)
+        elif self._measured_energy_daily_kwh > 0:
+            energy_kwh = self._measured_energy_daily_kwh
+            energy_source = "power_sensor"
+        # 3. Fall back to estimated energy from heater_power (least accurate)
+        elif self._estimated_energy_daily_kwh > 0:
+            energy_kwh = self._estimated_energy_daily_kwh
+            energy_source = "heater_power"
+
         # Get current K_7j BEFORE adding today's data (this is the score we had today)
         current_k_7d = self.thermal_model.k_coefficient_7d
 
@@ -858,9 +980,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         avg_wind_speed, dominant_wind_direction = self._get_daily_wind_averages()
 
         _LOGGER.info(
-            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d, k_7d=%.1f, wind=%.1f km/h %s",
+            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, "
+            "energy=%.2f kWh [%s], samples=%d, k_7d=%.1f, wind=%.1f km/h %s",
             self.zone_name, date, heating_hours, avg_delta_t,
-            self._estimated_energy_daily_kwh, self._delta_t_count_daily,
+            energy_kwh, energy_source, self._delta_t_count_daily,
             current_k_7d if current_k_7d else 0.0,
             avg_wind_speed if avg_wind_speed else 0.0,
             dominant_wind_direction if dominant_wind_direction else "N/A"
@@ -871,7 +994,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             date=date,
             heating_hours=heating_hours,
             avg_delta_t=avg_delta_t,
-            energy_kwh=self._estimated_energy_daily_kwh,
+            energy_kwh=energy_kwh,
             avg_indoor_temp=avg_indoor,
             avg_outdoor_temp=avg_outdoor,
             sample_count=self._delta_t_count_daily,
@@ -884,8 +1007,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         history_count = len(self.thermal_model.daily_history)
         new_k_7d = self.thermal_model.k_coefficient_7d
         _LOGGER.warning(
-            "[%s] ✅ ARCHIVE COMPLETE - history_days=%d, k_7d=%s W/°C",
-            self.zone_name, history_count, f"{new_k_7d:.1f}" if new_k_7d else "None"
+            "[%s] ✅ ARCHIVE COMPLETE - history_days=%d, k_7d=%s W/°C (energy_source=%s)",
+            self.zone_name, history_count, f"{new_k_7d:.1f}" if new_k_7d else "None", energy_source
         )
 
     def reset_history(self) -> None:
@@ -945,9 +1068,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if not self.power_sensor:
                 if self._last_heating_state:
                     self._heating_seconds_daily += time_delta_seconds
-                    # Update estimated energy (power * time)
-                    energy_kwh = (self.heater_power / 1000) * time_delta_hours
-                    self._estimated_energy_daily_kwh += energy_kwh
+                    # Update estimated energy (power * time) - only if heater_power is available
+                    if self.heater_power is not None and self.heater_power > 0:
+                        energy_kwh = (self.heater_power / 1000) * time_delta_hours
+                        self._estimated_energy_daily_kwh += energy_kwh
 
         # Update ΔT average (always done via polling)
         self._delta_t_sum_daily += delta_t

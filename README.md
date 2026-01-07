@@ -35,13 +35,13 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 
 ## 🤔 Why Home Performance?
 
-You use electric heating and wonder:
+You have a heating system and wonder:
 - **"Is my room well insulated?"** → Measured K coefficient
 - **"How much do I actually consume?"** → Daily energy
 - **"Did I forget to close a window?"** → Automatic detection
 - **"Which room costs the most?"** → Multi-zone comparison
 
-**Home Performance** answers these questions by analyzing your **real** heating data, without theoretical calculations.
+**Home Performance** answers these questions by analyzing your **real** heating data, without theoretical calculations. Works with electric heaters, heat pumps, gas boilers, and gas furnaces!
 
 ### 💡 Use Cases
 
@@ -99,16 +99,43 @@ You use electric heating and wonder:
 | Instant power | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | Precise heating time |
 | Energy counter | HA Utility Meter, native counter | Measured vs estimated energy |
 
-### Supported Heating Types
+### Supported Heat Source Types
+
+The integration supports **4 heat source types**:
+
+| Heat Source | `heater_power` | `energy_sensor` | Best for |
+|-------------|----------------|-----------------|----------|
+| **Electric** (default) | Required | Optional | Radiators, convectors, underfloor heating |
+| **Heat pump** | Optional | Optional | PAC, air-to-air, air-to-water |
+| **Gas Boiler** | Optional | Optional | European-style gas boilers (water heating), central heating |
+| **Gas Furnace** | Optional | Optional | US-style gas furnaces (forced air heating) |
+
+### ⚡ Energy Source Priority
+
+The K coefficient calculation uses energy data from the most accurate available source:
+
+| Priority | Source | Accuracy | Use case |
+|----------|--------|----------|----------|
+| 1️⃣ | `energy_sensor` | ⭐⭐⭐ Best | Smart energy meter (kWh) - actual consumption |
+| 2️⃣ | `power_sensor` | ⭐⭐ Good | Real-time power (W) integrated over time |
+| 3️⃣ | `heater_power` | ⭐ Basic | Declared power × heating time (estimation) |
+
+> **💡 Tips**:
+> - For **best accuracy**, use an energy meter (smart plug with energy tracking, smart gas meter, etc.)
+> - For **gas/heat pump without smart meter**, you can use [PowerCalc](https://github.com/bramstroker/homeassistant-powercalc) to create an energy sensor from a power estimate
+> - If you only have `heater_power`, the integration will still work but with estimated energy
+
+### Heating System Compatibility
 
 | Type | Compatible? | Notes |
 |------|-------------|-------|
-| Radiator + smart plug | ✅ | Ideal with power measurement |
-| Radiator + pilot wire | ✅ | NodOn, Qubino, etc. |
-| Convector with thermostat | ✅ | Via switch or climate |
-| Heat pump / AC | ✅ | Via climate entity |
-| Electric underfloor heating | ✅ | With power sensor |
-| Central gas/oil heating | ⚠️ | Possible but less precise (no individual power measurement) |
+| Radiator + smart plug | ✅ | Electric - ideal with power measurement |
+| Radiator + pilot wire | ✅ | Electric - NodOn, Qubino, etc. |
+| Convector with thermostat | ✅ | Electric - via switch or climate |
+| Heat pump / AC | ✅ | Heat pump - energy sensor recommended |
+| Electric underfloor heating | ✅ | Electric - with power sensor |
+| Gas boiler (Europe) | ✅ | Gas Boiler - energy sensor recommended |
+| Gas furnace (US) | ✅ | Gas Furnace - energy sensor recommended |
 
 ## 🎯 Concept
 
@@ -518,7 +545,8 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
 | Heating entity | climate.xxx or switch.xxx |
-| Heater power | Declared power in Watts (up to 100kW). For BTU/h: divide by 3.41 |
+| Heat source type | Electric, Heat pump, Gas Boiler, or Gas Furnace |
+| Heater power | Declared power in Watts (required for Electric, optional for others) |
 
 ### Optional Parameters
 
@@ -528,12 +556,62 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Volume | m³ (for K/m³ and insulation rating) |
 | Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
 | Power threshold | Detection threshold in Watts (default: 50W) |
-| External energy counter | sensor.xxx_energy (your own HA Utility Meter) |
+| Energy sensor | sensor.xxx_energy (optional - most accurate for K calculation) |
+| Efficiency factor | Converts consumed energy to thermal output (see below) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
 | Weather entity | weather.xxx (for wind data display - shared between zones) |
 | Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
 
+### Efficiency Factor
+
+The efficiency factor converts consumed energy (electricity, gas) to actual thermal output:
+
+| Heat Source | Default | Typical Range | Description |
+|-------------|---------|---------------|-------------|
+| Electric | 1.0 | 1.0 | 100% efficient (all electricity → heat) |
+| Heat pump | 3.0 | 2.5 - 4.5 | COP (1 kWh electric → 3 kWh heat) |
+| Gas boiler | 0.90 | 0.85 - 0.95 | Condensing boilers are most efficient |
+| Gas furnace | 0.85 | 0.78 - 0.90 | US-style forced air systems |
+
+> **💡 Tips**:
+> - For **heat pumps**, use your unit's actual COP (Coefficient of Performance) if known
+> - For **gas systems**, check your equipment's AFUE rating and convert to decimal (e.g., 92% AFUE = 0.92)
+
+### Configuration by Heat Source Type
+
+#### Electric (default)
+```
+Heat source type: Electric
+Heater power: 1500  (required - your heater's rated power in Watts)
+Energy sensor: (optional - for measured vs estimated energy)
+```
+
+#### Heat Pump
+```
+Heat source type: Heat pump
+Heater power: 17600  (optional - declared power for estimation fallback)
+Energy sensor: sensor.heatpump_energy  (optional but recommended for accuracy)
+```
+
+#### Gas Boiler (European)
+```
+Heat source type: Gas Boiler
+Heater power: 17600  (optional - declared power in Watts)
+Energy sensor: sensor.gas_energy  (optional but recommended for accuracy)
+Efficiency factor: 0.90  (default, condensing boilers typically 0.85-0.95)
+```
+
+#### Gas Furnace (US)
+```
+Heat source type: Gas Furnace
+Heater power: 17600  (optional - declared power in Watts, e.g., 60,000 BTU/h = 17,600W)
+Energy sensor: sensor.furnace_energy  (optional but recommended for accuracy)
+Efficiency factor: 0.85  (default, typical US furnace 0.78-0.90)
+```
+
 > **Notes**:
+> - For non-electric sources, the K coefficient is calculated directly from the measured energy.
+> - If `heater_power` is not provided, performance thresholds are derived from observed energy/time ratio.
 > - If you provide an external energy counter AND a power sensor, the external counter is used as priority for energy.
 > - The power sensor also enables **precise heat detection** (power > threshold), ideal for heaters with internal thermostat or pilot wire. The threshold is configurable (default: 50W).
 > - The **Window/Door sensor** allows using a physical contact sensor (window, door, opening) for accurate open detection instead of relying on temperature-based detection. If the sensor is unavailable, it falls back to temperature detection automatically.
@@ -635,13 +713,15 @@ The performance sensor compares your consumption to the French national average:
 
 ### Calculation Formula
 
-Thresholds are dynamically calculated based on heater power:
+Thresholds are dynamically calculated based on heater power (or derived power for non-electric sources):
 
 ```
 Excellent      : < (Power_W / 1000) × 4 kWh/day
 Standard       : < (Power_W / 1000) × 6 kWh/day
 Needs optimization : beyond
 ```
+
+> **For non-electric sources**: If `heater_power` is not configured, the system derives an average power from observed `energy / heating_hours`. This allows performance evaluation even for heat pumps, gas boilers, or gas furnaces.
 
 ### Thresholds by Power
 
@@ -661,7 +741,7 @@ Needs optimization : beyond
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (v1.0.0 - v1.3.0)
+### ✅ Completed
 
 - [x] K Coefficient (W/°C) - empirical thermal loss
 - [x] K/m² and K/m³ normalization
@@ -676,7 +756,7 @@ Needs optimization : beyond
 - [x] Precise heat detection via power sensor (event-driven)
 - [x] Real-time open window detection (event-driven)
 - [x] Built-in Lovelace card (auto-registered)
-- [x] Multiple card layouts (full, badge, pill) 🎄
+- [x] Multiple card layouts (full, badge, pill)
 - [x] Celsius/Fahrenheit automatic support
 - [x] Data persistence
 - [x] Energy performance vs national average
@@ -690,7 +770,8 @@ Needs optimization : beyond
 - [x] **Physical window/door sensor** support
 - [x] **Multi-zone card** - All zones in one card with List/Compare views
 - [x] **Long-term history** - 5 years of daily data storage
-- [x] **Wind data display** - Weather entity integration with wind exposure 🆕
+- [x] **Wind data display** - Weather entity integration with wind exposure
+- [x] **Multiple heat source types** (electric, heat pump, gas, district heating) 🔥
 
 ### 🔜 Next - Alerts & Notifications
 
