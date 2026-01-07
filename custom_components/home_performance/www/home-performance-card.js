@@ -256,7 +256,7 @@ class HomePerformanceCard extends LitElement {
     "energie_24h_estimee": ["energie_24h_estimee", "estimated_daily_energy", "daily_estimated_energy"],
     "temps_de_chauffe_24h": ["temps_de_chauffe_24h", "heating_time_24h", "daily_heating_time"],
     "ratio_de_chauffe": ["ratio_de_chauffe", "heating_ratio"],
-    "dt_moyen_24h": ["dt_moyen_24h", "average_delta_t", "avg_delta_t_24h"],
+    "dt_moyen_24h": ["dt_moyen_24h", "average_delta_t", "avg_delta_t_24h", "average_dt_24h"],
     "progression_analyse": ["progression_analyse", "analysis_progress"],
     "temps_restant_analyse": ["temps_restant_analyse", "analysis_time_remaining"],
   };
