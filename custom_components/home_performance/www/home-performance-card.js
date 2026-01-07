@@ -3,7 +3,7 @@
  * Modern dashboard card for Home Performance integration
  */
 
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "1.3.0";
 
 const LitElement = customElements.get("hui-masonry-view")
   ? Object.getPrototypeOf(customElements.get("hui-masonry-view"))
@@ -99,8 +99,31 @@ class HomePerformanceCard extends LitElement {
       editor_full: "Full",
       editor_badge: "Badge",
       editor_pill: "Pill",
+      editor_multi: "Multi-zone",
       editor_demo: "Demo mode (preview)",
       editor_show_graph: "Show history graph",
+
+      // Multi-zone
+      multi_title: "Home Performance",
+      multi_zones_monitored: "zones monitored",
+      multi_avg: "avg",
+      multi_list: "List",
+      multi_compare: "Compare",
+      multi_ref: "REF",
+      multi_k_inst: "K INST.",
+      multi_energy: "ENERGY",
+      multi_heating: "HEATING",
+      multi_delta: "ΔT AVG",
+      multi_no_zones: "No zones found",
+      multi_no_data: "No data available",
+      multi_waiting_data: "Waiting for K/m³ data...",
+      multi_kwh_day: "kWh/day",
+
+      // Wind
+      wind_exposure_exposed: "Exposed",
+      wind_exposure_partial: "Partial",
+      wind_exposure_sheltered: "Sheltered",
+      wind_exposure_unknown: "",
     },
     fr: {
       // Config & titles
@@ -180,8 +203,135 @@ class HomePerformanceCard extends LitElement {
       editor_full: "Complète",
       editor_badge: "Badge",
       editor_pill: "Pilule",
+      editor_multi: "Multi-zone",
       editor_demo: "Mode démo (prévisualisation)",
       editor_show_graph: "Afficher le graphique historique",
+
+      // Multi-zone
+      multi_title: "Home Performance",
+      multi_zones_monitored: "zones surveillées",
+      multi_avg: "moy",
+      multi_list: "Liste",
+      multi_compare: "Comparer",
+      multi_ref: "RÉF",
+      multi_k_inst: "K INST.",
+      multi_energy: "ÉNERGIE",
+      multi_heating: "CHAUFFE",
+      multi_delta: "ΔT MOY",
+      multi_no_zones: "Aucune zone trouvée",
+      multi_no_data: "Aucune donnée disponible",
+      multi_waiting_data: "En attente des données K/m³...",
+      multi_kwh_day: "kWh/jour",
+
+      // Wind
+      wind_exposure_exposed: "Exposée",
+      wind_exposure_partial: "Partielle",
+      wind_exposure_sheltered: "Abritée",
+      wind_exposure_unknown: "",
+    },
+    it: {
+      // Config & titles
+      default_title: "Performance Termica",
+      error_no_zone: "Specificare una zona",
+      loading: "Caricamento...",
+      loading_integration: "Caricamento integrazione...",
+
+      // Section headers
+      isolation: "ISOLAMENTO",
+      performance: "PRESTAZIONI",
+      temperatures: "TEMPERATURE",
+      technical_details: "DETTAGLI TECNICI",
+      history_title: "STORICO K (7 GIORNI)",
+
+      // Insulation ratings
+      excellent: "Eccellente",
+      excellent_desc: "Molto ben isolato",
+      good: "Buono",
+      good_desc: "Ben isolato",
+      average: "Medio",
+      average_desc: "Isolamento standard",
+      poor: "Scarso",
+      poor_desc: "Da migliorare",
+      very_poor: "Critico",
+      very_poor_desc: "Isolamento insufficiente",
+      excellent_inferred: "🏆 Eccellente",
+      excellent_inferred_desc: "Riscaldamento minimo necessario",
+      summer_mode: "☀️ Modalità estiva",
+      summer_mode_desc: "Misurazione impossibile",
+      off_season: "🌤️ Fuori stagione",
+      off_season_desc: "ΔT insufficiente",
+      waiting: "In attesa",
+      waiting_desc: "Riscaldamento necessario",
+      last_measurement: "Ultima misurazione",
+      last_k: "Ultimo K",
+
+      // Performance ratings
+      perf_excellent: "Eccellente",
+      perf_standard: "Standard",
+      perf_optimize: "Da ottimizzare",
+      vs_average: "vs media",
+
+      // Metrics
+      k_instant: "K istantaneo",
+      energy_day: "Energia/giorno",
+      heating_time: "Tempo risc.",
+      avg_delta: "Delta medio",
+      measured: "misurata",
+      estimated: "stimata",
+      on_24h: "su 24h",
+      rolling_24h: "su 24h mobili",
+      of_time: "del tempo",
+      indoor_outdoor: "Int. - Est.",
+
+      // Tooltips
+      tooltip_estimated: "stimato",
+
+      // Days
+      days: ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"],
+
+      // Loading & analyzing
+      integration_starting: "Home Performance si sta avviando. I dati saranno disponibili tra pochi secondi.",
+      zone_check_hint: "Se questo messaggio persiste, verificare che la zona",
+      exists_in_integration: "esista nell'integrazione Home Performance.",
+      expected_entity: "Entità prevista",
+      analyzing: "Analisi in corso",
+      analysis_in_progress: "Raccolta dati termici per calcolare le prestazioni della stanza. Risultati disponibili dopo 12h di analisi.",
+      remaining_time: "rimanenti",
+      completed: "Completato",
+      ready: "Pronto",
+
+      // Editor
+      editor_zone: "Zona (es: Soggiorno, Camera)",
+      editor_title: "Titolo",
+      editor_card_style: "Stile scheda",
+      editor_full: "Completa",
+      editor_badge: "Badge",
+      editor_pill: "Pillola",
+      editor_multi: "Multi-zona",
+      editor_demo: "Modalità demo (anteprima)",
+      editor_show_graph: "Mostra grafico storico",
+
+      // Multi-zone
+      multi_title: "Home Performance",
+      multi_zones_monitored: "zone monitorate",
+      multi_avg: "media",
+      multi_list: "Lista",
+      multi_compare: "Confronta",
+      multi_ref: "RIF",
+      multi_k_inst: "K IST.",
+      multi_energy: "ENERGIA",
+      multi_heating: "RISC.",
+      multi_delta: "ΔT MEDIO",
+      multi_no_zones: "Nessuna zona trovata",
+      multi_no_data: "Nessun dato disponibile",
+      multi_waiting_data: "In attesa dei dati K/m³...",
+      multi_kwh_day: "kWh/giorno",
+
+      // Wind
+      wind_exposure_exposed: "Esposta",
+      wind_exposure_partial: "Parziale",
+      wind_exposure_sheltered: "Riparata",
+      wind_exposure_unknown: "",
     }
   };
 
@@ -206,7 +356,8 @@ class HomePerformanceCard extends LitElement {
   }
 
   setConfig(config) {
-    if (!config.zone) {
+    // Multi layout doesn't require a zone (auto-detects all zones)
+    if (config.layout !== "multi" && !config.zone) {
       throw new Error(HomePerformanceCard._translations.en.error_no_zone);
     }
     this.config = {
@@ -214,8 +365,16 @@ class HomePerformanceCard extends LitElement {
       layout: "full",
       show_graph: true,
       demo: false,
+      // Multi-zone specific options
+      default_view: "list",      // "list" or "compare"
+      show_sparklines: true,
       ...config,
     };
+    // Initialize multi-zone view state
+    if (this.config.layout === "multi") {
+      this._multiView = this.config.default_view || "list";
+      this._expandedZone = null;
+    }
   }
 
   getCardSize() {
@@ -223,6 +382,7 @@ class HomePerformanceCard extends LitElement {
     switch (this.config?.layout) {
       case "badge": return 2;
       case "pill": return 1;
+      case "multi": return 4;
       default: return 5;
     }
   }
@@ -252,8 +412,8 @@ class HomePerformanceCard extends LitElement {
     "k_par_m3": ["k_par_m3", "k_per_m3"],
     "note_d_isolation": ["note_d_isolation", "insulation_rating", "note_isolation"],
     "performance_energetique": ["performance_energetique", "energy_performance"],
-    "energie_mesuree_jour": ["energie_mesuree_jour", "energie_jour_mesuree", "daily_measured_energy"],
-    "energie_24h_estimee": ["energie_24h_estimee", "estimated_daily_energy", "daily_estimated_energy"],
+    "energie_mesuree_jour": ["energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
+    "energie_24h_estimee": ["energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy", "daily_estimated_energy"],
     "temps_de_chauffe_24h": ["temps_de_chauffe_24h", "heating_time_24h", "daily_heating_time"],
     "ratio_de_chauffe": ["ratio_de_chauffe", "heating_ratio"],
     "dt_moyen_24h": ["dt_moyen_24h", "average_delta_t", "avg_delta_t_24h", "average_dt_24h"],
@@ -505,6 +665,23 @@ class HomePerformanceCard extends LitElement {
     return isNaN(num) ? value : num.toFixed(3);
   }
 
+  // Format heating time from decimal hours to "Xh Ymin" format
+  _formatHeatingTime(decimalHours) {
+    if (decimalHours === null || decimalHours === undefined || isNaN(parseFloat(decimalHours))) {
+      return "0min";
+    }
+    const totalMinutes = Math.round(parseFloat(decimalHours) * 60);
+    if (totalMinutes === 0) return "0min";
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h`;
+    }
+    return `${minutes}m`;
+  }
+
   // Demo data
   _getDemoData() {
     return {
@@ -537,6 +714,128 @@ class HomePerformanceCard extends LitElement {
     }
     const kCoefEntityId = this._getEntityId("coefficient_k");
     return this._getAttribute(kCoefEntityId, "k_history_7d") || [];
+  }
+
+  // ==========================================
+  // MULTI-ZONE METHODS
+  // ==========================================
+
+  // Detect all Home Performance zones from entity IDs
+  _getAllZones() {
+    if (!this.hass?.states) return [];
+
+    const zones = new Set();
+    const pattern = /^sensor\.home_performance_(.+?)_(coefficient_k|k_coefficient)$/;
+
+    Object.keys(this.hass.states).forEach(entityId => {
+      const match = entityId.match(pattern);
+      if (match) {
+        // Convert slug back to readable name
+        const slug = match[1];
+        const zoneName = this._unslugifyZone(slug);
+        zones.add(zoneName);
+      }
+    });
+
+    return Array.from(zones).sort();
+  }
+
+  // Convert slug to readable zone name (reverse of _slugifyZone)
+  _unslugifyZone(slug) {
+    return slug
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  // Get all data for a specific zone (for multi-zone view)
+  _getZoneData(zoneName) {
+    const savedZone = this.config.zone;
+    this.config.zone = zoneName;
+
+    const kCoefEntityId = this._getEntityId("coefficient_k");
+    const insulationEntityId = this._getEntityId("note_d_isolation");
+    const energyMeasuredId = this._getEntityId("energie_mesuree_jour");
+    const energyEstimatedId = this._getEntityId("energie_24h_estimee");
+    const heatingTimeId = this._getEntityId("temps_de_chauffe_24h");
+    const deltaTId = this._getEntityId("dt_moyen_24h");
+    const dataReadyId = this._getBinaryEntityId("donnees_pretes");
+
+    const kCoef = this._getState(kCoefEntityId);
+    const kCoef24h = this._getAttribute(kCoefEntityId, "k_24h");  // K instantané (24h)
+    const kPerM3 = this._getState(this._getEntityId("k_par_m3"));
+    const insulation = this._getState(insulationEntityId);
+    const insulationAttrs = {
+      status: this._getAttribute(insulationEntityId, "status"),
+      season: this._getAttribute(insulationEntityId, "season"),
+      message: this._getAttribute(insulationEntityId, "message"),
+      k_value: this._getAttribute(insulationEntityId, "k_value"),
+      k_source: this._getAttribute(insulationEntityId, "k_source"),
+    };
+
+    // Get energy (prefer measured, fallback to estimated)
+    let dailyEnergy = this._getState(energyMeasuredId);
+    if (!this._isValidValue(dailyEnergy)) {
+      dailyEnergy = this._getState(energyEstimatedId);
+    }
+
+    const heatingTime = this._getState(heatingTimeId);
+    const deltaT = this._getState(deltaTId);
+    const dataReady = this._getState(dataReadyId) === "on";
+
+    // Indoor/outdoor temps
+    const indoorTemp = this._getAttribute(deltaTId, "indoor_temp");
+    const outdoorTemp = this._getAttribute(deltaTId, "outdoor_temp");
+
+    // K history for sparkline
+    const kHistory = this._getAttribute(kCoefEntityId, "k_history_7d") || [];
+
+    // Wind data
+    const windSpeed = this._getAttribute(kCoefEntityId, "wind_speed");
+    const windDirection = this._getAttribute(kCoefEntityId, "wind_direction");
+    const windExposure = this._getAttribute(kCoefEntityId, "wind_exposure");
+    const roomOrientation = this._getAttribute(kCoefEntityId, "room_orientation");
+
+    // Restore original zone
+    this.config.zone = savedZone;
+
+    const insulationData = this._getInsulationData(insulation, insulationAttrs);
+    const scoreLetter = this._getScoreLetter(insulation);
+
+    return {
+      name: zoneName,
+      dataReady,
+      kCoef: this._isValidValue(kCoef) ? parseFloat(kCoef).toFixed(1) : null,
+      kCoef24h: this._isValidValue(kCoef24h) ? parseFloat(kCoef24h).toFixed(1) : null,  // K instantané
+      kPerM3: this._isValidValue(kPerM3) ? parseFloat(kPerM3).toFixed(2) : null,
+      dailyEnergy: this._isValidValue(dailyEnergy) ? parseFloat(dailyEnergy).toFixed(3) : null,
+      heatingTime: this._isValidValue(heatingTime) ? this._formatHeatingTime(heatingTime) : null,
+      deltaT: this._isValidValue(deltaT) ? parseFloat(deltaT).toFixed(1) : null,
+      indoorTemp: this._isValidValue(indoorTemp) ? parseFloat(indoorTemp).toFixed(1) : null,
+      outdoorTemp: this._isValidValue(outdoorTemp) ? parseFloat(outdoorTemp).toFixed(1) : null,
+      insulation,
+      insulationData,
+      scoreLetter,
+      // Wind data
+      windSpeed: this._isValidValue(windSpeed) ? parseFloat(windSpeed).toFixed(0) : null,
+      windDirection,
+      windExposure,
+      roomOrientation,
+      kHistory,
+    };
+  }
+
+  // Get color for insulation rating
+  _getInsulationColor(rating) {
+    const colors = {
+      excellent: "#10b981",
+      good: "#22c55e",
+      average: "#eab308",
+      poor: "#f97316",
+      very_poor: "#ef4444",
+      excellent_inferred: "#059669",
+    };
+    return colors[rating] || "#6b7280";
   }
 
   // Render sparkline SVG for pill/badge layouts (simple polyline like HA native)
@@ -574,6 +873,30 @@ class HomePerformanceCard extends LitElement {
           stroke-linecap="round"
           stroke-linejoin="round"
           vector-effect="non-scaling-stroke"
+        />
+      </svg>
+    `;
+  }
+
+  // Render placeholder sparkline (gray dashed line for zones without data)
+  _renderSparklinePlaceholder(width = 70, height = 24) {
+    const y = height / 2;
+    return html`
+      <svg
+        class="sparkline sparkline-placeholder"
+        viewBox="0 0 ${width} ${height}"
+        preserveAspectRatio="none"
+      >
+        <line
+          x1="2"
+          y1="${y}"
+          x2="${width - 2}"
+          y2="${y}"
+          stroke="var(--text-secondary)"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-dasharray="4 3"
+          opacity="0.3"
         />
       </svg>
     `;
@@ -652,6 +975,8 @@ class HomePerformanceCard extends LitElement {
         return this._renderBadgeLayout();
       case "pill":
         return this._renderPillLayout();
+      case "multi":
+        return this._renderMultiLayout();
       default:
         return this._renderFullLayout();
     }
@@ -744,6 +1069,12 @@ class HomePerformanceCard extends LitElement {
       k_source: this._getAttribute(insulationEntityId, "k_source"),
     };
 
+    // Get wind data
+    const kCoefEntityId = this._getEntityId("coefficient_k");
+    const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
+    const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
+    const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
+
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const scoreLetter = this._getScoreLetter(insulation);
     const hasHistory = kHistory && kHistory.length >= 2;
@@ -760,6 +1091,15 @@ class HomePerformanceCard extends LitElement {
             ${this._renderSparkline(kHistory, 60, 20, insulationData.color)}
           </div>
         ` : html`<div class="badge-separator"></div>`}
+        ${this._isValidValue(windSpeed) ? html`
+          <div class="badge-wind">
+            <svg viewBox="0 0 24 24" width="12" height="12">
+              <path fill="currentColor" d="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z"/>
+            </svg>
+            <span>${windDirection} ${Math.round(windSpeed)}</span>
+            ${roomOrientation ? html`<span class="badge-orientation">${roomOrientation}</span>` : ''}
+          </div>
+        ` : ''}
         <div class="badge-zone-name">${this.config.zone}</div>
         <div class="badge-k-value">
           ${this._isValidValue(kCoef) ? html`${kCoef}<span class="badge-k-unit">W/°C</span>` : "--"}
@@ -845,6 +1185,273 @@ class HomePerformanceCard extends LitElement {
           </div>
         </div>
       </ha-card>
+    `;
+  }
+
+  // ==========================================
+  // MULTI-ZONE LAYOUT
+  // ==========================================
+
+  _renderMultiLayout() {
+    const zones = this._getAllZones();
+
+    if (zones.length === 0) {
+      return html`
+        <ha-card class="multi-card">
+          <div class="multi-empty">
+            <ha-icon icon="mdi:home-search"></ha-icon>
+            <div>${this._t('multi_no_zones')}</div>
+          </div>
+        </ha-card>
+      `;
+    }
+
+    // Get data for all zones
+    const zonesData = zones.map(zone => this._getZoneData(zone));
+
+    // Filter only zones with data ready
+    const readyZones = zonesData.filter(z => z.dataReady);
+
+    // Calculate average score
+    const avgScore = this._calculateAverageScore(readyZones);
+
+    return html`
+      <ha-card class="multi-card">
+        <!-- Header -->
+        <div class="multi-header">
+          <div class="multi-header-left">
+            <div class="multi-title">${this._t('multi_title')}</div>
+            <div class="multi-subtitle">${zones.length} ${this._t('multi_zones_monitored')}</div>
+          </div>
+          <div class="multi-header-right">
+            <div class="multi-avg-score" style="--accent: ${avgScore.color}">
+              ${avgScore.letter} ${this._t('multi_avg')}
+            </div>
+            <div class="multi-toggle">
+              <button
+                class="multi-toggle-btn ${this._multiView === 'list' ? 'active' : ''}"
+                @click=${() => this._setMultiView('list')}
+              >${this._t('multi_list')}</button>
+              <button
+                class="multi-toggle-btn ${this._multiView === 'compare' ? 'active' : ''}"
+                @click=${() => this._setMultiView('compare')}
+              >${this._t('multi_compare')}</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="multi-content">
+          ${this._multiView === 'list'
+        ? this._renderMultiListView(zonesData)
+        : this._renderMultiCompareView(readyZones)}
+        </div>
+      </ha-card>
+    `;
+  }
+
+  _setMultiView(view) {
+    this._multiView = view;
+    this.requestUpdate();
+  }
+
+  _toggleZoneExpanded(zoneName) {
+    this._expandedZone = this._expandedZone === zoneName ? null : zoneName;
+    this.requestUpdate();
+  }
+
+  _calculateAverageScore(zonesData) {
+    const validRatings = zonesData
+      .filter(z => z.insulation && z.insulation !== 'unknown' && z.insulation !== 'unavailable')
+      .map(z => z.insulation);
+
+    if (validRatings.length === 0) {
+      return { letter: '?', color: '#6b7280' };
+    }
+
+    // Score mapping
+    const scoreMap = { excellent: 5, excellent_inferred: 5, good: 4, average: 3, poor: 2, very_poor: 1 };
+    const avgScore = validRatings.reduce((sum, r) => sum + (scoreMap[r] || 3), 0) / validRatings.length;
+
+    if (avgScore >= 4.5) return { letter: 'A+', color: '#10b981' };
+    if (avgScore >= 3.5) return { letter: 'A', color: '#22c55e' };
+    if (avgScore >= 2.5) return { letter: 'B', color: '#eab308' };
+    if (avgScore >= 1.5) return { letter: 'C', color: '#f97316' };
+    return { letter: 'D', color: '#ef4444' };
+  }
+
+  _renderMultiListView(zonesData) {
+    return html`
+      <div class="multi-zone-list">
+        ${zonesData.map(zone => this._renderMultiZoneRow(zone))}
+      </div>
+    `;
+  }
+
+  _renderMultiZoneRow(zone) {
+    const isExpanded = this._expandedZone === zone.name;
+    const accentColor = zone.insulationData?.color || '#6b7280';
+    const showSparklines = this.config.show_sparklines !== false; // default true
+    const hasValidHistory = zone.kHistory && zone.kHistory.length >= 2;
+
+    return html`
+      <div
+        class="multi-zone-row ${isExpanded ? 'expanded' : ''}"
+        style="--accent-color: ${accentColor}"
+        @click=${() => this._toggleZoneExpanded(zone.name)}
+      >
+        <div class="multi-zone-row-main">
+          <div class="multi-zone-score">${zone.scoreLetter || '?'}</div>
+          <div class="multi-zone-info">
+            <div class="multi-zone-name">${zone.name}</div>
+            <div class="multi-zone-rating">${zone.insulationData?.label || ''}</div>
+          </div>
+          <div class="multi-zone-stats">
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">${zone.kCoef || '--'}</div>
+              <div class="multi-zone-stat-label">W/°C</div>
+            </div>
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">${zone.dailyEnergy || '--'}</div>
+              <div class="multi-zone-stat-label">kWh</div>
+            </div>
+          </div>
+          ${showSparklines ? html`
+            <div class="multi-zone-sparkline">
+              ${hasValidHistory
+          ? this._renderSparkline(zone.kHistory, 70, 24, accentColor)
+          : this._renderSparklinePlaceholder(70, 24)}
+            </div>
+          ` : ''}
+          <svg class="multi-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        ${isExpanded ? this._renderMultiZoneDetails(zone) : ''}
+      </div>
+    `;
+  }
+
+  _renderMultiZoneDetails(zone) {
+    const tempUnit = this._getTempUnit();
+
+    return html`
+      <div class="multi-zone-details">
+        <div class="multi-zone-details-inner">
+          <div class="multi-zone-details-grid">
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:thermometer"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_k_inst')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.kCoef24h || '--'}</div>
+              <div class="multi-zone-detail-sub">W/°C</div>
+            </div>
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:flash"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_energy')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.dailyEnergy || '--'}</div>
+              <div class="multi-zone-detail-sub">${this._t('multi_kwh_day')}</div>
+            </div>
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:clock-outline"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_heating')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.heatingTime || '--'}</div>
+              <div class="multi-zone-detail-sub">${this._t('on_24h')}</div>
+            </div>
+            <div class="multi-zone-detail-item">
+              <div class="multi-zone-detail-header">
+                <ha-icon icon="mdi:thermometer-lines"></ha-icon>
+                <span class="multi-zone-detail-label">${this._t('multi_delta')}</span>
+              </div>
+              <div class="multi-zone-detail-value">${zone.deltaT ? `${zone.deltaT}°C` : '--'}</div>
+              <div class="multi-zone-detail-sub">${this._t('indoor_outdoor')}</div>
+            </div>
+          </div>
+          <div class="multi-zone-temps">
+            <div class="multi-zone-temp">
+              <ha-icon icon="mdi:home-thermometer"></ha-icon>
+              <strong>${zone.indoorTemp ? `${zone.indoorTemp}${tempUnit}` : '--'}</strong>
+            </div>
+            <div class="multi-zone-temp">
+              <ha-icon icon="mdi:cloud"></ha-icon>
+              <strong>${zone.outdoorTemp ? `${zone.outdoorTemp}${tempUnit}` : '--'}</strong>
+            </div>
+          </div>
+          ${zone.windSpeed ? html`
+            <div class="multi-zone-wind">
+              <svg viewBox="0 0 24 24" width="14" height="14">
+                <path fill="currentColor" d="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z"/>
+              </svg>
+              <span>${zone.windDirection} ${zone.windSpeed} km/h</span>
+              ${zone.roomOrientation ? html`
+                <span class="multi-zone-orientation">${zone.roomOrientation}</span>
+                <span class="multi-zone-exposure ${zone.windExposure}">${this._t('wind_exposure_' + (zone.windExposure || 'unknown'))}</span>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  _renderMultiCompareView(zonesData) {
+    if (zonesData.length === 0) {
+      return html`<div class="multi-empty-compare">${this._t('multi_no_data')}</div>`;
+    }
+
+    // Sort by K/m³ (best first = lowest)
+    const sorted = [...zonesData]
+      .filter(z => z.kPerM3 !== null)
+      .sort((a, b) => parseFloat(a.kPerM3) - parseFloat(b.kPerM3));
+
+    if (sorted.length === 0) {
+      return html`<div class="multi-empty-compare">${this._t('multi_waiting_data')}</div>`;
+    }
+
+    const bestValue = parseFloat(sorted[0].kPerM3);
+
+    return html`
+      <div class="multi-zone-ranking">
+        ${sorted.map((zone, index) => this._renderMultiRankingItem(zone, index, bestValue))}
+      </div>
+    `;
+  }
+
+  _renderMultiRankingItem(zone, index, bestValue) {
+    const accentColor = zone.insulationData?.color || '#6b7280';
+    const kPerM3 = parseFloat(zone.kPerM3);
+    const barWidth = bestValue / kPerM3 * 100;
+    const deltaPercent = ((kPerM3 - bestValue) / bestValue * 100).toFixed(0);
+    const isRef = index === 0;
+
+    // Delta class based on percentage
+    let deltaClass = 'ref';
+    if (!isRef) {
+      if (deltaPercent < 50) deltaClass = 'warn';
+      else if (deltaPercent < 150) deltaClass = 'bad';
+      else deltaClass = 'worst';
+    }
+
+    return html`
+      <div class="multi-ranking-item" style="--accent-color: ${accentColor}">
+        <div class="multi-ranking-position">${index + 1}</div>
+        <div class="multi-ranking-info">
+          <div class="multi-ranking-name">${zone.name}</div>
+          <div class="multi-ranking-score-label">${zone.scoreLetter} • ${zone.insulationData?.label || ''}</div>
+        </div>
+        <div class="multi-ranking-bar-wrapper">
+          <div class="multi-ranking-bar" style="width: ${barWidth}%; background: ${accentColor};"></div>
+        </div>
+        <div class="multi-ranking-value">${zone.kPerM3} W/m³</div>
+        <div class="multi-ranking-delta ${deltaClass}">
+          ${isRef ? this._t('multi_ref') : `+${deltaPercent}%`}
+        </div>
+      </div>
     `;
   }
 
@@ -967,6 +1574,13 @@ class HomePerformanceCard extends LitElement {
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const perfData = this._getPerformanceData(performance);
 
+    // Get wind data from k_coefficient attributes
+    const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
+    const windSpeedUnit = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed_unit") || "km/h";
+    const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
+    const windExposure = demo ? null : this._getAttribute(kCoefEntityId, "wind_exposure");
+    const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
+
     return html`
       <!-- Main Score - 3 columns -->
       <div class="score-section">
@@ -1069,6 +1683,25 @@ class HomePerformanceCard extends LitElement {
         </div>
       </div>
 
+      <!-- Wind Info (if available) -->
+      ${this._isValidValue(windSpeed) ? html`
+        <div class="wind-section">
+          <div class="wind-info">
+            <div class="wind-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20">
+                <path fill="currentColor" d="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z"/>
+              </svg>
+            </div>
+            <div class="wind-details">
+              <span class="wind-value">${windDirection} ${windSpeed} ${windSpeedUnit}</span>
+              ${roomOrientation ? html`
+                <span class="wind-exposure ${windExposure}">${this._t('wind_exposure_' + (windExposure || 'unknown'))}</span>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- K History Chart (7 days) -->
       ${this.config.show_graph && kHistory && kHistory.length >= 2 ? html`
         <div class="history-section">
@@ -1103,7 +1736,7 @@ class HomePerformanceCard extends LitElement {
         justify-content: space-between;
         align-items: center;
         padding: 12px 14px;
-        background: #1C1C1C;
+        background: var(--bg-secondary);
       }
 
       .header-title {
@@ -1429,6 +2062,69 @@ class HomePerformanceCard extends LitElement {
       }
 
       /* ========================================
+         WIND INFO SECTION
+         ======================================== */
+      .wind-section {
+        margin-top: 8px;
+        padding: 6px 10px;
+        background: rgba(128,128,128,0.08);
+        border-radius: 6px;
+        border-left: 2px solid var(--text-secondary);
+      }
+
+      .wind-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .wind-icon {
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+      }
+
+      .wind-icon svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .wind-details {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .wind-value {
+        font-size: 0.9em;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .wind-exposure {
+        font-size: 0.8em;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+
+      .wind-exposure.exposed {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+
+      .wind-exposure.partial {
+        background: rgba(234, 179, 8, 0.2);
+        color: #eab308;
+      }
+
+      .wind-exposure.sheltered {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+
+      /* ========================================
          K HISTORY - FULL LAYOUT (Bar Chart)
          ======================================== */
       .history-section {
@@ -1638,6 +2334,31 @@ class HomePerformanceCard extends LitElement {
         opacity: 0.8;
       }
 
+      .badge-wind {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin: 6px 0;
+        opacity: 0.9;
+      }
+
+      .badge-wind svg {
+        width: 13px;
+        height: 13px;
+        opacity: 0.8;
+      }
+
+      .badge-orientation {
+        padding: 2px 5px;
+        background: rgba(128,128,128,0.2);
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 500;
+      }
+
       /* Badge Analyzing State */
       .badge-analyzing {
         --accent: #6366f1;
@@ -1836,6 +2557,459 @@ class HomePerformanceCard extends LitElement {
         border-radius: 2px;
         transition: width 0.5s ease;
       }
+
+      /* ========================================
+         MULTI-ZONE LAYOUT
+         ======================================== */
+      .multi-card {
+        background: var(--bg-primary);
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+      }
+
+      .multi-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+      }
+
+      .multi-title {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+      }
+
+      .multi-subtitle {
+        font-size: 0.8em;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+
+      .multi-header-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .multi-avg-score {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: color-mix(in srgb, var(--accent) 15%, transparent);
+        border-radius: 16px;
+        font-size: 0.8em;
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      .multi-toggle {
+        display: flex;
+        background: var(--bg-tertiary, rgba(128,128,128,0.15));
+        border-radius: 8px;
+        padding: 3px;
+      }
+
+      .multi-toggle-btn {
+        padding: 6px 12px;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 0.75em;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .multi-toggle-btn:hover {
+        color: var(--text-primary);
+      }
+
+      .multi-toggle-btn.active {
+        background: var(--bg-active, rgba(128,128,128,0.3));
+        color: var(--text-primary);
+      }
+
+      .multi-content {
+        padding: 8px;
+      }
+
+      .multi-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        color: var(--text-secondary);
+        gap: 10px;
+      }
+
+      .multi-empty ha-icon {
+        --mdc-icon-size: 40px;
+        opacity: 0.5;
+      }
+
+      .multi-empty-compare {
+        padding: 20px;
+        text-align: center;
+        color: var(--text-secondary);
+      }
+
+      /* Multi Zone List */
+      .multi-zone-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .multi-zone-row {
+        background: var(--bg-secondary);
+        border-radius: 10px;
+        border-left: 3px solid var(--accent-color);
+        cursor: pointer;
+        transition: background 0.15s ease;
+        overflow: hidden;
+      }
+
+      .multi-zone-row:hover {
+        background: var(--bg-hover, rgba(128,128,128,0.12));
+      }
+
+      .multi-zone-row.expanded {
+        background: var(--bg-expanded, rgba(128,128,128,0.08));
+      }
+
+      .multi-zone-row-main {
+        display: grid;
+        grid-template-columns: 42px 1fr 110px 70px 20px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        min-height: 60px;
+      }
+
+      .multi-zone-score {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--accent-color);
+        background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+      }
+
+      .multi-zone-info {
+        min-width: 0;
+      }
+
+      .multi-zone-name {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .multi-zone-rating {
+        font-size: 0.7em;
+        color: var(--accent-color);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-zone-stats {
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+      }
+
+      .multi-zone-stat {
+        text-align: right;
+      }
+
+      .multi-zone-stat-value {
+        font-size: 0.85em;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .multi-zone-stat-label {
+        font-size: 0.65em;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-zone-sparkline {
+        width: 70px;
+        height: 24px;
+      }
+
+      .multi-zone-sparkline svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .multi-expand-icon {
+        width: 18px;
+        height: 18px;
+        color: var(--text-secondary);
+        transition: transform 0.2s ease;
+      }
+
+      .multi-zone-row.expanded .multi-expand-icon {
+        transform: rotate(180deg);
+      }
+
+      /* Multi Zone Details */
+      .multi-zone-details {
+        border-top: 1px solid var(--border-color);
+      }
+
+      .multi-zone-details-inner {
+        padding: 14px;
+      }
+
+      .multi-zone-details-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+
+      .multi-zone-detail-item {
+        text-align: center;
+        padding: 10px 6px;
+        background: var(--bg-tertiary, rgba(128,128,128,0.1));
+        border-radius: 8px;
+      }
+
+      .multi-zone-detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        margin-bottom: 6px;
+        color: var(--text-secondary);
+      }
+
+      .multi-zone-detail-header ha-icon {
+        --mdc-icon-size: 12px;
+        opacity: 0.7;
+      }
+
+      .multi-zone-detail-label {
+        font-size: 0.65em;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-zone-detail-value {
+        font-size: 1.05em;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .multi-zone-detail-sub {
+        font-size: 0.65em;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+
+      .multi-zone-temps {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-top: 10px;
+        padding: 10px;
+        background: var(--bg-tertiary, rgba(128,128,128,0.1));
+        border-radius: 8px;
+      }
+
+      .multi-zone-temp {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9em;
+        color: var(--text-primary);
+      }
+
+      .multi-zone-temp ha-icon {
+        --mdc-icon-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .multi-zone-wind {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 6px 10px;
+        background: rgba(128,128,128,0.08);
+        border-radius: 6px;
+        font-size: 0.85em;
+        color: var(--text-secondary);
+      }
+
+      .multi-zone-wind svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.8;
+      }
+
+      .multi-zone-orientation {
+        padding: 2px 6px;
+        background: rgba(128,128,128,0.2);
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: 500;
+      }
+
+      .multi-zone-exposure {
+        font-size: 0.85em;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+
+      .multi-zone-exposure.exposed {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+
+      .multi-zone-exposure.partial {
+        background: rgba(234, 179, 8, 0.2);
+        color: #eab308;
+      }
+
+      .multi-zone-exposure.sheltered {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+
+      /* Multi Compare/Ranking View */
+      .multi-zone-ranking {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .multi-ranking-item {
+        display: grid;
+        grid-template-columns: 28px 95px 1fr 75px 50px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        min-height: 60px;
+        background: var(--bg-secondary);
+        border-radius: 10px;
+        border-left: 3px solid var(--accent-color);
+      }
+
+      .multi-ranking-position {
+        font-size: 1em;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-align: center;
+      }
+
+      .multi-ranking-info {
+        min-width: 0;
+      }
+
+      .multi-ranking-name {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .multi-ranking-score-label {
+        margin-top: 2px;
+        font-size: 0.65em;
+        color: var(--accent-color);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .multi-ranking-bar-wrapper {
+        height: 6px;
+        background: var(--bg-tertiary, rgba(128,128,128,0.15));
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .multi-ranking-bar {
+        height: 100%;
+        border-radius: 3px;
+      }
+
+      .multi-ranking-value {
+        font-size: 0.75em;
+        font-weight: 600;
+        color: var(--text-primary);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .multi-ranking-delta {
+        font-size: 0.7em;
+        font-weight: 600;
+        text-align: center;
+        padding: 3px 0;
+        border-radius: 4px;
+      }
+
+      .multi-ranking-delta.ref {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+      }
+
+      .multi-ranking-delta.warn {
+        background: rgba(234, 179, 8, 0.15);
+        color: #eab308;
+      }
+
+      .multi-ranking-delta.bad {
+        background: rgba(249, 115, 22, 0.15);
+        color: #f97316;
+      }
+
+      .multi-ranking-delta.worst {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+      }
+
+      @media (max-width: 420px) {
+        .multi-zone-stats {
+          display: none;
+        }
+
+        .multi-zone-row-main {
+          grid-template-columns: 42px 1fr 70px 20px;
+        }
+
+        .multi-zone-details-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .multi-ranking-item {
+          grid-template-columns: 24px 70px 1fr 55px 45px;
+          gap: 8px;
+        }
+      }
     `;
   }
 }
@@ -1945,6 +3119,17 @@ class HomePerformanceCardEditor extends LitElement {
               </div>
               <span>${this._t('editor_pill')}</span>
             </div>
+            <div
+              class="layout-option ${this.config.layout === "multi" ? "selected" : ""}"
+              @click=${() => this._setLayout("multi")}
+            >
+              <div class="layout-preview layout-multi">
+                <div class="lp-row"></div>
+                <div class="lp-row"></div>
+                <div class="lp-row"></div>
+              </div>
+              <span>${this._t('editor_multi')}</span>
+            </div>
           </div>
         </div>
 
@@ -1988,16 +3173,19 @@ class HomePerformanceCardEditor extends LitElement {
 
       .layout-options {
         display: flex;
-        gap: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
       }
 
       .layout-option {
-        flex: 1;
+        flex: 1 1 calc(25% - 8px);
+        min-width: 70px;
+        max-width: calc(50% - 4px);
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
-        padding: 12px;
+        gap: 6px;
+        padding: 10px 6px;
         border: 2px solid var(--divider-color);
         border-radius: 12px;
         cursor: pointer;
@@ -2015,20 +3203,22 @@ class HomePerformanceCardEditor extends LitElement {
       }
 
       .layout-option span {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         color: var(--primary-text-color);
+        text-align: center;
+        white-space: nowrap;
       }
 
       .layout-preview {
-        width: 50px;
-        height: 40px;
+        width: 44px;
+        height: 34px;
         background: var(--card-background-color);
         border-radius: 6px;
         display: flex;
         flex-direction: column;
         padding: 4px;
-        gap: 3px;
+        gap: 2px;
       }
 
       .layout-full .lp-header {
@@ -2086,6 +3276,27 @@ class HomePerformanceCardEditor extends LitElement {
         height: 6px;
         background: var(--divider-color);
         border-radius: 2px;
+      }
+
+      .layout-multi {
+        justify-content: center;
+        gap: 2px;
+      }
+
+      .layout-multi .lp-row {
+        width: 100%;
+        height: 8px;
+        background: var(--divider-color);
+        border-radius: 2px;
+        border-left: 2px solid var(--primary-color);
+      }
+
+      .layout-multi .lp-row:nth-child(2) {
+        opacity: 0.7;
+      }
+
+      .layout-multi .lp-row:nth-child(3) {
+        opacity: 0.4;
       }
     `;
   }

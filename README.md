@@ -275,7 +275,8 @@ The `source` attribute on Time/Ratio indicates: `measured` (via power sensor > c
 | **Remaining analysis time** | Time before data is ready |
 | **Analysis progress** | Completion percentage (0-100%) |
 | **Data ready** | Binary sensor indicating if analysis is available |
-| **Open window** | Detection by rapid temperature drop |
+| **Heating active** | Binary sensor indicating if heating is currently running |
+| **Open window** | Detection by rapid temperature drop or physical sensor |
 
 ## 🏠 Multi-zones
 
@@ -345,6 +346,7 @@ Choose the layout that fits your dashboard style:
 | `full` | Complete card with all metrics (default) | Main dashboard, detailed view |
 | `badge` | Compact vertical badge with score | Grid of rooms, quick overview |
 | `pill` | Horizontal strip with key info | Sidebar, compact lists |
+| `multi` | All zones in one card with compare view | Multi-room overview, ranking |
 
 #### Full Layout (default)
 ```yaml
@@ -378,15 +380,42 @@ A slim horizontal bar showing score, zone name, K coefficient, and ΔT. Ideal fo
 
 <img width="483" alt="Pill layout" src="https://github.com/user-attachments/assets/3de72907-1882-47dc-9b7a-e512867cfaef" />
 
+#### Multi-Zone Layout (NEW)
+```yaml
+type: custom:home-performance-card
+layout: multi
+default_view: list
+show_sparklines: true
+```
+A comprehensive card that displays **all your zones in one place**. No need to specify a zone - it auto-detects all configured zones.
+
+**Features:**
+- 📋 **List View** - All zones with expandable details (click to expand)
+- 🏆 **Compare View** - Ranking by K/m³ performance with percentage difference
+- 🔄 **Toggle** - Switch between List and Compare views
+- 📊 **Sparklines** - Mini trend graphs for each zone
+- 🎯 **Average Score** - Overall home performance at a glance
+
+**Multi-Zone Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `default_view` | "list" | Initial view: `list` or `compare` |
+| `show_sparklines` | true | Show/hide mini trend graphs |
+
 ### Card Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `zone` | *required* | Exact name of your zone |
+| `zone` | *required** | Exact name of your zone |
 | `title` | "Thermal Performance" | Displayed title (full layout only) |
-| `layout` | "full" | Card style: `full`, `badge`, or `pill` |
+| `layout` | "full" | Card style: `full`, `badge`, `pill`, or `multi` |
 | `show_graph` | true | Show/hide the historical K graph |
 | `demo` | false | Demo mode with fake data |
+| `default_view` | "list" | Multi-zone only: initial view (`list` or `compare`) |
+| `show_sparklines` | true | Multi-zone only: show mini trend graphs |
+
+*\* Not required for `layout: multi` (auto-detects all zones)*
 
 ### Card Features
 
@@ -394,6 +423,7 @@ A slim horizontal bar showing score, zone name, K coefficient, and ΔT. Ideal fo
 - 📈 **Historical K graph** - 7-day history with bar chart (full) or sparkline (badge/pill)
 - 🌡️ **Temperatures** - Indoor/Outdoor in real-time
 - 📉 **Detailed metrics** - K coefficient, Energy, Heating time
+- 💨 **Wind data** - Current wind speed, direction and room exposure (full/badge/multi layouts)
 - ⏳ **Progress** - Progress bar during initial analysis
 - 🎨 **Adaptive design** - Adapts to light/dark theme
 - 🎛️ **Visual editor** - Choose layout directly in the UI
@@ -500,18 +530,38 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Power threshold | Detection threshold in Watts (default: 50W) |
 | External energy counter | sensor.xxx_energy (your own HA Utility Meter) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
+| Weather entity | weather.xxx (for wind data display - shared between zones) |
+| Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
 
 > **Notes**:
 > - If you provide an external energy counter AND a power sensor, the external counter is used as priority for energy.
 > - The power sensor also enables **precise heat detection** (power > threshold), ideal for heaters with internal thermostat or pilot wire. The threshold is configurable (default: 50W).
 > - The **Window/Door sensor** allows using a physical contact sensor (window, door, opening) for accurate open detection instead of relying on temperature-based detection. If the sensor is unavailable, it falls back to temperature detection automatically.
+> - The **Weather entity** enables wind data display on cards. Combined with room orientation, it calculates wind exposure (exposed/sheltered) to help understand K coefficient variations.
 > - Options are **modifiable afterwards** and the integration reloads automatically.
+
+### 📱 Window Open Notifications
+
+Get a push notification when a window is detected open while heating is running.
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| Enable alerts | Turn on/off push notifications | Off |
+| Mobile device | Select your phone from mobile_app devices | - |
+| Delay | Minutes to wait before alerting | 2 min |
+
+**Setup**: Settings → Integrations → Home Performance → Configure (⚙️)
+
+The notification is translated (EN/FR/IT) based on your Home Assistant language.
+
+> **Blueprint alternative**: A [Blueprint](blueprints/automation/home_performance/window_open_notification.yaml) is also available for advanced customization (custom messages, TTS, multiple devices...).
 
 ## 💾 Data Persistence
 
 Data is **automatically saved** and restored after a Home Assistant restart:
 
-- ✅ Thermal history (up to 48h)
+- ✅ Real-time thermal data (up to 48h)
+- ✅ **Long-term daily history (up to 5 years)** 📊
 - ✅ Calculated K coefficient
 - ✅ Energy counters
 - ✅ No need to wait 12h again after each restart!
@@ -519,6 +569,23 @@ Data is **automatically saved** and restored after a Home Assistant restart:
 **Storage**: `/config/.storage/home_performance.{zone}`
 
 **Save frequency**: Every 5 minutes + at HA shutdown
+
+### Long-term History
+
+The integration stores **daily aggregated data for up to 5 years** per zone:
+
+| Data stored | Retention |
+|-------------|-----------|
+| Real-time data points | 48 hours |
+| Daily summaries (K, energy, heating time, temps) | **5 years (1825 days)** |
+| K_7d calculation | Always uses last 7 days |
+
+**Storage size**: ~73 KB per zone per year (very lightweight)
+
+This long-term history will enable future features like:
+- 📈 Monthly/yearly performance graphs
+- 🔄 Season-to-season comparison (Winter 2024 vs 2023)
+- ⚠️ Insulation degradation detection over time
 
 ## 🚀 Usage
 
@@ -594,7 +661,7 @@ Needs optimization : beyond
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (v1.0.0 - v1.2.0)
+### ✅ Completed (v1.0.0 - v1.3.0)
 
 - [x] K Coefficient (W/°C) - empirical thermal loss
 - [x] K/m² and K/m³ normalization
@@ -617,25 +684,30 @@ Needs optimization : beyond
 - [x] Modifiable options with auto-reload
 - [x] Multi-zones (add/remove rooms)
 - [x] Event-driven architecture (instant reactivity)
+- [x] **Historical K graph** - 7-day bar chart (full) and sparkline (badge/pill) 📊
+- [x] **Configurable graph display** (`show_graph` option)
+- [x] **Efficiency factor** for heat pumps (COP) and gas systems
+- [x] **Physical window/door sensor** support
+- [x] **Multi-zone card** - All zones in one card with List/Compare views
+- [x] **Long-term history** - 5 years of daily data storage
+- [x] **Wind data display** - Weather entity integration with wind exposure 🆕
 
-### 🔜 v1.3 - Historical Visualization
+### 🔜 Next - Alerts & Notifications
 
-- [ ] **Historical K graph** - 7-day bar chart (full) and sparkline (badge/pill) 📊
-- [ ] **Configurable graph display** (`show_graph` option)
-
-### 🔮 v1.4 - Multi-zone & Comparisons
-
-- [ ] Multi-zone comparison in a single card
-- [ ] Performance evolution over time
-
-### 🔮 v1.2 - Alerts & Notifications
-
-- [ ] Open window notifications (push, TTS)
+- [x] Open window notifications (push) ✅
+- [ ] Open window notifications (TTS)
 - [ ] Poor insulation detected alerts
 - [ ] Weekly consumption report
 
+### 🔮 Planned - Long-term Analytics
+
+- [ ] Monthly/yearly performance graphs (using 5-year history)
+- [ ] Season-to-season comparison
+- [ ] Insulation degradation detection
+
 ### 💡 Future Ideas
 
+- [ ] BTU/h input support for US furnaces
 - [ ] Weather correction (wind, sunlight)
 - [ ] Humidity module (RH, mold risk)
 - [ ] Air quality module (CO2)

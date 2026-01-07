@@ -54,7 +54,9 @@
           "power_sensor": "Sensore di potenza (opzionale)",
           "power_threshold": "Soglia rilevamento riscaldamento",
           "energy_sensor": "Contatore energia esterno (opzionale)",
-          "window_sensor": "Sensore finestra/porta (opzionale)"
+          "window_sensor": "Sensore finestra/porta (opzionale)",
+          "weather_entity": "Entità meteo (opzionale)",
+          "room_orientation": "Orientamento stanza (opzionale)"
         },
         "data_description": {
           "surface": "Superficie del pavimento per calcolare il coefficiente K per m²",
@@ -62,7 +64,23 @@
           "power_sensor": "Sensore di potenza istantanea per misurare tempo e consumo reali di riscaldamento",
           "power_threshold": "Potenza in Watt oltre la quale il riscaldamento è considerato attivo (predefinito: 50W)",
           "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità sul calcolo integrato)",
-          "window_sensor": "Sensore fisico finestra/porta per rilevamento apertura preciso (invece del rilevamento basato sulla temperatura)"
+          "window_sensor": "Sensore fisico finestra/porta per rilevamento apertura preciso (invece del rilevamento basato sulla temperatura)",
+          "weather_entity": "Entità meteo per dati vento (condivisa tra zone)",
+          "room_orientation": "Orientamento principale della facciata per determinare l'esposizione al vento"
+        }
+      },
+      "notifications": {
+        "title": "Avvisi finestra aperta",
+        "description": "Ricevi una notifica sul telefono quando una finestra è aperta mentre il riscaldamento è attivo.",
+        "data": {
+          "window_notification_enabled": "Attiva avvisi finestra aperta",
+          "notify_device": "Dispositivo mobile",
+          "notification_delay": "Ritardo prima della notifica"
+        },
+        "data_description": {
+          "window_notification_enabled": "Invia notifica push quando la finestra è aperta e il riscaldamento è attivo",
+          "notify_device": "Seleziona il dispositivo mobile per ricevere le notifiche",
+          "notification_delay": "Attendi questo numero di minuti prima di avvisare (evita avvisi per aperture rapide)"
         }
       }
     },
@@ -89,7 +107,12 @@
           "power_sensor": "Sensore di potenza",
           "power_threshold": "Soglia rilevamento riscaldamento",
           "energy_sensor": "Contatore energia esterno",
-          "window_sensor": "Sensore finestra/porta"
+          "window_sensor": "Sensore finestra/porta",
+          "window_notification_enabled": "Attiva avvisi finestra aperta",
+          "notify_device": "Dispositivo mobile per notifiche",
+          "notification_delay": "Ritardo prima della notifica",
+          "weather_entity": "Entità meteo",
+          "room_orientation": "Orientamento stanza"
         },
         "data_description": {
           "heat_source_type": "Tipo di sistema di riscaldamento",
@@ -100,7 +123,26 @@
           "power_sensor": "Sensore di potenza istantanea (potenza > soglia = riscaldamento attivo)",
           "power_threshold": "Potenza in Watt oltre la quale il riscaldamento è considerato attivo (predefinito: 50W)",
           "energy_sensor": "Contatore energia di Home Assistant esistente (ha priorità)",
-          "window_sensor": "Sensore fisico finestra/porta per rilevamento apertura preciso"
+          "window_sensor": "Sensore fisico finestra/porta per rilevamento apertura preciso",
+          "window_notification_enabled": "Invia notifica push quando la finestra è aperta e il riscaldamento è attivo",
+          "notify_device": "Seleziona il dispositivo mobile per ricevere le notifiche",
+          "notification_delay": "Attendi questo numero di minuti prima di avvisare (evita avvisi per aperture rapide)",
+          "weather_entity": "Entità meteo per dati vento (condivisa tra zone)",
+          "room_orientation": "Orientamento principale della facciata per determinare l'esposizione al vento"
+        }
+      },
+      "notifications": {
+        "title": "Avvisi finestra aperta",
+        "description": "Ricevi una notifica sul telefono quando una finestra è aperta mentre il riscaldamento è attivo.",
+        "data": {
+          "window_notification_enabled": "Attiva avvisi finestra aperta",
+          "notify_device": "Dispositivo mobile",
+          "notification_delay": "Ritardo prima della notifica"
+        },
+        "data_description": {
+          "window_notification_enabled": "Invia notifica push quando la finestra è aperta e il riscaldamento è attivo",
+          "notify_device": "Seleziona il dispositivo mobile per ricevere le notifiche",
+          "notification_delay": "Attendi questo numero di minuti prima di avvisare (evita avvisi per aperture rapide)"
         }
       }
     },
@@ -161,8 +203,25 @@
       "fenetre_ouverte": {
         "name": "Finestra aperta"
       },
+      "chauffage_actif": {
+        "name": "Riscaldamento attivo"
+      },
       "donnees_pretes": {
         "name": "Dati pronti"
+      }
+    }
+  },
+  "selector": {
+    "room_orientation": {
+      "options": {
+        "N": "Nord",
+        "NE": "Nord-Est",
+        "E": "Est",
+        "SE": "Sud-Est",
+        "S": "Sud",
+        "SW": "Sud-Ovest",
+        "W": "Ovest",
+        "NW": "Nord-Ovest"
       }
     }
   }

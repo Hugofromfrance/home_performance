@@ -30,13 +30,17 @@
           "surface": "Floor Area (m²)",
           "volume": "Volume (m³)",
           "power_threshold": "Power Threshold (W)",
-          "window_sensor": "Window/Door Sensor"
+          "window_sensor": "Window/Door Sensor",
+          "weather_entity": "Weather Entity",
+          "room_orientation": "Room Orientation"
         },
         "data_description": {
           "surface": "Floor surface area of the zone",
           "volume": "Volume of the zone (surface × ceiling height)",
           "power_threshold": "Power above which heating is considered active (default: 50W)",
-          "window_sensor": "Optional: physical window/door contact sensor for accurate open detection"
+          "window_sensor": "Optional: physical window/door contact sensor for accurate open detection",
+          "weather_entity": "Weather entity for wind data (shared between zones)",
+          "room_orientation": "Main facade orientation to determine wind exposure"
         }
       }
     },
@@ -64,7 +68,9 @@
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
           "energy_sensor": "External energy meter",
-          "window_sensor": "Window/Door Sensor"
+          "window_sensor": "Window/Door Sensor",
+          "weather_entity": "Weather Entity",
+          "room_orientation": "Room Orientation"
         },
         "data_description": {
           "heat_source_type": "Type of heating system",
@@ -75,7 +81,9 @@
           "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
           "energy_sensor": "Existing Home Assistant energy meter (takes priority)",
-          "window_sensor": "Optional: physical window/door contact sensor for accurate open detection"
+          "window_sensor": "Optional: physical window/door contact sensor for accurate open detection",
+          "weather_entity": "Weather entity for wind data (shared between zones)",
+          "room_orientation": "Main facade orientation to determine wind exposure"
         }
       }
     },
@@ -121,8 +129,25 @@
       "window_open": {
         "name": "Window Open Detected"
       },
+      "heating_active": {
+        "name": "Heating Active"
+      },
       "data_ready": {
         "name": "Data Ready"
+      }
+    }
+  },
+  "selector": {
+    "room_orientation": {
+      "options": {
+        "N": "North",
+        "NE": "North-East",
+        "E": "East",
+        "SE": "South-East",
+        "S": "South",
+        "SW": "South-West",
+        "W": "West",
+        "NW": "North-West"
       }
     }
   }

@@ -32,7 +32,20 @@ CONF_VOLUME = "volume"  # m³
 CONF_POWER_THRESHOLD = "power_threshold"  # Seuil de puissance pour détection chauffe (W)
 CONF_WINDOW_SENSOR = "window_sensor"  # Capteur d'ouverture de fenêtre (optionnel)
 
+# Weather settings
+CONF_WEATHER_ENTITY = "weather_entity"  # Entité météo pour vent (partagée)
+CONF_ROOM_ORIENTATION = "room_orientation"  # Orientation principale de la pièce (N, NE, E, SE, S, SO, O, NO)
+
+# Room orientations
+ORIENTATIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+# Notification settings
+CONF_WINDOW_NOTIFICATION_ENABLED = "window_notification_enabled"
+CONF_NOTIFY_DEVICE = "notify_device"
+CONF_NOTIFICATION_DELAY = "notification_delay"
+
 # Default values
+DEFAULT_NOTIFICATION_DELAY = 2  # minutes
 DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
 
 # Timing
@@ -43,7 +56,8 @@ AGGREGATION_PERIOD_HOURS = 24  # Période d'agrégation pour le calcul de K
 MIN_DELTA_T = 5.0  # ΔT minimum pour calcul fiable (°C)
 MIN_HEATING_TIME_HOURS = 0.5  # Temps de chauffe minimum sur la période (30 min)
 MIN_DATA_HOURS = 12  # Heures minimum de données pour premier calcul
-HISTORY_DAYS = 7  # Nombre de jours d'historique pour le calcul stable de K
+HISTORY_DAYS = 7  # Nombre de jours pour le calcul stable de K_7d
+LONG_TERM_HISTORY_DAYS = 365 * 5  # 5 ans d'historique long terme (1825 jours)
 
 # Sensor types - Thermal
 SENSOR_K_COEFFICIENT = "k_coefficient"  # W/°C

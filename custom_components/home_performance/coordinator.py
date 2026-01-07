@@ -1,11 +1,13 @@
 """DataUpdateCoordinator for Home Performance."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers import device_registry as dr
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback, Event
 from homeassistant.helpers.event import async_track_state_change_event
@@ -29,8 +31,14 @@ from .const import (
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
     CONF_WINDOW_SENSOR,
+    CONF_WEATHER_ENTITY,
+    CONF_ROOM_ORIENTATION,
+    CONF_WINDOW_NOTIFICATION_ENABLED,
+    CONF_NOTIFY_DEVICE,
+    CONF_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_NOTIFICATION_DELAY,
 )
 from .models import ThermalLossModel, ThermalDataPoint
 
@@ -63,6 +71,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
         self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
         self.window_sensor: str | None = config.get(CONF_WINDOW_SENSOR)
+
+        # Weather settings
+        self.weather_entity: str | None = config.get(CONF_WEATHER_ENTITY)
+        self.room_orientation: str | None = config.get(CONF_ROOM_ORIENTATION)
+
+        # Notification settings
+        self.window_notification_enabled: bool = config.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
+        self.notify_device: str | None = config.get(CONF_NOTIFY_DEVICE)
+        self.notification_delay: int = config.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
 
         _LOGGER.info(
             "HomePerformance coordinator initialized for zone '%s': "
@@ -105,6 +122,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._delta_t_sum_daily: float = 0.0  # Sum of ΔT for daily average
         self._delta_t_count_daily: int = 0  # Count of samples for daily average
 
+        # Daily wind tracking (for history archival)
+        self._wind_speed_sum_daily: float = 0.0  # Sum of wind speed for daily average
+        self._wind_speed_count_daily: int = 0  # Count of wind samples
+        self._wind_direction_counts_daily: dict[str, int] = {}  # Count per direction
+
         # Real-time heating tracking (event-driven for precision)
         self._heating_start_time: float | None = None  # Timestamp when heating started
         self._is_heating_realtime: bool = False  # Current real-time heating state
@@ -117,6 +139,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._window_open_realtime: bool = False  # Real-time window open state
         self._window_open_since: float | None = None  # Timestamp when window was detected open
         self._consecutive_drops: int = 0  # Count of consecutive temperature drops
+
+        # Notification tracking
+        self._notification_task: asyncio.Task | None = None  # Delayed notification task
+        self._last_notification_time: float | None = None  # Cooldown tracking
 
         # Persistence - use slugify for consistent handling of special characters
         zone_slug = slugify(self.zone_name, separator="_")
@@ -182,6 +208,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._heating_start_time = now
                 self._is_heating_realtime = True
                 _LOGGER.info("[%s] 🔥 Heating started (real-time detection)", self.zone_name)
+                # Trigger notification if window is already open
+                if self._window_open_realtime:
+                    self._schedule_window_notification()
 
             # Heating stopped
             elif not is_heating_now and self._is_heating_realtime:
@@ -197,6 +226,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 self._heating_start_time = None
                 self._is_heating_realtime = False
+                # Cancel any pending window notification
+                self._cancel_window_notification()
 
         # Subscribe to power sensor state changes
         self._power_listener_unsub = async_track_state_change_event(
@@ -264,11 +295,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                                     "[%s] 🪟 Window OPEN detected! Temp drop: %.2f°C/min (heating: %s)",
                                     self.zone_name, abs(rate_per_minute), self._is_heating_realtime
                                 )
+                                # Trigger notification if heating is on and notifications enabled
+                                if self._is_heating_realtime:
+                                    self._schedule_window_notification()
                     elif rate_per_minute > 0.1:
                         # Temperature rising = window likely closed
                         self._consecutive_drops = 0
                         if was_window_open:
                             _LOGGER.info("[%s] 🪟 Window CLOSED (temperature rising)", self.zone_name)
+                            self._cancel_window_notification()
                         self._window_open_realtime = False
                         self._window_open_since = None
                     elif abs(rate_per_minute) < 0.2:
@@ -278,6 +313,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             minutes_open = (now - self._window_open_since) / 60
                             if minutes_open > 5:
                                 _LOGGER.info("[%s] 🪟 Window CLOSED (temperature stabilized after %.1f min)", self.zone_name, minutes_open)
+                                self._cancel_window_notification()
                                 self._window_open_realtime = False
                                 self._window_open_since = None
 
@@ -293,8 +329,109 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         _LOGGER.info("[%s] ✅ Real-time temperature listener set up for %s", self.zone_name, self.indoor_temp_sensor)
 
+    def _schedule_window_notification(self) -> None:
+        """Schedule a window open notification after the configured delay."""
+        if not self.window_notification_enabled or not self.notify_device:
+            return
+
+        # Cancel any existing notification task
+        if self._notification_task and not self._notification_task.done():
+            self._notification_task.cancel()
+
+        # Create a new notification task
+        self._notification_task = self.hass.async_create_task(
+            self._async_send_window_notification()
+        )
+
+    def _cancel_window_notification(self) -> None:
+        """Cancel any pending window notification."""
+        if self._notification_task and not self._notification_task.done():
+            self._notification_task.cancel()
+            self._notification_task = None
+            _LOGGER.debug("[%s] Window notification cancelled", self.zone_name)
+
+    async def _async_send_window_notification(self) -> None:
+        """Send window open notification after delay."""
+        try:
+            # Wait for the configured delay
+            await asyncio.sleep(self.notification_delay * 60)
+
+            # Re-check conditions after delay
+            if not self._window_open_realtime or not self._is_heating_realtime:
+                _LOGGER.debug("[%s] Conditions no longer met, skipping notification", self.zone_name)
+                return
+
+            # Cooldown: don't send notifications more than once per 15 minutes
+            now = time.time()
+            if self._last_notification_time and (now - self._last_notification_time) < 900:
+                _LOGGER.debug("[%s] Notification cooldown active, skipping", self.zone_name)
+                return
+
+            # Get notify service name from device
+            device_registry = dr.async_get(self.hass)
+            device = device_registry.async_get(self.notify_device)
+
+            if not device:
+                _LOGGER.warning("[%s] Notify device not found: %s", self.zone_name, self.notify_device)
+                return
+
+            # Find the mobile_app notify service for this device
+            # The service name is typically notify.mobile_app_<device_name>
+            notify_service = None
+            for identifier in device.identifiers:
+                if identifier[0] == "mobile_app":
+                    # The device ID format is usually the device name
+                    device_name = identifier[1].lower().replace(" ", "_").replace("-", "_")
+                    notify_service = f"mobile_app_{device_name}"
+                    break
+
+            if not notify_service:
+                # Fallback: try using device name directly
+                if device.name:
+                    device_name = device.name.lower().replace(" ", "_").replace("-", "_")
+                    notify_service = f"mobile_app_{device_name}"
+                else:
+                    _LOGGER.warning("[%s] Could not determine notify service for device", self.zone_name)
+                    return
+
+            # Get translated message based on HA language
+            lang = self.hass.config.language or "en"
+            title = f"⚠️ {self.zone_name}"
+            if lang.startswith("fr"):
+                message = "Fenêtre ouverte · Chauffage actif"
+            elif lang.startswith("it"):
+                message = "Finestra aperta · Riscaldamento attivo"
+            else:  # English default
+                message = "Window open · Heating active"
+
+            # Send the notification
+            await self.hass.services.async_call(
+                "notify",
+                notify_service,
+                {
+                    "title": title,
+                    "message": message,
+                    "data": {
+                        "tag": f"home_performance_window_{self.zone_name}",
+                        "group": "home_performance",
+                    },
+                },
+                blocking=False,
+            )
+
+            self._last_notification_time = now
+            _LOGGER.info("[%s] 📱 Window open notification sent", self.zone_name)
+
+        except asyncio.CancelledError:
+            _LOGGER.debug("[%s] Window notification task cancelled", self.zone_name)
+        except Exception as err:
+            _LOGGER.error("[%s] Failed to send window notification: %s", self.zone_name, err)
+
     async def async_shutdown(self) -> None:
         """Clean up when coordinator is shut down."""
+        # Cancel any pending notification
+        self._cancel_window_notification()
+
         # Unsubscribe from power sensor listener
         if self._power_listener_unsub:
             self._power_listener_unsub()
@@ -451,6 +588,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Get external energy sensor value (if configured)
             external_energy = self._get_external_energy()
 
+            # Get weather data (wind)
+            weather_data = self._get_weather_data()
+
+            # Update wind counters for daily average
+            self._update_wind_counters(weather_data)
+
             # Calculate daily values (minuit-minuit)
             # Include ongoing heating session in the total
             heating_seconds = self._heating_seconds_daily
@@ -513,6 +656,13 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "insulation_rating": self.thermal_model.get_insulation_rating(),
                 "insulation_status": self.thermal_model.get_insulation_status(),
                 "last_valid_k": self.thermal_model.last_valid_k,
+                # Weather data (wind)
+                "wind_speed": weather_data.get("wind_speed"),
+                "wind_speed_unit": weather_data.get("wind_speed_unit"),
+                "wind_bearing": weather_data.get("wind_bearing"),
+                "wind_direction": weather_data.get("wind_direction"),
+                "wind_exposure": weather_data.get("wind_exposure"),
+                "room_orientation": weather_data.get("room_orientation"),
             }
 
         except Exception as err:
@@ -561,6 +711,13 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "temp_stable": None,
             },
             "last_valid_k": None,
+            # Weather data
+            "wind_speed": None,
+            "wind_speed_unit": None,
+            "wind_bearing": None,
+            "wind_direction": None,
+            "wind_exposure": None,
+            "room_orientation": self.room_orientation,
         }
 
     def _get_restored_data(self) -> dict[str, Any]:
@@ -621,6 +778,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "insulation_rating": self.thermal_model.get_insulation_rating(),
             "insulation_status": self.thermal_model.get_insulation_status(),
             "last_valid_k": self.thermal_model.last_valid_k,
+            # Weather data (get current)
+            **self._get_weather_data(),
         }
 
     def _check_daily_reset(self, now_dt) -> None:
@@ -659,6 +818,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._heating_seconds_daily = 0.0
             self._delta_t_sum_daily = 0.0
             self._delta_t_count_daily = 0
+            self._reset_daily_wind_counters()
             self._last_daily_reset_date = today
             self._daily_reset_datetime = now_dt.replace(
                 hour=0, minute=0, second=0, microsecond=0
@@ -694,11 +854,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Get current K_7j BEFORE adding today's data (this is the score we had today)
         current_k_7d = self.thermal_model.k_coefficient_7d
 
+        # Get wind averages for the day
+        avg_wind_speed, dominant_wind_direction = self._get_daily_wind_averages()
+
         _LOGGER.info(
-            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d, k_7d=%.1f",
+            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d, k_7d=%.1f, wind=%.1f km/h %s",
             self.zone_name, date, heating_hours, avg_delta_t,
             self._estimated_energy_daily_kwh, self._delta_t_count_daily,
-            current_k_7d if current_k_7d else 0.0
+            current_k_7d if current_k_7d else 0.0,
+            avg_wind_speed if avg_wind_speed else 0.0,
+            dominant_wind_direction if dominant_wind_direction else "N/A"
         )
 
         # Add to thermal model history (with the K_7j score we had at this moment)
@@ -711,6 +876,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             avg_outdoor_temp=avg_outdoor,
             sample_count=self._delta_t_count_daily,
             k_7d=current_k_7d,
+            avg_wind_speed=avg_wind_speed,
+            dominant_wind_direction=dominant_wind_direction,
         )
 
         # Log history status after archiving
@@ -745,6 +912,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._delta_t_sum_daily = 0.0
         self._delta_t_count_daily = 0
         self._estimated_energy_daily_kwh = 0.0
+        self._reset_daily_wind_counters()
 
         # Reset measured energy counters
         self._measured_energy_daily_kwh = 0.0
@@ -785,6 +953,43 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._delta_t_sum_daily += delta_t
         self._delta_t_count_daily += 1
 
+    def _update_wind_counters(self, weather_data: dict[str, Any]) -> None:
+        """Update daily wind counters for history archival."""
+        wind_speed = weather_data.get("wind_speed")
+        wind_direction = weather_data.get("wind_direction")
+
+        if wind_speed is not None:
+            self._wind_speed_sum_daily += wind_speed
+            self._wind_speed_count_daily += 1
+
+        if wind_direction is not None:
+            self._wind_direction_counts_daily[wind_direction] = (
+                self._wind_direction_counts_daily.get(wind_direction, 0) + 1
+            )
+
+    def _get_daily_wind_averages(self) -> tuple[float | None, str | None]:
+        """Calculate average wind speed and dominant direction for the day."""
+        # Average wind speed
+        avg_wind_speed = None
+        if self._wind_speed_count_daily > 0:
+            avg_wind_speed = self._wind_speed_sum_daily / self._wind_speed_count_daily
+
+        # Dominant wind direction (most frequent)
+        dominant_direction = None
+        if self._wind_direction_counts_daily:
+            dominant_direction = max(
+                self._wind_direction_counts_daily,
+                key=self._wind_direction_counts_daily.get
+            )
+
+        return avg_wind_speed, dominant_direction
+
+    def _reset_daily_wind_counters(self) -> None:
+        """Reset wind counters at midnight."""
+        self._wind_speed_sum_daily = 0.0
+        self._wind_speed_count_daily = 0
+        self._wind_direction_counts_daily = {}
+
     def _get_temperature(self, entity_id: str) -> float | None:
         """Get temperature from sensor entity, converted to Celsius.
 
@@ -824,6 +1029,83 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return float(state.state)
         except (ValueError, TypeError):
             return None
+
+    def _get_weather_data(self) -> dict[str, Any]:
+        """Get weather data (wind speed, bearing, direction) from weather entity."""
+        result = {
+            "wind_speed": None,
+            "wind_speed_unit": None,
+            "wind_bearing": None,
+            "wind_direction": None,
+            "wind_exposure": None,
+            "room_orientation": self.room_orientation,
+        }
+
+        if self.weather_entity is None:
+            return result
+
+        state = self.hass.states.get(self.weather_entity)
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return result
+
+        attrs = state.attributes
+
+        # Get wind speed
+        wind_speed = attrs.get("wind_speed")
+        if wind_speed is not None:
+            try:
+                result["wind_speed"] = float(wind_speed)
+                result["wind_speed_unit"] = attrs.get("wind_speed_unit", "km/h")
+            except (ValueError, TypeError):
+                pass
+
+        # Get wind bearing and convert to direction
+        wind_bearing = attrs.get("wind_bearing")
+        if wind_bearing is not None:
+            try:
+                bearing = int(wind_bearing)
+                result["wind_bearing"] = bearing
+                # Convert bearing to direction (N, NE, E, SE, S, SW, W, NW)
+                directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+                index = int(((bearing + 22.5) % 360) / 45)
+                result["wind_direction"] = directions[index]
+            except (ValueError, TypeError):
+                pass
+
+        # Calculate wind exposure if room orientation is configured
+        if self.room_orientation and result["wind_direction"]:
+            result["wind_exposure"] = self._calculate_wind_exposure(
+                result["wind_direction"], self.room_orientation
+            )
+
+        return result
+
+    def _calculate_wind_exposure(self, wind_direction: str, room_orientation: str) -> str:
+        """Calculate if room is exposed or sheltered based on wind direction.
+
+        Simplified logic (works for detached and semi-detached houses):
+            - "exposed": Wind within ±45° of facade direction
+            - "sheltered": Wind outside ±45° of facade direction
+        """
+        # Direction order for calculation
+        directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+        try:
+            wind_idx = directions.index(wind_direction)
+            room_idx = directions.index(room_orientation)
+        except ValueError:
+            return "unknown"
+
+        # Calculate angular difference (0-4 steps, where 4 is opposite)
+        diff = abs(wind_idx - room_idx)
+        if diff > 4:
+            diff = 8 - diff
+
+        # Simplified: exposed only if wind is within ±45° (diff <= 1)
+        if diff <= 1:
+            return "exposed"  # Wind facing facade (±45°)
+        else:
+            return "sheltered"  # Wind from side or back
 
     def _get_heating_state(self) -> bool:
         """Get heating state from power sensor (exclusive) or climate/switch entity.

@@ -31,6 +31,7 @@ async def async_setup_entry(
 
     entities = [
         WindowOpenSensor(coordinator, zone_name),
+        HeatingActiveSensor(coordinator, zone_name),
         DataReadySensor(coordinator, zone_name),
     ]
 
@@ -107,6 +108,40 @@ class WindowOpenSensor(HomePerformanceBaseBinarySensor):
                 "detection_method": "temperature",
                 "description": "Detected via rapid temperature drop",
             }
+
+
+class HeatingActiveSensor(HomePerformanceBaseBinarySensor):
+    """Binary sensor for heating active state."""
+
+    _attr_device_class = BinarySensorDeviceClass.HEAT
+    _attr_icon = "mdi:fire"
+    _attr_translation_key = "chauffage_actif"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "heating_active")
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if heating is currently active."""
+        if self.coordinator.data:
+            return self.coordinator.data.get("heating_on", False)
+        return False
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        if self.coordinator.data:
+            return {
+                "heating_hours_today": round(self.coordinator.data.get("heating_hours", 0), 2),
+                "heating_ratio": round(self.coordinator.data.get("heating_ratio", 0) * 100, 1),
+                "description": "Heating is currently running",
+            }
+        return {
+            "heating_hours_today": 0,
+            "heating_ratio": 0,
+            "description": "Heating state unknown",
+        }
 
 
 class DataReadySensor(HomePerformanceBaseBinarySensor):

@@ -25,7 +25,14 @@ from .const import (
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
     CONF_WINDOW_SENSOR,
+    CONF_WEATHER_ENTITY,
+    CONF_ROOM_ORIENTATION,
+    ORIENTATIONS,
+    CONF_WINDOW_NOTIFICATION_ENABLED,
+    CONF_NOTIFY_DEVICE,
+    CONF_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
+    DEFAULT_NOTIFICATION_DELAY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +44,16 @@ def get_last_outdoor_temp_sensor(hass: HomeAssistant) -> str | None:
         outdoor_sensor = entry.data.get(CONF_OUTDOOR_TEMP_SENSOR)
         if outdoor_sensor:
             return outdoor_sensor
+    return None
+
+
+def get_last_weather_entity(hass: HomeAssistant) -> str | None:
+    """Get weather entity from existing zones (for pre-filling)."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        # Check in options first, then data
+        weather = entry.options.get(CONF_WEATHER_ENTITY) or entry.data.get(CONF_WEATHER_ENTITY)
+        if weather:
+            return weather
     return None
 
 
@@ -75,8 +92,14 @@ def get_schema_step_zone(hass: HomeAssistant, default_outdoor: str | None = None
     )
 
 
-def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
+def get_schema_step_dimensions(hass: HomeAssistant, default_weather: str | None = None) -> vol.Schema:
     """Return schema for room dimensions and optional power sensor configuration."""
+    # Build weather entity field with or without default
+    if default_weather:
+        weather_field = vol.Optional(CONF_WEATHER_ENTITY, default=default_weather)
+    else:
+        weather_field = vol.Optional(CONF_WEATHER_ENTITY)
+
     return vol.Schema(
         {
             vol.Optional(CONF_SURFACE): selector.NumberSelector(
@@ -124,6 +147,18 @@ def get_schema_step_dimensions(hass: HomeAssistant) -> vol.Schema:
                 selector.EntitySelectorConfig(
                     domain="binary_sensor",
                     device_class=["window", "door", "opening"],
+                )
+            ),
+            weather_field: selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="weather",
+                )
+            ),
+            vol.Optional(CONF_ROOM_ORIENTATION): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=ORIENTATIONS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="room_orientation",
                 )
             ),
         }
@@ -205,9 +240,12 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data=self._data,
             )
 
+        # Get weather entity from existing zones (for pre-filling)
+        default_weather = get_last_weather_entity(self.hass)
+
         return self.async_show_form(
             step_id="dimensions",
-            data_schema=get_schema_step_dimensions(self.hass),
+            data_schema=get_schema_step_dimensions(self.hass, default_weather),
         )
 
     @staticmethod
@@ -376,6 +414,75 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 selector.EntitySelectorConfig(
                     domain="binary_sensor",
                     device_class=["window", "door", "opening"],
+                )
+            )
+
+        # === NOTIFICATION OPTIONS ===
+        # Enable window notifications
+        notification_enabled = current.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
+        schema_dict[vol.Optional(CONF_WINDOW_NOTIFICATION_ENABLED, default=notification_enabled)] = selector.BooleanSelector()
+
+        # Notify device - only show if notifications are or will be enabled
+        notify_device_value = current.get(CONF_NOTIFY_DEVICE)
+        if notify_device_value is not None:
+            schema_dict[vol.Optional(CONF_NOTIFY_DEVICE, default=notify_device_value)] = selector.DeviceSelector(
+                selector.DeviceSelectorConfig(
+                    filter=selector.DeviceFilterSelectorConfig(
+                        integration="mobile_app"
+                    )
+                )
+            )
+        else:
+            schema_dict[vol.Optional(CONF_NOTIFY_DEVICE)] = selector.DeviceSelector(
+                selector.DeviceSelectorConfig(
+                    filter=selector.DeviceFilterSelectorConfig(
+                        integration="mobile_app"
+                    )
+                )
+            )
+
+        # Notification delay
+        notification_delay = current.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
+        schema_dict[vol.Optional(CONF_NOTIFICATION_DELAY, default=notification_delay)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0,
+                max=30,
+                step=1,
+                unit_of_measurement="min",
+                mode="slider",
+            )
+        )
+
+        # === WEATHER OPTIONS ===
+        # Weather entity - shared between zones, pre-fill from other zones if not set
+        weather_entity_value = current.get(CONF_WEATHER_ENTITY)
+        if not weather_entity_value:
+            weather_entity_value = get_last_weather_entity(self.hass)
+        if weather_entity_value is not None:
+            schema_dict[vol.Optional(CONF_WEATHER_ENTITY, default=weather_entity_value)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="weather")
+            )
+        else:
+            schema_dict[vol.Optional(CONF_WEATHER_ENTITY)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="weather")
+            )
+
+        # Room orientation
+        room_orientation_value = current.get(CONF_ROOM_ORIENTATION)
+        if room_orientation_value is not None:
+            schema_dict[vol.Optional(CONF_ROOM_ORIENTATION, default=room_orientation_value)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=ORIENTATIONS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="room_orientation",
+                )
+            )
+        else:
+            schema_dict[vol.Optional(CONF_ROOM_ORIENTATION)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=ORIENTATIONS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="room_orientation",
                 )
             )
 

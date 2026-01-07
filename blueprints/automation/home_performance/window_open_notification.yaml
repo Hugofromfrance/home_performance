@@ -1,0 +1,141 @@
+blueprint:
+  name: "Home Performance - Window Open Alert"
+  description: >
+    Send a push notification when a window is detected as open while heating is active.
+    Message is automatically translated based on your Home Assistant language (EN/FR/IT).
+
+    Requires Home Performance integration with window detection enabled.
+  domain: automation
+  author: Home Performance
+  source_url: https://github.com/Hugofromfrance/home_performance/blob/main/blueprints/automation/home_performance/window_open_notification.yaml
+
+  input:
+    window_sensor:
+      name: Window Open Sensor
+      description: "The Home Performance window detection sensor (binary_sensor.home_performance_*_fenetre_ouverte)"
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: window
+
+    heating_sensor:
+      name: Heating Active Sensor
+      description: "The Home Performance heating active sensor (binary_sensor.home_performance_*_chauffage_actif)"
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: heat
+
+    notify_device:
+      name: Mobile Device
+      description: "The mobile device to send notifications to"
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+
+    delay_minutes:
+      name: Delay before notification
+      description: "Wait this many minutes before sending the notification (to avoid alerts for quick window openings)"
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 30
+          unit_of_measurement: minutes
+          mode: slider
+
+    repeat_interval:
+      name: Repeat interval
+      description: "Send reminder notifications every X minutes while window stays open (0 = no repeat)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: minutes
+          mode: slider
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  window_sensor: !input window_sensor
+  heating_sensor: !input heating_sensor
+  repeat_interval: !input repeat_interval
+  zone: >
+    {{ state_attr(window_sensor, 'friendly_name') | default('') | replace('Home Performance ', '') | replace(' Fenêtre ouverte', '') | replace(' Window open', '') | replace(' Finestra aperta', '') | replace(' Heating active', '') | replace(' Chauffage actif', '') | replace(' Riscaldamento attivo', '') }}
+  lang: "{{ states('sensor.time') and config.language[:2] | default('en') }}"
+  title: "⚠️ {{ zone }}"
+  message: >
+    {% if lang == 'fr' %}
+      Fenêtre ouverte · Chauffage actif
+    {% elif lang == 'it' %}
+      Finestra aperta · Riscaldamento attivo
+    {% else %}
+      Window open · Heating active
+    {% endif %}
+  reminder_message: >
+    {% if lang == 'fr' %}
+      Rappel · Fenêtre toujours ouverte
+    {% elif lang == 'it' %}
+      Promemoria · Finestra ancora aperta
+    {% else %}
+      Reminder · Window still open
+    {% endif %}
+
+trigger:
+  - platform: state
+    entity_id: !input window_sensor
+    to: "on"
+    id: window_opened
+
+condition:
+  - condition: state
+    entity_id: !input heating_sensor
+    state: "on"
+
+action:
+  - delay:
+      minutes: !input delay_minutes
+
+  - condition: state
+    entity_id: !input window_sensor
+    state: "on"
+
+  - condition: state
+    entity_id: !input heating_sensor
+    state: "on"
+
+  - device_id: !input notify_device
+    domain: mobile_app
+    type: notify
+    title: "{{ title }}"
+    message: "{{ message }}"
+
+  - repeat:
+      while:
+        - condition: template
+          value_template: "{{ repeat_interval > 0 }}"
+        - condition: state
+          entity_id: !input window_sensor
+          state: "on"
+        - condition: state
+          entity_id: !input heating_sensor
+          state: "on"
+      sequence:
+        - delay:
+            minutes: !input repeat_interval
+        - condition: state
+          entity_id: !input window_sensor
+          state: "on"
+        - condition: state
+          entity_id: !input heating_sensor
+          state: "on"
+        - device_id: !input notify_device
+          domain: mobile_app
+          type: notify
+          title: "{{ title }}"
+          message: "{{ reminder_message }}"

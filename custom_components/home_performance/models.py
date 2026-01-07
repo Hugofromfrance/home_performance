@@ -30,6 +30,7 @@ from .const import (
     MIN_HEATING_TIME_HOURS,
     MIN_DATA_HOURS,
     HISTORY_DAYS,
+    LONG_TERM_HISTORY_DAYS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -114,6 +115,9 @@ class DailyHistoryEntry:
     avg_outdoor_temp: float  # Average outdoor temperature
     sample_count: int  # Number of samples (data points)
     k_7d: float | None = None  # K_7j at the time of archival (for historical graph)
+    # Weather data (for future analysis)
+    avg_wind_speed: float | None = None  # Average wind speed that day (km/h)
+    dominant_wind_direction: str | None = None  # Most frequent wind direction
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for persistence."""
@@ -128,6 +132,10 @@ class DailyHistoryEntry:
         }
         if self.k_7d is not None:
             result["k_7d"] = self.k_7d
+        if self.avg_wind_speed is not None:
+            result["avg_wind_speed"] = self.avg_wind_speed
+        if self.dominant_wind_direction is not None:
+            result["dominant_wind_direction"] = self.dominant_wind_direction
         return result
 
     @classmethod
@@ -142,6 +150,8 @@ class DailyHistoryEntry:
             avg_outdoor_temp=data.get("avg_outdoor_temp", 0.0),
             sample_count=data.get("sample_count", 0),
             k_7d=data.get("k_7d"),
+            avg_wind_speed=data.get("avg_wind_speed"),
+            dominant_wind_direction=data.get("dominant_wind_direction"),
         )
 
 
@@ -246,17 +256,23 @@ class ThermalLossModel:
 
     @property
     def k_per_m2(self) -> float | None:
-        """Get K normalized by surface (W/(°C·m²))."""
-        if self._k_coefficient is None or self.surface is None:
+        """Get K normalized by surface (W/(°C·m²)).
+
+        Uses stable K (prefers 7-day average) for consistent comparisons.
+        """
+        if self.k_coefficient is None or self.surface is None:
             return None
-        return self._k_coefficient / self.surface
+        return self.k_coefficient / self.surface
 
     @property
     def k_per_m3(self) -> float | None:
-        """Get K normalized by volume (W/(°C·m³))."""
-        if self._k_coefficient is None or self.volume is None:
+        """Get K normalized by volume (W/(°C·m³)).
+
+        Uses stable K (prefers 7-day average) for consistent comparisons.
+        """
+        if self.k_coefficient is None or self.volume is None:
             return None
-        return self._k_coefficient / self.volume
+        return self.k_coefficient / self.volume
 
     @property
     def total_energy_kwh(self) -> float:
@@ -381,11 +397,13 @@ class ThermalLossModel:
         avg_outdoor_temp: float,
         sample_count: int,
         k_7d: float | None = None,
+        avg_wind_speed: float | None = None,
+        dominant_wind_direction: str | None = None,
     ) -> None:
         """Archive a day's data into the rolling 7-day history.
 
         Called at midnight to store the previous day's aggregated data.
-        Automatically removes entries older than HISTORY_DAYS.
+        Automatically removes entries older than LONG_TERM_HISTORY_DAYS (5 years).
 
         Args:
             date: ISO date string (YYYY-MM-DD)
@@ -396,6 +414,8 @@ class ThermalLossModel:
             avg_outdoor_temp: Average outdoor temperature
             sample_count: Number of data samples
             k_7d: The K_7j score at time of archival (for historical graph)
+            avg_wind_speed: Average wind speed that day (km/h)
+            dominant_wind_direction: Most frequent wind direction (N, NE, E, SE, S, SW, W, NW)
         """
         # Don't add if we don't have meaningful data
         if sample_count < 10:
@@ -421,12 +441,14 @@ class ThermalLossModel:
             avg_outdoor_temp=avg_outdoor_temp,
             sample_count=sample_count,
             k_7d=k_7d,
+            avg_wind_speed=avg_wind_speed,
+            dominant_wind_direction=dominant_wind_direction,
         )
         self._daily_history.append(entry)
 
-        # Sort by date and keep only last HISTORY_DAYS days
+        # Sort by date and keep only last LONG_TERM_HISTORY_DAYS days (5 years)
         self._daily_history.sort(key=lambda e: e.date)
-        if len(self._daily_history) > HISTORY_DAYS:
+        while len(self._daily_history) > LONG_TERM_HISTORY_DAYS:
             removed = self._daily_history.pop(0)
             _LOGGER.debug("[%s] Removed oldest history entry: %s", self.zone_name, removed.date)
 
@@ -445,13 +467,17 @@ class ThermalLossModel:
 
         This provides a stable K that doesn't reset at midnight.
         Uses weighted average based on sample count per day.
+        Only uses the last HISTORY_DAYS (7) days for calculation.
         """
         if not self._daily_history:
             return
 
+        # Only use the last HISTORY_DAYS (7) days for K calculation
+        recent_history = self._daily_history[-HISTORY_DAYS:] if len(self._daily_history) > HISTORY_DAYS else self._daily_history
+
         # Filter valid days (sufficient ΔT and heating time)
         valid_days = [
-            d for d in self._daily_history
+            d for d in recent_history
             if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
         ]
 
