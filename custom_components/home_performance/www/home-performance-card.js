@@ -3,7 +3,7 @@
  * Modern dashboard card for Home Performance integration
  */
 
-const CARD_VERSION = "1.2.2";
+const CARD_VERSION = "1.3.0";
 
 const LitElement = customElements.get("hui-masonry-view")
   ? Object.getPrototypeOf(customElements.get("hui-masonry-view"))
