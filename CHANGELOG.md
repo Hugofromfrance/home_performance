@@ -5,7 +5,7 @@
 
 ### ✨ Nouvelles fonctionnalités
 
-* add i18n for multi zone card ([1b79a94](https://github.com/Hugofromfrance/home_performance/commit/1b79a94368db9f1aecf50b2f467fb2704fcf91c6))
+* Add multi zone card  ([1b79a94](https://github.com/Hugofromfrance/home_performance/commit/1b79a94368db9f1aecf50b2f467fb2704fcf91c6))
 * Add new reset all service ([c41d2c8](https://github.com/Hugofromfrance/home_performance/commit/c41d2c8bf2f9c2b59a7cbd63b2d0435b9d0767ae))
 * Add wind speed and orientation ([07a23e2](https://github.com/Hugofromfrance/home_performance/commit/07a23e20befd38b0eebcdbc138308e77b031f6b8))
 * Add window open push notification ([932a1bf](https://github.com/Hugofromfrance/home_performance/commit/932a1bf87ca8225c011900eae9ba9ae5290f5f44))
