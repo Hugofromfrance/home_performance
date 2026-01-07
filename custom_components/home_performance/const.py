@@ -32,6 +32,13 @@ CONF_VOLUME = "volume"  # m³
 CONF_POWER_THRESHOLD = "power_threshold"  # Seuil de puissance pour détection chauffe (W)
 CONF_WINDOW_SENSOR = "window_sensor"  # Capteur d'ouverture de fenêtre (optionnel)
 
+# Weather settings
+CONF_WEATHER_ENTITY = "weather_entity"  # Entité météo pour vent (partagée)
+CONF_ROOM_ORIENTATION = "room_orientation"  # Orientation principale de la pièce (N, NE, E, SE, S, SO, O, NO)
+
+# Room orientations
+ORIENTATIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
 # Notification settings
 CONF_WINDOW_NOTIFICATION_ENABLED = "window_notification_enabled"
 CONF_NOTIFY_DEVICE = "notify_device"

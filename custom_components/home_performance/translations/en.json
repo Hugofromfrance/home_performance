@@ -54,7 +54,9 @@
           "power_sensor": "Power sensor (optional)",
           "power_threshold": "Heating detection threshold",
           "energy_sensor": "External energy meter (optional)",
-          "window_sensor": "Window/Door sensor (optional)"
+          "window_sensor": "Window/Door sensor (optional)",
+          "weather_entity": "Weather entity (optional)",
+          "room_orientation": "Room orientation (optional)"
         },
         "data_description": {
           "surface": "Floor area to calculate K coefficient per m²",
@@ -62,7 +64,9 @@
           "power_sensor": "Instantaneous power sensor to measure actual heating time and consumption",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
           "energy_sensor": "Existing Home Assistant energy meter (takes priority over integrated calculation)",
-          "window_sensor": "Physical window/door contact sensor for accurate open detection (instead of temperature-based)"
+          "window_sensor": "Physical window/door contact sensor for accurate open detection (instead of temperature-based)",
+          "weather_entity": "Weather entity for wind data (shared between zones)",
+          "room_orientation": "Main facade orientation to determine wind exposure"
         }
       },
       "notifications": {
@@ -106,7 +110,9 @@
           "window_sensor": "Window/Door sensor",
           "window_notification_enabled": "Enable window open alerts",
           "notify_device": "Mobile device for notifications",
-          "notification_delay": "Delay before notification"
+          "notification_delay": "Delay before notification",
+          "weather_entity": "Weather entity",
+          "room_orientation": "Room orientation"
         },
         "data_description": {
           "heat_source_type": "Type of heating system",
@@ -120,7 +126,9 @@
           "window_sensor": "Physical window/door contact sensor for accurate open detection",
           "window_notification_enabled": "Send push notification when window is open and heating is active",
           "notify_device": "Select the mobile device to receive notifications",
-          "notification_delay": "Wait this many minutes before alerting (avoids alerts for quick openings)"
+          "notification_delay": "Wait this many minutes before alerting (avoids alerts for quick openings)",
+          "weather_entity": "Weather entity for wind data (shared between zones)",
+          "room_orientation": "Main facade orientation to determine wind exposure"
         }
       },
       "notifications": {
@@ -200,6 +208,20 @@
       },
       "donnees_pretes": {
         "name": "Data ready"
+      }
+    }
+  },
+  "selector": {
+    "room_orientation": {
+      "options": {
+        "N": "North",
+        "NE": "North-East",
+        "E": "East",
+        "SE": "South-East",
+        "S": "South",
+        "SW": "South-West",
+        "W": "West",
+        "NW": "North-West"
       }
     }
   }

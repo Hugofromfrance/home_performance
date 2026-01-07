@@ -118,6 +118,12 @@ class HomePerformanceCard extends LitElement {
       multi_no_data: "No data available",
       multi_waiting_data: "Waiting for K/m³ data...",
       multi_kwh_day: "kWh/day",
+
+      // Wind
+      wind_exposure_exposed: "Exposed",
+      wind_exposure_partial: "Partial",
+      wind_exposure_sheltered: "Sheltered",
+      wind_exposure_unknown: "",
     },
     fr: {
       // Config & titles
@@ -216,6 +222,12 @@ class HomePerformanceCard extends LitElement {
       multi_no_data: "Aucune donnée disponible",
       multi_waiting_data: "En attente des données K/m³...",
       multi_kwh_day: "kWh/jour",
+
+      // Wind
+      wind_exposure_exposed: "Exposée",
+      wind_exposure_partial: "Partielle",
+      wind_exposure_sheltered: "Abritée",
+      wind_exposure_unknown: "",
     },
     it: {
       // Config & titles
@@ -314,6 +326,12 @@ class HomePerformanceCard extends LitElement {
       multi_no_data: "Nessun dato disponibile",
       multi_waiting_data: "In attesa dei dati K/m³...",
       multi_kwh_day: "kWh/giorno",
+
+      // Wind
+      wind_exposure_exposed: "Esposta",
+      wind_exposure_partial: "Parziale",
+      wind_exposure_sheltered: "Riparata",
+      wind_exposure_unknown: "",
     }
   };
 
@@ -394,8 +412,8 @@ class HomePerformanceCard extends LitElement {
     "k_par_m3": ["k_par_m3", "k_per_m3"],
     "note_d_isolation": ["note_d_isolation", "insulation_rating", "note_isolation"],
     "performance_energetique": ["performance_energetique", "energy_performance"],
-    "energie_mesuree_jour": ["energie_mesuree_jour", "energie_jour_mesuree", "daily_measured_energy"],
-    "energie_24h_estimee": ["energie_24h_estimee", "estimated_daily_energy", "daily_estimated_energy"],
+    "energie_mesuree_jour": ["energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
+    "energie_24h_estimee": ["energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy", "daily_estimated_energy"],
     "temps_de_chauffe_24h": ["temps_de_chauffe_24h", "heating_time_24h", "daily_heating_time"],
     "ratio_de_chauffe": ["ratio_de_chauffe", "heating_ratio"],
     "dt_moyen_24h": ["dt_moyen_24h", "average_delta_t", "avg_delta_t_24h", "average_dt_24h"],
@@ -772,6 +790,12 @@ class HomePerformanceCard extends LitElement {
     // K history for sparkline
     const kHistory = this._getAttribute(kCoefEntityId, "k_history_7d") || [];
 
+    // Wind data
+    const windSpeed = this._getAttribute(kCoefEntityId, "wind_speed");
+    const windDirection = this._getAttribute(kCoefEntityId, "wind_direction");
+    const windExposure = this._getAttribute(kCoefEntityId, "wind_exposure");
+    const roomOrientation = this._getAttribute(kCoefEntityId, "room_orientation");
+
     // Restore original zone
     this.config.zone = savedZone;
 
@@ -792,6 +816,11 @@ class HomePerformanceCard extends LitElement {
       insulation,
       insulationData,
       scoreLetter,
+      // Wind data
+      windSpeed: this._isValidValue(windSpeed) ? parseFloat(windSpeed).toFixed(0) : null,
+      windDirection,
+      windExposure,
+      roomOrientation,
       kHistory,
     };
   }
@@ -844,6 +873,30 @@ class HomePerformanceCard extends LitElement {
           stroke-linecap="round"
           stroke-linejoin="round"
           vector-effect="non-scaling-stroke"
+        />
+      </svg>
+    `;
+  }
+
+  // Render placeholder sparkline (gray dashed line for zones without data)
+  _renderSparklinePlaceholder(width = 70, height = 24) {
+    const y = height / 2;
+    return html`
+      <svg
+        class="sparkline sparkline-placeholder"
+        viewBox="0 0 ${width} ${height}"
+        preserveAspectRatio="none"
+      >
+        <line
+          x1="2"
+          y1="${y}"
+          x2="${width - 2}"
+          y2="${y}"
+          stroke="var(--text-secondary)"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-dasharray="4 3"
+          opacity="0.3"
         />
       </svg>
     `;
@@ -1016,6 +1069,12 @@ class HomePerformanceCard extends LitElement {
       k_source: this._getAttribute(insulationEntityId, "k_source"),
     };
 
+    // Get wind data
+    const kCoefEntityId = this._getEntityId("coefficient_k");
+    const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
+    const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
+    const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
+
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const scoreLetter = this._getScoreLetter(insulation);
     const hasHistory = kHistory && kHistory.length >= 2;
@@ -1032,6 +1091,15 @@ class HomePerformanceCard extends LitElement {
             ${this._renderSparkline(kHistory, 60, 20, insulationData.color)}
           </div>
         ` : html`<div class="badge-separator"></div>`}
+        ${this._isValidValue(windSpeed) ? html`
+          <div class="badge-wind">
+            <svg viewBox="0 0 24 24" width="12" height="12">
+              <path fill="currentColor" d="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z"/>
+            </svg>
+            <span>${windDirection} ${Math.round(windSpeed)}</span>
+            ${roomOrientation ? html`<span class="badge-orientation">${roomOrientation}</span>` : ''}
+          </div>
+        ` : ''}
         <div class="badge-zone-name">${this.config.zone}</div>
         <div class="badge-k-value">
           ${this._isValidValue(kCoef) ? html`${kCoef}<span class="badge-k-unit">W/°C</span>` : "--"}
@@ -1223,7 +1291,8 @@ class HomePerformanceCard extends LitElement {
   _renderMultiZoneRow(zone) {
     const isExpanded = this._expandedZone === zone.name;
     const accentColor = zone.insulationData?.color || '#6b7280';
-    const hasSparkline = this.config.show_sparklines && zone.kHistory && zone.kHistory.length >= 2;
+    const showSparklines = this.config.show_sparklines !== false; // default true
+    const hasValidHistory = zone.kHistory && zone.kHistory.length >= 2;
 
     return html`
       <div
@@ -1247,9 +1316,11 @@ class HomePerformanceCard extends LitElement {
               <div class="multi-zone-stat-label">kWh</div>
             </div>
           </div>
-          ${hasSparkline ? html`
+          ${showSparklines ? html`
             <div class="multi-zone-sparkline">
-              ${this._renderSparkline(zone.kHistory, 70, 24, accentColor)}
+              ${hasValidHistory
+          ? this._renderSparkline(zone.kHistory, 70, 24, accentColor)
+          : this._renderSparklinePlaceholder(70, 24)}
             </div>
           ` : ''}
           <svg class="multi-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1311,6 +1382,18 @@ class HomePerformanceCard extends LitElement {
               <strong>${zone.outdoorTemp ? `${zone.outdoorTemp}${tempUnit}` : '--'}</strong>
             </div>
           </div>
+          ${zone.windSpeed ? html`
+            <div class="multi-zone-wind">
+              <svg viewBox="0 0 24 24" width="14" height="14">
+                <path fill="currentColor" d="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z"/>
+              </svg>
+              <span>${zone.windDirection} ${zone.windSpeed} km/h</span>
+              ${zone.roomOrientation ? html`
+                <span class="multi-zone-orientation">${zone.roomOrientation}</span>
+                <span class="multi-zone-exposure ${zone.windExposure}">${this._t('wind_exposure_' + (zone.windExposure || 'unknown'))}</span>
+              ` : ''}
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1491,6 +1574,13 @@ class HomePerformanceCard extends LitElement {
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const perfData = this._getPerformanceData(performance);
 
+    // Get wind data from k_coefficient attributes
+    const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
+    const windSpeedUnit = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed_unit") || "km/h";
+    const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
+    const windExposure = demo ? null : this._getAttribute(kCoefEntityId, "wind_exposure");
+    const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
+
     return html`
       <!-- Main Score - 3 columns -->
       <div class="score-section">
@@ -1592,6 +1682,25 @@ class HomePerformanceCard extends LitElement {
           </div>
         </div>
       </div>
+
+      <!-- Wind Info (if available) -->
+      ${this._isValidValue(windSpeed) ? html`
+        <div class="wind-section">
+          <div class="wind-info">
+            <div class="wind-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20">
+                <path fill="currentColor" d="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z"/>
+              </svg>
+            </div>
+            <div class="wind-details">
+              <span class="wind-value">${windDirection} ${windSpeed} ${windSpeedUnit}</span>
+              ${roomOrientation ? html`
+                <span class="wind-exposure ${windExposure}">${this._t('wind_exposure_' + (windExposure || 'unknown'))}</span>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      ` : ''}
 
       <!-- K History Chart (7 days) -->
       ${this.config.show_graph && kHistory && kHistory.length >= 2 ? html`
@@ -1953,6 +2062,69 @@ class HomePerformanceCard extends LitElement {
       }
 
       /* ========================================
+         WIND INFO SECTION
+         ======================================== */
+      .wind-section {
+        margin-top: 8px;
+        padding: 6px 10px;
+        background: rgba(128,128,128,0.08);
+        border-radius: 6px;
+        border-left: 2px solid var(--text-secondary);
+      }
+
+      .wind-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .wind-icon {
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+      }
+
+      .wind-icon svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .wind-details {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .wind-value {
+        font-size: 0.9em;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .wind-exposure {
+        font-size: 0.8em;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+
+      .wind-exposure.exposed {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+
+      .wind-exposure.partial {
+        background: rgba(234, 179, 8, 0.2);
+        color: #eab308;
+      }
+
+      .wind-exposure.sheltered {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+
+      /* ========================================
          K HISTORY - FULL LAYOUT (Bar Chart)
          ======================================== */
       .history-section {
@@ -2160,6 +2332,31 @@ class HomePerformanceCard extends LitElement {
         color: var(--text-secondary);
         margin-top: 2px;
         opacity: 0.8;
+      }
+
+      .badge-wind {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin: 6px 0;
+        opacity: 0.9;
+      }
+
+      .badge-wind svg {
+        width: 13px;
+        height: 13px;
+        opacity: 0.8;
+      }
+
+      .badge-orientation {
+        padding: 2px 5px;
+        background: rgba(128,128,128,0.2);
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 500;
       }
 
       /* Badge Analyzing State */
@@ -2648,6 +2845,55 @@ class HomePerformanceCard extends LitElement {
       .multi-zone-temp ha-icon {
         --mdc-icon-size: 14px;
         color: var(--text-secondary);
+      }
+
+      .multi-zone-wind {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 6px 10px;
+        background: rgba(128,128,128,0.08);
+        border-radius: 6px;
+        font-size: 0.85em;
+        color: var(--text-secondary);
+      }
+
+      .multi-zone-wind svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.8;
+      }
+
+      .multi-zone-orientation {
+        padding: 2px 6px;
+        background: rgba(128,128,128,0.2);
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: 500;
+      }
+
+      .multi-zone-exposure {
+        font-size: 0.85em;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+
+      .multi-zone-exposure.exposed {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+
+      .multi-zone-exposure.partial {
+        background: rgba(234, 179, 8, 0.2);
+        color: #eab308;
+      }
+
+      .multi-zone-exposure.sheltered {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
       }
 
       /* Multi Compare/Ranking View */

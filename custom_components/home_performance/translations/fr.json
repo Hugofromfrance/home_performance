@@ -54,7 +54,9 @@
           "power_sensor": "Capteur de puissance (optionnel)",
           "power_threshold": "Seuil de détection chauffe",
           "energy_sensor": "Compteur d'énergie externe (optionnel)",
-          "window_sensor": "Capteur d'ouverture fenêtre/porte (optionnel)"
+          "window_sensor": "Capteur d'ouverture fenêtre/porte (optionnel)",
+          "weather_entity": "Entité météo (optionnel)",
+          "room_orientation": "Orientation de la pièce (optionnel)"
         },
         "data_description": {
           "surface": "Surface au sol pour calculer le coefficient K par m²",
@@ -62,7 +64,9 @@
           "power_sensor": "Capteur de puissance instantanée pour mesurer le temps de chauffe réel et la consommation",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
           "energy_sensor": "Compteur d'énergie Home Assistant existant (prioritaire sur le calcul intégré)",
-          "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise (remplace la détection par température)"
+          "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise (remplace la détection par température)",
+          "weather_entity": "Entité météo pour les données de vent (partagée entre zones)",
+          "room_orientation": "Orientation principale de la façade pour déterminer l'exposition au vent"
         }
       },
       "notifications": {
@@ -106,7 +110,9 @@
           "window_sensor": "Capteur d'ouverture fenêtre/porte",
           "window_notification_enabled": "Activer les alertes fenêtre ouverte",
           "notify_device": "Appareil mobile pour notifications",
-          "notification_delay": "Délai avant notification"
+          "notification_delay": "Délai avant notification",
+          "weather_entity": "Entité météo",
+          "room_orientation": "Orientation de la pièce"
         },
         "data_description": {
           "heat_source_type": "Type de système de chauffage",
@@ -120,7 +126,9 @@
           "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise",
           "window_notification_enabled": "Envoyer une notification push quand la fenêtre est ouverte et le chauffage actif",
           "notify_device": "Sélectionnez l'appareil mobile pour recevoir les notifications",
-          "notification_delay": "Attendre ce nombre de minutes avant d'alerter (évite les alertes pour les ouvertures rapides)"
+          "notification_delay": "Attendre ce nombre de minutes avant d'alerter (évite les alertes pour les ouvertures rapides)",
+          "weather_entity": "Entité météo pour les données de vent (partagée entre zones)",
+          "room_orientation": "Orientation principale de la façade pour déterminer l'exposition au vent"
         }
       },
       "notifications": {
@@ -200,6 +208,20 @@
       },
       "donnees_pretes": {
         "name": "Données prêtes"
+      }
+    }
+  },
+  "selector": {
+    "room_orientation": {
+      "options": {
+        "N": "Nord",
+        "NE": "Nord-Est",
+        "E": "Est",
+        "SE": "Sud-Est",
+        "S": "Sud",
+        "SW": "Sud-Ouest",
+        "W": "Ouest",
+        "NW": "Nord-Ouest"
       }
     }
   }

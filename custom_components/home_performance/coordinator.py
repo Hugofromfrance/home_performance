@@ -31,6 +31,8 @@ from .const import (
     CONF_VOLUME,
     CONF_POWER_THRESHOLD,
     CONF_WINDOW_SENSOR,
+    CONF_WEATHER_ENTITY,
+    CONF_ROOM_ORIENTATION,
     CONF_WINDOW_NOTIFICATION_ENABLED,
     CONF_NOTIFY_DEVICE,
     CONF_NOTIFICATION_DELAY,
@@ -69,6 +71,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
         self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
         self.window_sensor: str | None = config.get(CONF_WINDOW_SENSOR)
+
+        # Weather settings
+        self.weather_entity: str | None = config.get(CONF_WEATHER_ENTITY)
+        self.room_orientation: str | None = config.get(CONF_ROOM_ORIENTATION)
 
         # Notification settings
         self.window_notification_enabled: bool = config.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
@@ -115,6 +121,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._heating_seconds_daily: float = 0.0  # Heating time since midnight
         self._delta_t_sum_daily: float = 0.0  # Sum of ΔT for daily average
         self._delta_t_count_daily: int = 0  # Count of samples for daily average
+
+        # Daily wind tracking (for history archival)
+        self._wind_speed_sum_daily: float = 0.0  # Sum of wind speed for daily average
+        self._wind_speed_count_daily: int = 0  # Count of wind samples
+        self._wind_direction_counts_daily: dict[str, int] = {}  # Count per direction
 
         # Real-time heating tracking (event-driven for precision)
         self._heating_start_time: float | None = None  # Timestamp when heating started
@@ -577,6 +588,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Get external energy sensor value (if configured)
             external_energy = self._get_external_energy()
 
+            # Get weather data (wind)
+            weather_data = self._get_weather_data()
+
+            # Update wind counters for daily average
+            self._update_wind_counters(weather_data)
+
             # Calculate daily values (minuit-minuit)
             # Include ongoing heating session in the total
             heating_seconds = self._heating_seconds_daily
@@ -639,6 +656,13 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "insulation_rating": self.thermal_model.get_insulation_rating(),
                 "insulation_status": self.thermal_model.get_insulation_status(),
                 "last_valid_k": self.thermal_model.last_valid_k,
+                # Weather data (wind)
+                "wind_speed": weather_data.get("wind_speed"),
+                "wind_speed_unit": weather_data.get("wind_speed_unit"),
+                "wind_bearing": weather_data.get("wind_bearing"),
+                "wind_direction": weather_data.get("wind_direction"),
+                "wind_exposure": weather_data.get("wind_exposure"),
+                "room_orientation": weather_data.get("room_orientation"),
             }
 
         except Exception as err:
@@ -687,6 +711,13 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "temp_stable": None,
             },
             "last_valid_k": None,
+            # Weather data
+            "wind_speed": None,
+            "wind_speed_unit": None,
+            "wind_bearing": None,
+            "wind_direction": None,
+            "wind_exposure": None,
+            "room_orientation": self.room_orientation,
         }
 
     def _get_restored_data(self) -> dict[str, Any]:
@@ -747,6 +778,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "insulation_rating": self.thermal_model.get_insulation_rating(),
             "insulation_status": self.thermal_model.get_insulation_status(),
             "last_valid_k": self.thermal_model.last_valid_k,
+            # Weather data (get current)
+            **self._get_weather_data(),
         }
 
     def _check_daily_reset(self, now_dt) -> None:
@@ -785,6 +818,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._heating_seconds_daily = 0.0
             self._delta_t_sum_daily = 0.0
             self._delta_t_count_daily = 0
+            self._reset_daily_wind_counters()
             self._last_daily_reset_date = today
             self._daily_reset_datetime = now_dt.replace(
                 hour=0, minute=0, second=0, microsecond=0
@@ -820,11 +854,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Get current K_7j BEFORE adding today's data (this is the score we had today)
         current_k_7d = self.thermal_model.k_coefficient_7d
 
+        # Get wind averages for the day
+        avg_wind_speed, dominant_wind_direction = self._get_daily_wind_averages()
+
         _LOGGER.info(
-            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d, k_7d=%.1f",
+            "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d, k_7d=%.1f, wind=%.1f km/h %s",
             self.zone_name, date, heating_hours, avg_delta_t,
             self._estimated_energy_daily_kwh, self._delta_t_count_daily,
-            current_k_7d if current_k_7d else 0.0
+            current_k_7d if current_k_7d else 0.0,
+            avg_wind_speed if avg_wind_speed else 0.0,
+            dominant_wind_direction if dominant_wind_direction else "N/A"
         )
 
         # Add to thermal model history (with the K_7j score we had at this moment)
@@ -837,6 +876,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             avg_outdoor_temp=avg_outdoor,
             sample_count=self._delta_t_count_daily,
             k_7d=current_k_7d,
+            avg_wind_speed=avg_wind_speed,
+            dominant_wind_direction=dominant_wind_direction,
         )
 
         # Log history status after archiving
@@ -871,6 +912,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._delta_t_sum_daily = 0.0
         self._delta_t_count_daily = 0
         self._estimated_energy_daily_kwh = 0.0
+        self._reset_daily_wind_counters()
 
         # Reset measured energy counters
         self._measured_energy_daily_kwh = 0.0
@@ -911,6 +953,43 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._delta_t_sum_daily += delta_t
         self._delta_t_count_daily += 1
 
+    def _update_wind_counters(self, weather_data: dict[str, Any]) -> None:
+        """Update daily wind counters for history archival."""
+        wind_speed = weather_data.get("wind_speed")
+        wind_direction = weather_data.get("wind_direction")
+
+        if wind_speed is not None:
+            self._wind_speed_sum_daily += wind_speed
+            self._wind_speed_count_daily += 1
+
+        if wind_direction is not None:
+            self._wind_direction_counts_daily[wind_direction] = (
+                self._wind_direction_counts_daily.get(wind_direction, 0) + 1
+            )
+
+    def _get_daily_wind_averages(self) -> tuple[float | None, str | None]:
+        """Calculate average wind speed and dominant direction for the day."""
+        # Average wind speed
+        avg_wind_speed = None
+        if self._wind_speed_count_daily > 0:
+            avg_wind_speed = self._wind_speed_sum_daily / self._wind_speed_count_daily
+
+        # Dominant wind direction (most frequent)
+        dominant_direction = None
+        if self._wind_direction_counts_daily:
+            dominant_direction = max(
+                self._wind_direction_counts_daily,
+                key=self._wind_direction_counts_daily.get
+            )
+
+        return avg_wind_speed, dominant_direction
+
+    def _reset_daily_wind_counters(self) -> None:
+        """Reset wind counters at midnight."""
+        self._wind_speed_sum_daily = 0.0
+        self._wind_speed_count_daily = 0
+        self._wind_direction_counts_daily = {}
+
     def _get_temperature(self, entity_id: str) -> float | None:
         """Get temperature from sensor entity, converted to Celsius.
 
@@ -950,6 +1029,83 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return float(state.state)
         except (ValueError, TypeError):
             return None
+
+    def _get_weather_data(self) -> dict[str, Any]:
+        """Get weather data (wind speed, bearing, direction) from weather entity."""
+        result = {
+            "wind_speed": None,
+            "wind_speed_unit": None,
+            "wind_bearing": None,
+            "wind_direction": None,
+            "wind_exposure": None,
+            "room_orientation": self.room_orientation,
+        }
+
+        if self.weather_entity is None:
+            return result
+
+        state = self.hass.states.get(self.weather_entity)
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return result
+
+        attrs = state.attributes
+
+        # Get wind speed
+        wind_speed = attrs.get("wind_speed")
+        if wind_speed is not None:
+            try:
+                result["wind_speed"] = float(wind_speed)
+                result["wind_speed_unit"] = attrs.get("wind_speed_unit", "km/h")
+            except (ValueError, TypeError):
+                pass
+
+        # Get wind bearing and convert to direction
+        wind_bearing = attrs.get("wind_bearing")
+        if wind_bearing is not None:
+            try:
+                bearing = int(wind_bearing)
+                result["wind_bearing"] = bearing
+                # Convert bearing to direction (N, NE, E, SE, S, SW, W, NW)
+                directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+                index = int(((bearing + 22.5) % 360) / 45)
+                result["wind_direction"] = directions[index]
+            except (ValueError, TypeError):
+                pass
+
+        # Calculate wind exposure if room orientation is configured
+        if self.room_orientation and result["wind_direction"]:
+            result["wind_exposure"] = self._calculate_wind_exposure(
+                result["wind_direction"], self.room_orientation
+            )
+
+        return result
+
+    def _calculate_wind_exposure(self, wind_direction: str, room_orientation: str) -> str:
+        """Calculate if room is exposed or sheltered based on wind direction.
+
+        Simplified logic (works for detached and semi-detached houses):
+            - "exposed": Wind within ±45° of facade direction
+            - "sheltered": Wind outside ±45° of facade direction
+        """
+        # Direction order for calculation
+        directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+        try:
+            wind_idx = directions.index(wind_direction)
+            room_idx = directions.index(room_orientation)
+        except ValueError:
+            return "unknown"
+
+        # Calculate angular difference (0-4 steps, where 4 is opposite)
+        diff = abs(wind_idx - room_idx)
+        if diff > 4:
+            diff = 8 - diff
+
+        # Simplified: exposed only if wind is within ±45° (diff <= 1)
+        if diff <= 1:
+            return "exposed"  # Wind facing facade (±45°)
+        else:
+            return "sheltered"  # Wind from side or back
 
     def _get_heating_state(self) -> bool:
         """Get heating state from power sensor (exclusive) or climate/switch entity.

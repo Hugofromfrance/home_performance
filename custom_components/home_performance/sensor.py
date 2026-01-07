@@ -265,6 +265,12 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                     "estimated": day_data.get("estimated", False)
                 })
 
+        # Wind data (if weather entity configured)
+        wind_speed = data.get("wind_speed")
+        wind_direction = data.get("wind_direction")
+        wind_exposure = data.get("wind_exposure")
+        room_orientation = data.get("room_orientation")
+
         return {
             "description": "Thermal loss per degree of temperature difference (W/°C)",
             "heater_power_w": data.get("heater_power"),
@@ -276,6 +282,13 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                 "Lower K = better insulation. "
                 "Typical values: 10-20 (well insulated), 20-40 (average), 40+ (poorly insulated)"
             ),
+            # Weather data (wind)
+            "wind_speed": round(wind_speed, 1) if wind_speed is not None else None,
+            "wind_speed_unit": data.get("wind_speed_unit"),
+            "wind_direction": wind_direction,
+            "wind_bearing": data.get("wind_bearing"),
+            "wind_exposure": wind_exposure,
+            "room_orientation": room_orientation,
         }
 
 
