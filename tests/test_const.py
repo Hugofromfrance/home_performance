@@ -1,19 +1,18 @@
 """Tests for Home Performance constants."""
+
 from __future__ import annotations
 
-import pytest
-
 from custom_components.home_performance.const import (
-    DOMAIN,
-    SENSOR_ENTITY_SUFFIXES,
-    BINARY_SENSOR_ENTITY_SUFFIXES,
-    MIN_DELTA_T,
-    MIN_DATA_HOURS,
-    MIN_HEATING_TIME_HOURS,
-    HISTORY_DAYS,
     AGGREGATION_PERIOD_HOURS,
+    BINARY_SENSOR_ENTITY_SUFFIXES,
     DEFAULT_POWER_THRESHOLD,
+    DOMAIN,
+    HISTORY_DAYS,
+    MIN_DATA_HOURS,
+    MIN_DELTA_T,
+    MIN_HEATING_TIME_HOURS,
     ORIENTATIONS,
+    SENSOR_ENTITY_SUFFIXES,
 )
 
 
@@ -148,4 +147,3 @@ class TestOrientations:
         """Test ORIENTATIONS contains expected directions."""
         expected = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
         assert set(ORIENTATIONS) == set(expected)
-

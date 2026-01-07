@@ -1,4 +1,5 @@
 """Binary sensor platform for Home Performance."""
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DOMAIN, CONF_ZONE_NAME, MIN_DATA_HOURS, VERSION, BINARY_SENSOR_ENTITY_SUFFIXES
+from .const import BINARY_SENSOR_ENTITY_SUFFIXES, DOMAIN, MIN_DATA_HOURS, VERSION
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,9 +39,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class HomePerformanceBaseBinarySensor(
-    CoordinatorEntity[HomePerformanceCoordinator], BinarySensorEntity
-):
+class HomePerformanceBaseBinarySensor(CoordinatorEntity[HomePerformanceCoordinator], BinarySensorEntity):
     """Base class for Home Performance binary sensors."""
 
     _attr_has_entity_name = True

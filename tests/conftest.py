@@ -1,4 +1,5 @@
 """Fixtures for Home Performance tests."""
+
 from __future__ import annotations
 
 import pytest
@@ -26,4 +27,3 @@ def surface() -> float:
 def volume() -> float:
     """Return a test volume in m³."""
     return 50.0
-

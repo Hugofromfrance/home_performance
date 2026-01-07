@@ -18,26 +18,23 @@ jobs:
   test:
     name: Python Tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12", "3.13"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('requirements_dev.txt') }}
+          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('requirements_dev.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-3.12-
 
       - name: Install dependencies
         run: |
@@ -68,11 +65,11 @@ jobs:
 
       - name: Check formatting with Black
         run: |
-          black --check --diff custom_components/home_performance tests
+          black --check --diff **/*.py
 
       - name: Lint with Ruff
         run: |
-          ruff check custom_components/home_performance tests
+          ruff check **/*.py
 
       - name: Type check with mypy
         run: |

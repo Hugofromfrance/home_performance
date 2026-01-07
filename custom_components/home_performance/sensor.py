@@ -1,4 +1,5 @@
 """Sensor platform for Home Performance."""
+
 from __future__ import annotations
 
 import logging
@@ -10,13 +11,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTime, UnitOfTemperature, PERCENTAGE
+from homeassistant.const import PERCENTAGE, UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DOMAIN, CONF_ZONE_NAME, VERSION, SENSOR_ENTITY_SUFFIXES
+from .const import DOMAIN, SENSOR_ENTITY_SUFFIXES, VERSION
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -208,6 +209,7 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
 
         # Generate last 7 days
         from datetime import datetime, timedelta
+
         today = datetime.now().date()
 
         # First pass: get K_7j for each day (stored at archival time)
@@ -218,7 +220,7 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
             entry = history_by_date.get(date_str)
 
             k_value = None
-            is_today = (i == 0)
+            is_today = i == 0
 
             if is_today:
                 # Today: use current K_7j (not yet archived)
@@ -232,10 +234,12 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                     energy_wh = heater_power * entry.heating_hours
                     k_value = energy_wh / (entry.avg_delta_t * 24)
 
-            days_data.append({
-                "date": date_str,
-                "k": k_value,  # None if no valid data
-            })
+            days_data.append(
+                {
+                    "date": date_str,
+                    "k": k_value,  # None if no valid data
+                }
+            )
 
         # Second pass: fill gaps using carry-forward and backfill
         # Forward pass: carry-forward from first valid day
@@ -264,11 +268,13 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
         k_history = []
         for day_data in days_data:
             if day_data["k"] is not None:
-                k_history.append({
-                    "date": day_data["date"],
-                    "k": round(day_data["k"], 1),
-                    "estimated": day_data.get("estimated", False)
-                })
+                k_history.append(
+                    {
+                        "date": day_data["date"],
+                        "k": round(day_data["k"], 1),
+                        "estimated": day_data.get("estimated", False),
+                    }
+                )
 
         # Wind data (if weather entity configured)
         wind_speed = data.get("wind_speed")
@@ -390,11 +396,7 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
             "heater_power_w": data.get("heater_power"),
             "calculation": "estimation",
             "window": "24h glissantes",
-            "heating_hours": (
-                round(data.get("heating_hours"), 1)
-                if data.get("heating_hours") is not None
-                else None
-            ),
+            "heating_hours": (round(data.get("heating_hours"), 1) if data.get("heating_hours") is not None else None),
         }
 
 
@@ -431,7 +433,11 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         return {
             "formatted": format_duration(hours),
             "source": "measured" if has_power_sensor else "estimated",
-            "detection": f"power > {power_threshold}W ({self.coordinator.power_sensor})" if has_power_sensor else f"state of {self.coordinator.heating_entity}",
+            "detection": (
+                f"power > {power_threshold}W ({self.coordinator.power_sensor})"
+                if has_power_sensor
+                else f"state of {self.coordinator.heating_entity}"
+            ),
             "power_threshold_w": power_threshold if has_power_sensor else None,
             "description": "Cumulative heating time over the last 24h",
         }
@@ -519,21 +525,14 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
             "level_display": level_descriptions.get(perf.get("level"), "En attente"),
             "saving_percent": perf.get("saving_percent"),
             "excellent_threshold_kwh": (
-                round(perf.get("excellent_threshold"), 1)
-                if perf.get("excellent_threshold") is not None
-                else None
+                round(perf.get("excellent_threshold"), 1) if perf.get("excellent_threshold") is not None else None
             ),
             "standard_threshold_kwh": (
-                round(perf.get("standard_threshold"), 1)
-                if perf.get("standard_threshold") is not None
-                else None
+                round(perf.get("standard_threshold"), 1) if perf.get("standard_threshold") is not None else None
             ),
             "daily_energy_kwh": round(daily_kwh, 2) if daily_kwh is not None else None,
             "heater_power_w": heater_power,
-            "description": (
-                "Evaluation based on national statistics. "
-                "Thresholds calculated based on heater power."
-            ),
+            "description": ("Evaluation based on national statistics. " "Thresholds calculated based on heater power."),
         }
 
 
@@ -592,21 +591,9 @@ class DeltaTSensor(HomePerformanceBaseSensor):
         return {
             "description": "Average temperature difference between indoor and outdoor (rolling 24h window)",
             "window": "rolling 24h",
-            "current_delta_t": (
-                round(self._convert_delta(current_dt), 1)
-                if current_dt is not None
-                else None
-            ),
-            "indoor_temp": (
-                round(data.get("indoor_temp"), 1)
-                if data.get("indoor_temp") is not None
-                else None
-            ),
-            "outdoor_temp": (
-                round(data.get("outdoor_temp"), 1)
-                if data.get("outdoor_temp") is not None
-                else None
-            ),
+            "current_delta_t": (round(self._convert_delta(current_dt), 1) if current_dt is not None else None),
+            "indoor_temp": (round(data.get("indoor_temp"), 1) if data.get("indoor_temp") is not None else None),
+            "outdoor_temp": (round(data.get("outdoor_temp"), 1) if data.get("outdoor_temp") is not None else None),
             "unit_note": "Temperature delta (not absolute) - correctly converted for your unit system",
         }
 
@@ -829,11 +816,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
             "season_description": season_descriptions.get(season, season),
             "k_value": round(k_value, 1) if k_value is not None else None,
             "k_source": k_source,
-            "k_per_m3": (
-                round(data.get("k_per_m3"), 2)
-                if data.get("k_per_m3") is not None
-                else None
-            ),
+            "k_per_m3": (round(data.get("k_per_m3"), 2) if data.get("k_per_m3") is not None else None),
             "temp_stable": insulation_status.get("temp_stable"),
             "message": message,
             "note": "Based on K/m³ or inferred if minimal heating needed",
@@ -906,5 +889,3 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
             "power_sensor": self.coordinator.power_sensor if not uses_external else None,
             "current_power_w": data.get("measured_power_w") if not uses_external else None,
         }
-
-

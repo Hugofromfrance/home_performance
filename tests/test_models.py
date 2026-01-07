@@ -1,4 +1,5 @@
 """Tests for Home Performance models."""
+
 from __future__ import annotations
 
 import time
@@ -6,15 +7,13 @@ import time
 import pytest
 
 from custom_components.home_performance.models import (
-    ThermalDataPoint,
+    SEASON_HEATING,
+    SEASON_SUMMER,
+    SECONDS_PER_HOUR,
     AggregatedPeriod,
     DailyHistoryEntry,
+    ThermalDataPoint,
     ThermalLossModel,
-    SECONDS_PER_HOUR,
-    MAX_DATA_POINTS,
-    SEASON_SUMMER,
-    SEASON_OFF,
-    SEASON_HEATING,
 )
 
 
@@ -300,12 +299,14 @@ class TestThermalLossModel:
         # Add data
         base_time = time.time()
         for i in range(5):
-            model.add_data_point(ThermalDataPoint(
-                timestamp=base_time + i * 60,
-                indoor_temp=20.0,
-                outdoor_temp=5.0,
-                heating_on=True,
-            ))
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=base_time + i * 60,
+                    indoor_temp=20.0,
+                    outdoor_temp=5.0,
+                    heating_on=True,
+                )
+            )
         model._k_coefficient = 25.0
         model._total_energy_kwh = 10.0
 
@@ -342,12 +343,14 @@ class TestThermalLossModel:
         # Create aggregation with ΔT >= 5°C
         base_time = time.time()
         for i in range(20):
-            model.add_data_point(ThermalDataPoint(
-                timestamp=base_time + i * 60,
-                indoor_temp=20.0,
-                outdoor_temp=5.0,  # ΔT = 15°C
-                heating_on=True,
-            ))
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=base_time + i * 60,
+                    indoor_temp=20.0,
+                    outdoor_temp=5.0,  # ΔT = 15°C
+                    heating_on=True,
+                )
+            )
         model._calculate_k()
 
         assert model.get_season_status() == SEASON_HEATING
@@ -356,12 +359,14 @@ class TestThermalLossModel:
         """Test season status during summer (outdoor > indoor)."""
         base_time = time.time()
         for i in range(20):
-            model.add_data_point(ThermalDataPoint(
-                timestamp=base_time + i * 60,
-                indoor_temp=22.0,
-                outdoor_temp=30.0,  # ΔT = -8°C (summer)
-                heating_on=False,
-            ))
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=base_time + i * 60,
+                    indoor_temp=22.0,
+                    outdoor_temp=30.0,  # ΔT = -8°C (summer)
+                    heating_on=False,
+                )
+            )
         model._calculate_k()
 
         assert model.get_season_status() == SEASON_SUMMER
@@ -371,12 +376,14 @@ class TestThermalLossModel:
         # Add some data
         base_time = time.time()
         for i in range(5):
-            model.add_data_point(ThermalDataPoint(
-                timestamp=base_time + i * 60,
-                indoor_temp=20.0,
-                outdoor_temp=5.0,
-                heating_on=i % 2 == 0,
-            ))
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=base_time + i * 60,
+                    indoor_temp=20.0,
+                    outdoor_temp=5.0,
+                    heating_on=i % 2 == 0,
+                )
+            )
         model._k_coefficient = 25.5
         model._total_energy_kwh = 5.5
 
@@ -459,12 +466,14 @@ class TestThermalLossModelKCalculation:
                 # Heating on for first 6 hours, then cycling
                 heating_on = hour < 6 or (hour >= 12 and hour < 14)
 
-                model.add_data_point(ThermalDataPoint(
-                    timestamp=ts,
-                    indoor_temp=20.0,
-                    outdoor_temp=5.0,  # ΔT = 15°C
-                    heating_on=heating_on,
-                ))
+                model.add_data_point(
+                    ThermalDataPoint(
+                        timestamp=ts,
+                        indoor_temp=20.0,
+                        outdoor_temp=5.0,  # ΔT = 15°C
+                        heating_on=heating_on,
+                    )
+                )
 
         return model
 
@@ -497,12 +506,14 @@ class TestThermalLossModelKCalculation:
             # Heating on for exactly the first 6 hours
             heating_on = hour < 6
 
-            model.add_data_point(ThermalDataPoint(
-                timestamp=ts,
-                indoor_temp=20.0,
-                outdoor_temp=5.0,  # ΔT = 15°C
-                heating_on=heating_on,
-            ))
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=ts,
+                    indoor_temp=20.0,
+                    outdoor_temp=5.0,  # ΔT = 15°C
+                    heating_on=heating_on,
+                )
+            )
 
         # Expected K = 1000 * 6 / (15 * 24) ≈ 16.67 W/°C
         expected_k = (heater_power * 6) / (15 * 24)
@@ -510,4 +521,3 @@ class TestThermalLossModelKCalculation:
         assert model.k_coefficient_24h is not None
         # Allow some tolerance due to discrete sampling
         assert model.k_coefficient_24h == pytest.approx(expected_k, rel=0.1)
-
