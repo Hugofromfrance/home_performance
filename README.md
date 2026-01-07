@@ -423,6 +423,7 @@ A comprehensive card that displays **all your zones in one place**. No need to s
 - 📈 **Historical K graph** - 7-day history with bar chart (full) or sparkline (badge/pill)
 - 🌡️ **Temperatures** - Indoor/Outdoor in real-time
 - 📉 **Detailed metrics** - K coefficient, Energy, Heating time
+- 💨 **Wind data** - Current wind speed, direction and room exposure (full/badge/multi layouts)
 - ⏳ **Progress** - Progress bar during initial analysis
 - 🎨 **Adaptive design** - Adapts to light/dark theme
 - 🎛️ **Visual editor** - Choose layout directly in the UI
@@ -529,11 +530,14 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Power threshold | Detection threshold in Watts (default: 50W) |
 | External energy counter | sensor.xxx_energy (your own HA Utility Meter) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
+| Weather entity | weather.xxx (for wind data display - shared between zones) |
+| Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
 
 > **Notes**:
 > - If you provide an external energy counter AND a power sensor, the external counter is used as priority for energy.
 > - The power sensor also enables **precise heat detection** (power > threshold), ideal for heaters with internal thermostat or pilot wire. The threshold is configurable (default: 50W).
 > - The **Window/Door sensor** allows using a physical contact sensor (window, door, opening) for accurate open detection instead of relying on temperature-based detection. If the sensor is unavailable, it falls back to temperature detection automatically.
+> - The **Weather entity** enables wind data display on cards. Combined with room orientation, it calculates wind exposure (exposed/sheltered) to help understand K coefficient variations.
 > - Options are **modifiable afterwards** and the integration reloads automatically.
 
 ### 📱 Window Open Notifications
@@ -684,8 +688,9 @@ Needs optimization : beyond
 - [x] **Configurable graph display** (`show_graph` option)
 - [x] **Efficiency factor** for heat pumps (COP) and gas systems
 - [x] **Physical window/door sensor** support
-- [x] **Multi-zone card** - All zones in one card with List/Compare views 🆕
-- [x] **Long-term history** - 5 years of daily data storage 🆕
+- [x] **Multi-zone card** - All zones in one card with List/Compare views
+- [x] **Long-term history** - 5 years of daily data storage
+- [x] **Wind data display** - Weather entity integration with wind exposure 🆕
 
 ### 🔜 Next - Alerts & Notifications
 
