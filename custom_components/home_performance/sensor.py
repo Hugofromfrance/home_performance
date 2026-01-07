@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DOMAIN, CONF_ZONE_NAME, VERSION
+from .const import DOMAIN, CONF_ZONE_NAME, VERSION, SENSOR_ENTITY_SUFFIXES
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -146,6 +146,11 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
         # Use slugify for consistent handling of special characters (ü, é, ç, etc.)
         zone_slug = slugify(zone_name, separator="_")
         self._attr_unique_id = f"home_performance_{zone_slug}_{sensor_type}"
+
+        # Suggest standardized entity_id for new installations
+        # Existing users keep their current entity_id via Entity Registry
+        suffix = SENSOR_ENTITY_SUFFIXES.get(sensor_type, sensor_type)
+        self._attr_suggested_object_id = f"home_performance_{zone_slug}_{suffix}"
 
     @property
     def device_info(self) -> dict[str, Any]:

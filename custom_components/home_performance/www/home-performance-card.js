@@ -401,24 +401,27 @@ class HomePerformanceCard extends LitElement {
       .replace(/^_+|_+$/g, '');
   }
 
-  // Entity name mappings: French (primary) -> English (fallback)
-  // This handles systems where HA generates entity IDs from translated names
+  // Entity name mappings: NEW standardized name first, then legacy variants for backward compatibility
+  // New installations use first entry (English), existing users match via fallbacks (French/legacy)
   _entityMappings = {
-    // Binary sensors
-    "donnees_pretes": ["donnees_pretes", "data_ready"],
-    "fenetre_ouverte": ["fenetre_ouverte", "window_open"],
-    // Sensors
-    "coefficient_k": ["coefficient_k", "k_coefficient"],
-    "k_par_m3": ["k_par_m3", "k_per_m3"],
-    "note_d_isolation": ["note_d_isolation", "insulation_rating", "note_isolation"],
-    "performance_energetique": ["performance_energetique", "energy_performance"],
-    "energie_mesuree_jour": ["energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
-    "energie_24h_estimee": ["energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy", "daily_estimated_energy"],
-    "temps_de_chauffe_24h": ["temps_de_chauffe_24h", "heating_time_24h", "daily_heating_time"],
-    "ratio_de_chauffe": ["ratio_de_chauffe", "heating_ratio"],
-    "dt_moyen_24h": ["dt_moyen_24h", "average_delta_t", "avg_delta_t_24h", "average_dt_24h"],
-    "progression_analyse": ["progression_analyse", "analysis_progress"],
-    "temps_restant_analyse": ["temps_restant_analyse", "analysis_time_remaining"],
+    // Binary sensors - standardized first, then legacy
+    "donnees_pretes": ["data_ready", "donnees_pretes"],
+    "fenetre_ouverte": ["window_open", "fenetre_ouverte"],
+    "chauffage_actif": ["heating_active", "chauffage_actif"],
+    // Sensors - standardized first, then legacy variants
+    "coefficient_k": ["k_coefficient", "coefficient_k"],
+    "k_par_m2": ["k_per_m2", "k_par_m2"],
+    "k_par_m3": ["k_per_m3", "k_par_m3"],
+    "note_d_isolation": ["insulation_rating", "note_d_isolation", "note_isolation"],
+    "performance_energetique": ["energy_performance", "performance_energetique"],
+    "energie_mesuree_jour": ["measured_energy_daily", "energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
+    "energie_24h_estimee": ["daily_estimated_energy", "energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy"],
+    "temps_de_chauffe_24h": ["heating_time_24h", "temps_de_chauffe_24h", "daily_heating_time"],
+    "ratio_de_chauffe": ["heating_ratio_24h", "ratio_de_chauffe", "taux_de_chauffe_24h", "heating_ratio"],
+    "dt_moyen_24h": ["avg_delta_t_24h", "dt_moyen_24h", "average_delta_t", "average_dt_24h"],
+    "progression_analyse": ["analysis_progress", "progression_analyse"],
+    "temps_restant_analyse": ["analysis_remaining", "temps_restant_analyse", "analysis_time_remaining"],
+    "heures_de_donnees": ["data_hours", "heures_de_donnees"],
   };
 
   _getEntityId(suffix) {
