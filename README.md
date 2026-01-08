@@ -2,6 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/Hugofromfrance/home_performance.svg)](https://github.com/Hugofromfrance/home_performance/releases)
+[![Tests](https://github.com/Hugofromfrance/home_performance/actions/workflows/tests.yml/badge.svg)](https://github.com/Hugofromfrance/home_performance/actions/workflows/tests.yml)
 [![Liberapay](https://img.shields.io/liberapay/goal/Hugofromfrance.svg?logo=liberapay)](https://liberapay.com/Hugofromfrance/donate)
 
 A Home Assistant integration to analyze and monitor the thermal performance of your home.
