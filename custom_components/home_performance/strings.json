@@ -140,14 +140,14 @@
   "selector": {
     "room_orientation": {
       "options": {
-        "N": "North",
-        "NE": "North-East",
-        "E": "East",
-        "SE": "South-East",
-        "S": "South",
-        "SW": "South-West",
-        "W": "West",
-        "NW": "North-West"
+        "n": "North",
+        "ne": "North-East",
+        "e": "East",
+        "se": "South-East",
+        "s": "South",
+        "sw": "South-West",
+        "w": "West",
+        "nw": "North-West"
       }
     }
   }

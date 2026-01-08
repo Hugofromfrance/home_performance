@@ -214,14 +214,14 @@
   "selector": {
     "room_orientation": {
       "options": {
-        "N": "Nord",
-        "NE": "Nord-Est",
-        "E": "Est",
-        "SE": "Sud-Est",
-        "S": "Sud",
-        "SW": "Sud-Ouest",
-        "W": "Ouest",
-        "NW": "Nord-Ouest"
+        "n": "Nord",
+        "ne": "Nord-Est",
+        "e": "Est",
+        "se": "Sud-Est",
+        "s": "Sud",
+        "sw": "Sud-Ouest",
+        "w": "Ouest",
+        "nw": "Nord-Ouest"
       }
     }
   }

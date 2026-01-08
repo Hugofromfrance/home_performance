@@ -150,7 +150,7 @@ class TestOrientations:
 
     def test_orientations_contains_expected(self):
         """Test ORIENTATIONS contains expected directions."""
-        expected = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        expected = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
         assert set(ORIENTATIONS) == set(expected)
 
 

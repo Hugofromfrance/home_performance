@@ -75,7 +75,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Weather settings
         self.weather_entity: str | None = config.get(CONF_WEATHER_ENTITY)
-        self.room_orientation: str | None = config.get(CONF_ROOM_ORIENTATION)
+        # Normalize orientation to lowercase (supports legacy uppercase values)
+        raw_orientation = config.get(CONF_ROOM_ORIENTATION)
+        self.room_orientation: str | None = raw_orientation.lower() if raw_orientation else None
 
         # Notification settings
         self.window_notification_enabled: bool = config.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
@@ -1094,12 +1096,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             - "exposed": Wind within ±45° of facade direction
             - "sheltered": Wind outside ±45° of facade direction
         """
-        # Direction order for calculation
-        directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        # Direction order for calculation (lowercase)
+        directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+
+        # Normalize inputs to lowercase for comparison
+        wind_dir_lower = wind_direction.lower() if wind_direction else ""
+        room_orient_lower = room_orientation.lower() if room_orientation else ""
 
         try:
-            wind_idx = directions.index(wind_direction)
-            room_idx = directions.index(room_orientation)
+            wind_idx = directions.index(wind_dir_lower)
+            room_idx = directions.index(room_orient_lower)
         except ValueError:
             return "unknown"
 

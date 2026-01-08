@@ -38,7 +38,7 @@ CONF_WEATHER_ENTITY = "weather_entity"  # Entité météo pour vent (partagée)
 CONF_ROOM_ORIENTATION = "room_orientation"  # Orientation principale de la pièce (N, NE, E, SE, S, SO, O, NO)
 
 # Room orientations
-ORIENTATIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+ORIENTATIONS = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 
 # Notification settings
 CONF_WINDOW_NOTIFICATION_ENABLED = "window_notification_enabled"
