@@ -13,6 +13,11 @@
 * Archive data for 5 years ([bf3c255](https://github.com/Hugofromfrance/home_performance/commit/bf3c2553d5a913fc0cb8d002d90ccb622ecf8845))
 
 
+### 🔧 Améliorations
+
+* Standardize entity_id naming for new installations (English names) while preserving backward compatibility for existing users ([#53](https://github.com/Hugofromfrance/home_performance/issues/53))
+
+
 ### 🐛 Corrections de bugs
 
 * display correct value for instan k in multi zone card detail ([036bc95](https://github.com/Hugofromfrance/home_performance/commit/036bc95e19e4e25e9a3b0a1f0439dcebff685c37))

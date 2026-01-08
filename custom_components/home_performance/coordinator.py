@@ -1,46 +1,47 @@
 """DataUpdateCoordinator for Home Performance."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers import device_registry as dr
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfTemperature
-from homeassistant.core import HomeAssistant, callback, Event
+from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 from homeassistant.util.unit_conversion import TemperatureConverter
-import time
 
 from .const import (
-    DOMAIN,
-    CONF_INDOOR_TEMP_SENSOR,
-    CONF_OUTDOOR_TEMP_SENSOR,
-    CONF_HEATING_ENTITY,
-    CONF_HEATER_POWER,
-    CONF_POWER_SENSOR,
     CONF_ENERGY_SENSOR,
-    CONF_ZONE_NAME,
+    CONF_HEATER_POWER,
+    CONF_HEATING_ENTITY,
+    CONF_INDOOR_TEMP_SENSOR,
+    CONF_NOTIFICATION_DELAY,
+    CONF_NOTIFY_DEVICE,
+    CONF_OUTDOOR_TEMP_SENSOR,
+    CONF_POWER_SENSOR,
+    CONF_POWER_THRESHOLD,
+    CONF_ROOM_ORIENTATION,
     CONF_SURFACE,
     CONF_VOLUME,
-    CONF_POWER_THRESHOLD,
-    CONF_WINDOW_SENSOR,
     CONF_WEATHER_ENTITY,
-    CONF_ROOM_ORIENTATION,
     CONF_WINDOW_NOTIFICATION_ENABLED,
-    CONF_NOTIFY_DEVICE,
-    CONF_NOTIFICATION_DELAY,
+    CONF_WINDOW_SENSOR,
+    CONF_ZONE_NAME,
+    DEFAULT_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
-    DEFAULT_NOTIFICATION_DELAY,
+    DOMAIN,
 )
-from .models import ThermalLossModel, ThermalDataPoint
+from .models import ThermalDataPoint, ThermalLossModel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +75,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Weather settings
         self.weather_entity: str | None = config.get(CONF_WEATHER_ENTITY)
-        self.room_orientation: str | None = config.get(CONF_ROOM_ORIENTATION)
+        # Normalize orientation to lowercase (supports legacy uppercase values)
+        raw_orientation = config.get(CONF_ROOM_ORIENTATION)
+        self.room_orientation: str | None = raw_orientation.lower() if raw_orientation else None
 
         # Notification settings
         self.window_notification_enabled: bool = config.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
@@ -92,7 +95,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.power_sensor,
             self.energy_sensor,
             self.heater_power,
-            self.window_sensor
+            self.window_sensor,
         )
 
         # Thermal model
@@ -190,7 +193,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 new_power = 0.0
 
             try:
-                old_power = float(old_state.state) if old_state and old_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN) else 0.0
+                old_power = (
+                    float(old_state.state)
+                    if old_state and old_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+                    else 0.0
+                )
             except (ValueError, TypeError):
                 old_power = 0.0
 
@@ -200,7 +207,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             _LOGGER.debug(
                 "[%s] Power sensor changed: %.1fW -> %.1fW (heating: %s -> %s)",
-                self.zone_name, old_power, new_power, was_heating, is_heating_now
+                self.zone_name,
+                old_power,
+                new_power,
+                was_heating,
+                is_heating_now,
             )
 
             # Heating started
@@ -222,7 +233,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._estimated_energy_daily_kwh += energy_kwh
                     _LOGGER.info(
                         "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min), Energy: %.4f kWh",
-                        self.zone_name, duration, duration / 60, energy_kwh
+                        self.zone_name,
+                        duration,
+                        duration / 60,
+                        energy_kwh,
                     )
                 self._heating_start_time = None
                 self._is_heating_realtime = False
@@ -255,9 +269,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 unit = new_state.attributes.get("unit_of_measurement", UnitOfTemperature.CELSIUS)
                 if unit == UnitOfTemperature.FAHRENHEIT:
                     new_temp = TemperatureConverter.convert(
-                        new_temp,
-                        UnitOfTemperature.FAHRENHEIT,
-                        UnitOfTemperature.CELSIUS
+                        new_temp, UnitOfTemperature.FAHRENHEIT, UnitOfTemperature.CELSIUS
                     )
             except (ValueError, TypeError):
                 return
@@ -281,9 +293,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
                     was_window_open = self._window_open_realtime
                     is_rapid_drop = (
-                        (self._is_heating_realtime and rate_per_minute < DROP_THRESHOLD_HEATING)
-                        or rate_per_minute < DROP_THRESHOLD_ANY
-                    )
+                        self._is_heating_realtime and rate_per_minute < DROP_THRESHOLD_HEATING
+                    ) or rate_per_minute < DROP_THRESHOLD_ANY
 
                     if is_rapid_drop:
                         self._consecutive_drops += 1
@@ -293,7 +304,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                                 self._window_open_since = now
                                 _LOGGER.warning(
                                     "[%s] 🪟 Window OPEN detected! Temp drop: %.2f°C/min (heating: %s)",
-                                    self.zone_name, abs(rate_per_minute), self._is_heating_realtime
+                                    self.zone_name,
+                                    abs(rate_per_minute),
+                                    self._is_heating_realtime,
                                 )
                                 # Trigger notification if heating is on and notifications enabled
                                 if self._is_heating_realtime:
@@ -312,7 +325,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         if was_window_open and self._window_open_since:
                             minutes_open = (now - self._window_open_since) / 60
                             if minutes_open > 5:
-                                _LOGGER.info("[%s] 🪟 Window CLOSED (temperature stabilized after %.1f min)", self.zone_name, minutes_open)
+                                _LOGGER.info(
+                                    "[%s] 🪟 Window CLOSED (temperature stabilized after %.1f min)",
+                                    self.zone_name,
+                                    minutes_open,
+                                )
                                 self._cancel_window_notification()
                                 self._window_open_realtime = False
                                 self._window_open_since = None
@@ -339,9 +356,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._notification_task.cancel()
 
         # Create a new notification task
-        self._notification_task = self.hass.async_create_task(
-            self._async_send_window_notification()
-        )
+        self._notification_task = self.hass.async_create_task(self._async_send_window_notification())
 
     def _cancel_window_notification(self) -> None:
         """Cancel any pending window notification."""
@@ -546,10 +561,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # If sensors not available yet, return restored data (not empty!)
             if indoor_temp is None or outdoor_temp is None:
-                _LOGGER.debug(
-                    "[%s] Temperature sensors not available yet, returning restored data",
-                    self.zone_name
-                )
+                _LOGGER.debug("[%s] Temperature sensors not available yet, returning restored data", self.zone_name)
                 return self._get_restored_data()
 
             now = dt_util.utcnow().timestamp()
@@ -599,7 +611,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             heating_seconds = self._heating_seconds_daily
             if self._is_heating_realtime and self._heating_start_time is not None:
                 # Add time from current ongoing heating session
-                heating_seconds += (now - self._heating_start_time)
+                heating_seconds += now - self._heating_start_time
             heating_hours_daily = heating_seconds / 3600
 
             # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
@@ -728,7 +740,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Include ongoing heating session in the total
         heating_seconds = self._heating_seconds_daily
         if self._is_heating_realtime and self._heating_start_time is not None:
-            heating_seconds += (time.time() - self._heating_start_time)
+            heating_seconds += time.time() - self._heating_start_time
         heating_hours_daily = heating_seconds / 3600
 
         # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
@@ -792,26 +804,30 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._last_daily_reset_date != today:
             _LOGGER.warning(
                 "[%s] 🌙 MIDNIGHT RESET TRIGGERED - previous_date=%s, new_date=%s, samples=%d",
-                self.zone_name, self._last_daily_reset_date, today, self._delta_t_count_daily
+                self.zone_name,
+                self._last_daily_reset_date,
+                today,
+                self._delta_t_count_daily,
             )
 
             # Archive yesterday's data BEFORE resetting (if we have data)
             if self._last_daily_reset_date and self._delta_t_count_daily > 0:
                 _LOGGER.warning(
                     "[%s] 📦 ARCHIVING day %s with %d samples",
-                    self.zone_name, self._last_daily_reset_date, self._delta_t_count_daily
+                    self.zone_name,
+                    self._last_daily_reset_date,
+                    self._delta_t_count_daily,
                 )
                 self._archive_daily_data(self._last_daily_reset_date)
             else:
                 _LOGGER.warning(
                     "[%s] ⚠️ SKIPPING archive - last_date=%s, samples=%d",
-                    self.zone_name, self._last_daily_reset_date, self._delta_t_count_daily
+                    self.zone_name,
+                    self._last_daily_reset_date,
+                    self._delta_t_count_daily,
                 )
 
-            _LOGGER.info(
-                "[%s] 🌙 Daily reset (new day: %s)",
-                self.zone_name, today
-            )
+            _LOGGER.info("[%s] 🌙 Daily reset (new day: %s)", self.zone_name, today)
             # Reset all daily counters
             self._measured_energy_daily_kwh = 0.0
             self._estimated_energy_daily_kwh = 0.0
@@ -820,9 +836,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._delta_t_count_daily = 0
             self._reset_daily_wind_counters()
             self._last_daily_reset_date = today
-            self._daily_reset_datetime = now_dt.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            self._daily_reset_datetime = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
     def _archive_daily_data(self, date: str) -> None:
         """Archive a day's data to the thermal model's 7-day history.
@@ -833,18 +847,14 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             date: The date (YYYY-MM-DD) of the data to archive
         """
         # Calculate averages
-        avg_delta_t = (
-            self._delta_t_sum_daily / self._delta_t_count_daily
-            if self._delta_t_count_daily > 0 else 0.0
-        )
+        avg_delta_t = self._delta_t_sum_daily / self._delta_t_count_daily if self._delta_t_count_daily > 0 else 0.0
 
         # Get average temps from the last aggregation or estimate
-        analysis = self.thermal_model.get_analysis()
         avg_indoor = 0.0
         avg_outdoor = 0.0
 
         # Try to get from model's last aggregation
-        if hasattr(self.thermal_model, '_last_aggregation') and self.thermal_model._last_aggregation:
+        if hasattr(self.thermal_model, "_last_aggregation") and self.thermal_model._last_aggregation:
             agg = self.thermal_model._last_aggregation
             avg_indoor = agg.avg_indoor_temp
             avg_outdoor = agg.avg_outdoor_temp
@@ -859,11 +869,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         _LOGGER.info(
             "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, samples=%d, k_7d=%.1f, wind=%.1f km/h %s",
-            self.zone_name, date, heating_hours, avg_delta_t,
-            self._estimated_energy_daily_kwh, self._delta_t_count_daily,
+            self.zone_name,
+            date,
+            heating_hours,
+            avg_delta_t,
+            self._estimated_energy_daily_kwh,
+            self._delta_t_count_daily,
             current_k_7d if current_k_7d else 0.0,
             avg_wind_speed if avg_wind_speed else 0.0,
-            dominant_wind_direction if dominant_wind_direction else "N/A"
+            dominant_wind_direction if dominant_wind_direction else "N/A",
         )
 
         # Add to thermal model history (with the K_7j score we had at this moment)
@@ -885,7 +899,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         new_k_7d = self.thermal_model.k_coefficient_7d
         _LOGGER.warning(
             "[%s] ✅ ARCHIVE COMPLETE - history_days=%d, k_7d=%s W/°C",
-            self.zone_name, history_count, f"{new_k_7d:.1f}" if new_k_7d else "None"
+            self.zone_name,
+            history_count,
+            f"{new_k_7d:.1f}" if new_k_7d else "None",
         )
 
     def reset_history(self) -> None:
@@ -977,10 +993,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Dominant wind direction (most frequent)
         dominant_direction = None
         if self._wind_direction_counts_daily:
-            dominant_direction = max(
-                self._wind_direction_counts_daily,
-                key=self._wind_direction_counts_daily.get
-            )
+            dominant_direction = max(self._wind_direction_counts_daily, key=self._wind_direction_counts_daily.get)
 
         return avg_wind_speed, dominant_direction
 
@@ -1008,9 +1021,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Convert to Celsius if needed
             if unit == UnitOfTemperature.FAHRENHEIT:
                 temp_value = TemperatureConverter.convert(
-                    temp_value,
-                    UnitOfTemperature.FAHRENHEIT,
-                    UnitOfTemperature.CELSIUS
+                    temp_value, UnitOfTemperature.FAHRENHEIT, UnitOfTemperature.CELSIUS
                 )
 
             return temp_value
@@ -1074,9 +1085,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Calculate wind exposure if room orientation is configured
         if self.room_orientation and result["wind_direction"]:
-            result["wind_exposure"] = self._calculate_wind_exposure(
-                result["wind_direction"], self.room_orientation
-            )
+            result["wind_exposure"] = self._calculate_wind_exposure(result["wind_direction"], self.room_orientation)
 
         return result
 
@@ -1087,12 +1096,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             - "exposed": Wind within ±45° of facade direction
             - "sheltered": Wind outside ±45° of facade direction
         """
-        # Direction order for calculation
-        directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        # Direction order for calculation (lowercase)
+        directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+
+        # Normalize inputs to lowercase for comparison
+        wind_dir_lower = wind_direction.lower() if wind_direction else ""
+        room_orient_lower = room_orientation.lower() if room_orientation else ""
 
         try:
-            wind_idx = directions.index(wind_direction)
-            room_idx = directions.index(room_orientation)
+            wind_idx = directions.index(wind_dir_lower)
+            room_idx = directions.index(room_orient_lower)
         except ValueError:
             return "unknown"
 
@@ -1126,7 +1139,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     is_heating = power_w > self.power_threshold
                     _LOGGER.debug(
                         "[%s] Heating detection via power sensor %s: %.1fW (threshold: %.0fW) -> heating=%s",
-                        self.zone_name, self.power_sensor, power_w, self.power_threshold, is_heating
+                        self.zone_name,
+                        self.power_sensor,
+                        power_w,
+                        self.power_threshold,
+                        is_heating,
                     )
                     return is_heating
                 except (ValueError, TypeError) as err:
@@ -1136,7 +1153,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # DO NOT fallback to switch (it's always ON for thermostatic radiators)
             _LOGGER.debug(
                 "[%s] Power sensor %s unavailable (state=%s), assuming not heating",
-                self.zone_name, self.power_sensor, power_state.state if power_state else "None"
+                self.zone_name,
+                self.power_sensor,
+                power_state.state if power_state else "None",
             )
             return False
 
@@ -1156,7 +1175,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hvac_mode = state.state  # heat, cool, heat_cool, off, etc.
             _LOGGER.debug(
                 "[%s] Heating via climate %s: hvac_mode=%s, hvac_action=%s",
-                self.zone_name, self.heating_entity, hvac_mode, hvac_action
+                self.zone_name,
+                self.heating_entity,
+                hvac_mode,
+                hvac_action,
             )
             # Check hvac_action first (most reliable - indicates actual heating activity)
             if hvac_action:
@@ -1166,8 +1188,13 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Handle switch/input_boolean
         is_on = state.state == STATE_ON
-        _LOGGER.debug("[%s] Heating via switch %s: state=%s -> heating=%s",
-                      self.zone_name, self.heating_entity, state.state, is_on)
+        _LOGGER.debug(
+            "[%s] Heating via switch %s: state=%s -> heating=%s",
+            self.zone_name,
+            self.heating_entity,
+            state.state,
+            is_on,
+        )
         return is_on
 
     def _get_window_open_state(self, current_temp: float, now: float) -> tuple[bool, str]:
@@ -1188,8 +1215,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return (is_open, "sensor")
             # Sensor unavailable - fall back to temperature detection
             _LOGGER.debug(
-                "[%s] Window sensor %s unavailable, using temperature detection",
-                self.zone_name, self.window_sensor
+                "[%s] Window sensor %s unavailable, using temperature detection", self.zone_name, self.window_sensor
             )
 
         # Priority 2: Temperature-based detection (real-time + polling fallback)
@@ -1247,9 +1273,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._measured_energy_daily_kwh = 0.0
             self._last_daily_reset_date = today
             # Store the reset datetime for utility meter compatibility
-            self._daily_reset_datetime = now_dt.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            self._daily_reset_datetime = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # Get current power value
         power_state = self.hass.states.get(self.power_sensor)

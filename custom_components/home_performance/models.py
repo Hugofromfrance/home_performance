@@ -17,20 +17,21 @@ Example: 1000W heater running 6h/24h to maintain 19°C when it's 5°C outside:
 
 This room loses 18W per degree of temperature difference with outside.
 """
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from collections import deque
+from dataclasses import dataclass
 from typing import Any
 
 from .const import (
     AGGREGATION_PERIOD_HOURS,
-    MIN_DELTA_T,
-    MIN_HEATING_TIME_HOURS,
-    MIN_DATA_HOURS,
     HISTORY_DAYS,
     LONG_TERM_HISTORY_DAYS,
+    MIN_DATA_HOURS,
+    MIN_DELTA_T,
+    MIN_HEATING_TIME_HOURS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -139,7 +140,7 @@ class DailyHistoryEntry:
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DailyHistoryEntry":
+    def from_dict(cls, data: dict[str, Any]) -> DailyHistoryEntry:
         """Create from dictionary."""
         return cls(
             date=data["date"],
@@ -218,9 +219,7 @@ class ThermalLossModel:
         """Get hours of data collected."""
         if len(self.data_points) < 2:
             return 0.0
-        return (
-            self.data_points[-1].timestamp - self.data_points[0].timestamp
-        ) / SECONDS_PER_HOUR
+        return (self.data_points[-1].timestamp - self.data_points[0].timestamp) / SECONDS_PER_HOUR
 
     @property
     def k_coefficient(self) -> float | None:
@@ -308,9 +307,7 @@ class ThermalLossModel:
         period_points = [p for p in self.data_points if p.timestamp >= period_start]
 
         if len(period_points) < 10:  # Need minimum points for aggregation
-            _LOGGER.debug(
-                "Not enough points for K calculation: %d", len(period_points)
-            )
+            _LOGGER.debug("Not enough points for K calculation: %d", len(period_points))
             return
 
         # Calculate aggregated values - ALWAYS update aggregation even if K won't be calculated
@@ -346,8 +343,7 @@ class ThermalLossModel:
         self._last_valid_k = k  # Preserve this valid K
 
         _LOGGER.info(
-            "K calculated for %s: %.1f W/°C "
-            "(energy=%.0f Wh, ΔT=%.1f°C, duration=%.1fh, heating=%.1fh)",
+            "K calculated for %s: %.1f W/°C " "(energy=%.0f Wh, ΔT=%.1f°C, duration=%.1fh, heating=%.1fh)",
             self.zone_name,
             k,
             energy_wh,
@@ -420,8 +416,7 @@ class ThermalLossModel:
         # Don't add if we don't have meaningful data
         if sample_count < 10:
             _LOGGER.debug(
-                "[%s] Skipping daily archive for %s - insufficient samples (%d)",
-                self.zone_name, date, sample_count
+                "[%s] Skipping daily archive for %s - insufficient samples (%d)", self.zone_name, date, sample_count
             )
             return
 
@@ -453,10 +448,13 @@ class ThermalLossModel:
             _LOGGER.debug("[%s] Removed oldest history entry: %s", self.zone_name, removed.date)
 
         _LOGGER.info(
-            "[%s] 📅 Added daily summary for %s: %.1fh heating, ΔT=%.1f°C, %.2f kWh "
-            "(history: %d days)",
-            self.zone_name, date, heating_hours, avg_delta_t, energy_kwh,
-            len(self._daily_history)
+            "[%s] 📅 Added daily summary for %s: %.1fh heating, ΔT=%.1f°C, %.2f kWh " "(history: %d days)",
+            self.zone_name,
+            date,
+            heating_hours,
+            avg_delta_t,
+            energy_kwh,
+            len(self._daily_history),
         )
 
         # Recalculate 7-day K coefficient
@@ -473,18 +471,20 @@ class ThermalLossModel:
             return
 
         # Only use the last HISTORY_DAYS (7) days for K calculation
-        recent_history = self._daily_history[-HISTORY_DAYS:] if len(self._daily_history) > HISTORY_DAYS else self._daily_history
+        recent_history = (
+            self._daily_history[-HISTORY_DAYS:] if len(self._daily_history) > HISTORY_DAYS else self._daily_history
+        )
 
         # Filter valid days (sufficient ΔT and heating time)
         valid_days = [
-            d for d in recent_history
-            if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
+            d for d in recent_history if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
         ]
 
         if not valid_days:
             _LOGGER.debug(
                 "[%s] No valid days in history for K calculation (%d days total)",
-                self.zone_name, len(self._daily_history)
+                self.zone_name,
+                len(self._daily_history),
             )
             return
 
@@ -504,7 +504,12 @@ class ThermalLossModel:
 
             _LOGGER.debug(
                 "[%s] Day %s: K=%.1f W/°C (heating=%.1fh, ΔT=%.1f°C, weight=%d)",
-                self.zone_name, day.date, k_day, day.heating_hours, day.avg_delta_t, weight
+                self.zone_name,
+                day.date,
+                k_day,
+                day.heating_hours,
+                day.avg_delta_t,
+                weight,
             )
 
         if total_weight > 0:
@@ -513,7 +518,10 @@ class ThermalLossModel:
 
             _LOGGER.info(
                 "[%s] 📊 7-day K coefficient: %.1f W/°C (from %d valid days, %d total)",
-                self.zone_name, self._k_coefficient_7d, len(valid_days), len(self._daily_history)
+                self.zone_name,
+                self._k_coefficient_7d,
+                len(valid_days),
+                len(self._daily_history),
             )
 
     def clear_history(self) -> None:
@@ -531,7 +539,9 @@ class ThermalLossModel:
 
         _LOGGER.info(
             "[%s] 🔄 History cleared (%d days removed). Last valid K preserved: %.1f W/°C",
-            self.zone_name, old_count, self._last_valid_k or 0
+            self.zone_name,
+            old_count,
+            self._last_valid_k or 0,
         )
 
     def clear_all(self) -> None:
@@ -564,7 +574,9 @@ class ThermalLossModel:
 
         _LOGGER.info(
             "[%s] 🗑️ COMPLETE RESET: Cleared %d history days, %d data points, all K coefficients",
-            self.zone_name, history_count, points_count
+            self.zone_name,
+            history_count,
+            points_count,
         )
 
     def get_analysis(self) -> dict[str, Any]:
@@ -582,9 +594,7 @@ class ThermalLossModel:
             "heating_hours": agg.heating_hours if agg else None,
             "heating_ratio": agg.heating_ratio if agg else None,
             "avg_delta_t": agg.delta_t if agg else None,
-            "daily_energy_kwh": (
-                (self.heater_power * agg.heating_hours / 1000) if agg else None
-            ),
+            "daily_energy_kwh": ((self.heater_power * agg.heating_hours / 1000) if agg else None),
             # Cumulative energy (for Energy Dashboard)
             "total_energy_kwh": self._total_energy_kwh,
             # Status
@@ -835,12 +845,16 @@ class ThermalLossModel:
             "k_coefficient_7d": self._k_coefficient_7d,
             "last_valid_k": self._last_valid_k,
             "total_energy_kwh": self._total_energy_kwh,
-            "last_point": {
-                "timestamp": self._last_point.timestamp,
-                "indoor_temp": self._last_point.indoor_temp,
-                "outdoor_temp": self._last_point.outdoor_temp,
-                "heating_on": self._last_point.heating_on,
-            } if self._last_point else None,
+            "last_point": (
+                {
+                    "timestamp": self._last_point.timestamp,
+                    "indoor_temp": self._last_point.indoor_temp,
+                    "outdoor_temp": self._last_point.outdoor_temp,
+                    "heating_on": self._last_point.heating_on,
+                }
+                if self._last_point
+                else None
+            ),
             # 7-day history for stable K calculation
             "daily_history": [entry.to_dict() for entry in self._daily_history],
         }
@@ -857,12 +871,14 @@ class ThermalLossModel:
         if "data_points" in data:
             self.data_points.clear()
             for p in data["data_points"]:
-                self.data_points.append(ThermalDataPoint(
-                    timestamp=p["timestamp"],
-                    indoor_temp=p["indoor_temp"],
-                    outdoor_temp=p["outdoor_temp"],
-                    heating_on=p["heating_on"],
-                ))
+                self.data_points.append(
+                    ThermalDataPoint(
+                        timestamp=p["timestamp"],
+                        indoor_temp=p["indoor_temp"],
+                        outdoor_temp=p["outdoor_temp"],
+                        heating_on=p["heating_on"],
+                    )
+                )
 
         # Restore calculated values
         if "k_coefficient" in data:
@@ -902,16 +918,10 @@ class ThermalLossModel:
                     entry = DailyHistoryEntry.from_dict(entry_data)
                     self._daily_history.append(entry)
                 except (KeyError, TypeError) as err:
-                    _LOGGER.warning(
-                        "[%s] Could not restore history entry: %s",
-                        self.zone_name, err
-                    )
+                    _LOGGER.warning("[%s] Could not restore history entry: %s", self.zone_name, err)
             # Sort by date
             self._daily_history.sort(key=lambda e: e.date)
-            _LOGGER.info(
-                "[%s] Restored %d days of history",
-                self.zone_name, len(self._daily_history)
-            )
+            _LOGGER.info("[%s] Restored %d days of history", self.zone_name, len(self._daily_history))
 
         # Recalculate aggregation if we have data
         if self.data_hours >= MIN_DATA_HOURS:

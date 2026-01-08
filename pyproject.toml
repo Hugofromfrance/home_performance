@@ -6,13 +6,41 @@ requires-python = ">=3.12"
 
 [tool.ruff]
 target-version = "py312"
-line-length = 100
+line-length = 120
+exclude = [".venv*", "__pycache__"]
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = [
+    "E501",  # Line too long - TODO: fix progressively
+    "N806",  # Variable in function should be lowercase (allows local constants)
+]
 
 [tool.black]
-line-length = 100
+line-length = 120
 target-version = ["py312"]
+exclude = ".venv*"
 
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["custom_components/home_performance"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
