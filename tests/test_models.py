@@ -8,6 +8,7 @@ import pytest
 
 from custom_components.home_performance.models import (
     SEASON_HEATING,
+    SEASON_OFF,
     SEASON_SUMMER,
     SECONDS_PER_HOUR,
     AggregatedPeriod,
@@ -521,3 +522,217 @@ class TestThermalLossModelKCalculation:
         assert model.k_coefficient_24h is not None
         # Allow some tolerance due to discrete sampling
         assert model.k_coefficient_24h == pytest.approx(expected_k, rel=0.1)
+
+    def test_k_not_calculated_low_delta_t(self, zone_name: str, heater_power: float):
+        """Test K is not calculated when ΔT is too low."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=ts,
+                    indoor_temp=20.0,
+                    outdoor_temp=18.0,  # ΔT = 2°C (below MIN_DELTA_T=5)
+                    heating_on=True,
+                )
+            )
+
+        # K should not be calculated due to low ΔT
+        assert model.k_coefficient_24h is None
+
+    def test_k_not_calculated_low_heating_time(self, zone_name: str, heater_power: float):
+        """Test K is not calculated when heating time is too low."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            # Only 10 minutes of heating (below MIN_HEATING_TIME_HOURS=0.5)
+            heating_on = minute < 10
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=ts,
+                    indoor_temp=20.0,
+                    outdoor_temp=5.0,
+                    heating_on=heating_on,
+                )
+            )
+
+        # K should not be calculated due to insufficient heating
+        assert model.k_coefficient_24h is None
+
+
+class TestThermalLossModelInsulationStatus:
+    """Test insulation status and rating methods."""
+
+    def test_get_insulation_status_waiting_data(self, zone_name: str, heater_power: float, volume: float):
+        """Test insulation status when waiting for data."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power, volume=volume)
+        status = model.get_insulation_status()
+        assert status["status"] == "waiting_data"
+        assert status["rating"] is None
+
+    def test_get_insulation_status_calculated(self, zone_name: str, heater_power: float, volume: float):
+        """Test insulation status when K is calculated."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power, volume=volume)
+        model._k_coefficient = 25.0
+
+        # Add enough data points
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=ts,
+                    indoor_temp=20.0,
+                    outdoor_temp=5.0,
+                    heating_on=minute % 4 == 0,
+                )
+            )
+
+        status = model.get_insulation_status()
+        assert status["status"] == "calculated"
+        assert status["k_value"] == 25.0
+        assert status["k_source"] == "calculated"
+
+    def test_get_temp_stability_insufficient_data(self, zone_name: str, heater_power: float):
+        """Test temp stability with insufficient data."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        stability = model.get_temp_stability()
+        assert stability["stable"] is False
+        assert stability["min_temp"] is None
+
+    def test_get_temp_stability_stable(self, zone_name: str, heater_power: float):
+        """Test temp stability when temperature is stable."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=ts,
+                    indoor_temp=20.0 + (minute % 10) * 0.1,
+                    outdoor_temp=5.0,
+                    heating_on=False,
+                )
+            )
+
+        stability = model.get_temp_stability()
+        assert stability["stable"] is True
+        assert stability["variation"] < 3.0
+
+    def test_get_temp_stability_unstable(self, zone_name: str, heater_power: float):
+        """Test temp stability when temperature is unstable."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            indoor = 18.0 if minute % 120 < 60 else 23.0
+            model.add_data_point(ThermalDataPoint(timestamp=ts, indoor_temp=indoor, outdoor_temp=5.0, heating_on=False))
+
+        stability = model.get_temp_stability()
+        assert stability["stable"] is False
+        assert stability["variation"] >= 3.0
+
+
+class TestThermalLossModel7DayK:
+    """Test 7-day K coefficient calculation."""
+
+    def test_k_7d_not_calculated_without_history(self, zone_name: str, heater_power: float):
+        """Test K_7d is None without history."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        assert model.k_coefficient_7d is None
+
+    def test_k_7d_calculated_with_valid_history(self, zone_name: str, heater_power: float):
+        """Test K_7d is calculated from valid daily history."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        for i in range(7):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=6.0,
+                avg_delta_t=10.0,
+                energy_kwh=9.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+            )
+
+        assert model.k_coefficient_7d is not None
+        assert model.history_days_count == 7
+
+    def test_daily_history_sorted_by_date(self, zone_name: str, heater_power: float):
+        """Test that daily history is sorted by date."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        model.add_daily_summary(
+            date="2025-01-15",
+            heating_hours=6.0,
+            avg_delta_t=10.0,
+            energy_kwh=9.0,
+            avg_indoor_temp=20.0,
+            avg_outdoor_temp=10.0,
+            sample_count=100,
+        )
+        model.add_daily_summary(
+            date="2025-01-10",
+            heating_hours=6.0,
+            avg_delta_t=10.0,
+            energy_kwh=9.0,
+            avg_indoor_temp=20.0,
+            avg_outdoor_temp=10.0,
+            sample_count=100,
+        )
+
+        dates = [entry.date for entry in model.daily_history]
+        assert dates == sorted(dates)
+
+    def test_k_prefers_7d_over_24h(self, zone_name: str, heater_power: float, volume: float):
+        """Test that k_coefficient property prefers 7d over 24h."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power, volume=volume)
+        model._k_coefficient = 30.0
+        model._k_coefficient_7d = 25.0
+        assert model.k_coefficient == 25.0
+
+    def test_k_falls_back_to_24h(self, zone_name: str, heater_power: float, volume: float):
+        """Test that k_coefficient falls back to 24h when 7d is None."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power, volume=volume)
+        model._k_coefficient = 30.0
+        model._k_coefficient_7d = None
+        assert model.k_coefficient == 30.0
+
+
+class TestThermalLossModelSeasonStatus:
+    """Test season status detection."""
+
+    def test_season_off_low_delta_t(self, zone_name: str, heater_power: float):
+        """Test season is off-season when ΔT is low but positive."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=ts,
+                    indoor_temp=20.0,
+                    outdoor_temp=17.0,  # ΔT = 3°C (below MIN_DELTA_T but positive)
+                    heating_on=True,
+                )
+            )
+
+        assert model.get_season_status() == SEASON_OFF
+
+    def test_season_default_heating(self, zone_name: str, heater_power: float):
+        """Test season defaults to heating without data."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        assert model.get_season_status() == SEASON_HEATING
+
+
+class TestAggregatedPeriodEdgeCases:
+    """Test edge cases for AggregatedPeriod."""
+
+    def test_aggregate_period_raises_on_empty(self, zone_name: str, heater_power: float):
+        """Test _aggregate_period raises ValueError on empty list."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        with pytest.raises(ValueError, match="No points to aggregate"):
+            model._aggregate_period([])

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from unittest.mock import mock_open, patch
+
 from custom_components.home_performance.const import (
     AGGREGATION_PERIOD_HOURS,
     BINARY_SENSOR_ENTITY_SUFFIXES,
@@ -13,6 +16,8 @@ from custom_components.home_performance.const import (
     MIN_HEATING_TIME_HOURS,
     ORIENTATIONS,
     SENSOR_ENTITY_SUFFIXES,
+    VERSION,
+    get_version,
 )
 
 
@@ -147,3 +152,47 @@ class TestOrientations:
         """Test ORIENTATIONS contains expected directions."""
         expected = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
         assert set(ORIENTATIONS) == set(expected)
+
+
+class TestGetVersion:
+    """Test get_version function."""
+
+    def test_version_is_string(self):
+        """Test that VERSION is a string."""
+        assert isinstance(VERSION, str)
+
+    def test_version_not_empty(self):
+        """Test that VERSION is not empty or unknown in normal case."""
+        # In normal operation, version should be read from manifest.json
+        assert VERSION != ""
+
+    def test_get_version_returns_string(self):
+        """Test get_version returns a string."""
+        result = get_version()
+        assert isinstance(result, str)
+
+    def test_get_version_file_not_found(self):
+        """Test get_version returns 'unknown' when manifest.json not found."""
+        with patch("builtins.open", side_effect=FileNotFoundError()):
+            result = get_version()
+            assert result == "unknown"
+
+    def test_get_version_invalid_json(self):
+        """Test get_version returns 'unknown' when manifest.json is invalid."""
+        with patch("builtins.open", mock_open(read_data="invalid json {")):
+            result = get_version()
+            assert result == "unknown"
+
+    def test_get_version_missing_version_key(self):
+        """Test get_version returns 'unknown' when version key is missing."""
+        manifest_without_version = json.dumps({"domain": "test"})
+        with patch("builtins.open", mock_open(read_data=manifest_without_version)):
+            result = get_version()
+            assert result == "unknown"
+
+    def test_get_version_valid_manifest(self):
+        """Test get_version returns version from valid manifest."""
+        manifest_data = json.dumps({"version": "1.2.3", "domain": "test"})
+        with patch("builtins.open", mock_open(read_data=manifest_data)):
+            result = get_version()
+            assert result == "1.2.3"
