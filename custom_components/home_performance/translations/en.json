@@ -153,61 +153,55 @@
   },
   "entity": {
     "sensor": {
-      "coefficient_k": {
+      "k_coefficient": {
         "name": "K Coefficient"
       },
-      "k_par_m2": {
+      "k_per_m2": {
         "name": "K per m²"
       },
-      "k_par_m3": {
+      "k_per_m3": {
         "name": "K per m³"
       },
-      "energie_estimee_totale": {
-        "name": "Total estimated energy"
+      "daily_estimated_energy": {
+        "name": "Daily Estimated Energy"
       },
-      "energie_estimee_journaliere": {
-        "name": "Daily estimated energy"
+      "daily_measured_energy": {
+        "name": "Daily Measured Energy"
       },
-      "energie_mesuree_journaliere": {
-        "name": "Daily measured energy"
+      "heating_time_24h": {
+        "name": "Heating Time (24h)"
       },
-      "energie_mesuree_totale": {
-        "name": "Total measured energy"
+      "heating_ratio_24h": {
+        "name": "Heating Ratio (24h)"
       },
-      "temps_de_chauffe_24h": {
-        "name": "Heating time / 24h"
+      "energy_performance": {
+        "name": "Energy Performance"
       },
-      "taux_de_chauffe_24h": {
-        "name": "Heating ratio / 24h"
+      "avg_delta_t_24h": {
+        "name": "Average ΔT (24h)"
       },
-      "performance_energetique": {
-        "name": "Energy performance"
+      "data_hours": {
+        "name": "Data Hours"
       },
-      "dt_moyen_24h": {
-        "name": "Average ΔT 24h"
+      "analysis_remaining": {
+        "name": "Analysis Time Remaining"
       },
-      "heures_de_donnees": {
-        "name": "Data hours"
+      "analysis_progress": {
+        "name": "Analysis Progress"
       },
-      "temps_d_analyse_restant": {
-        "name": "Analysis time remaining"
-      },
-      "progression_analyse": {
-        "name": "Analysis progress"
-      },
-      "note_d_isolation": {
-        "name": "Insulation rating"
+      "insulation_rating": {
+        "name": "Insulation Rating"
       }
     },
     "binary_sensor": {
-      "fenetre_ouverte": {
-        "name": "Window open"
+      "window_open": {
+        "name": "Window Open"
       },
-      "chauffage_actif": {
-        "name": "Heating active"
+      "heating_active": {
+        "name": "Heating Active"
       },
-      "donnees_pretes": {
-        "name": "Data ready"
+      "data_ready": {
+        "name": "Data Ready"
       }
     }
   },

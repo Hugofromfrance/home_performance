@@ -153,60 +153,54 @@
   },
   "entity": {
     "sensor": {
-      "coefficient_k": {
+      "k_coefficient": {
         "name": "Coefficient K"
       },
-      "k_par_m2": {
+      "k_per_m2": {
         "name": "K par m²"
       },
-      "k_par_m3": {
+      "k_per_m3": {
         "name": "K par m³"
       },
-      "energie_estimee_totale": {
-        "name": "Énergie estimée totale"
-      },
-      "energie_estimee_journaliere": {
+      "daily_estimated_energy": {
         "name": "Énergie estimée journalière"
       },
-      "energie_mesuree_journaliere": {
+      "daily_measured_energy": {
         "name": "Énergie mesurée journalière"
       },
-      "energie_mesuree_totale": {
-        "name": "Énergie mesurée totale"
+      "heating_time_24h": {
+        "name": "Temps de chauffe (24h)"
       },
-      "temps_de_chauffe_24h": {
-        "name": "Temps de chauffe / 24h"
+      "heating_ratio_24h": {
+        "name": "Taux de chauffe (24h)"
       },
-      "taux_de_chauffe_24h": {
-        "name": "Taux de chauffe / 24h"
-      },
-      "performance_energetique": {
+      "energy_performance": {
         "name": "Performance énergétique"
       },
-      "dt_moyen_24h": {
-        "name": "ΔT moyen 24h"
+      "avg_delta_t_24h": {
+        "name": "ΔT moyen (24h)"
       },
-      "heures_de_donnees": {
+      "data_hours": {
         "name": "Heures de données"
       },
-      "temps_d_analyse_restant": {
+      "analysis_remaining": {
         "name": "Temps d'analyse restant"
       },
-      "progression_analyse": {
+      "analysis_progress": {
         "name": "Progression analyse"
       },
-      "note_d_isolation": {
+      "insulation_rating": {
         "name": "Note d'isolation"
       }
     },
     "binary_sensor": {
-      "fenetre_ouverte": {
+      "window_open": {
         "name": "Fenêtre ouverte"
       },
-      "chauffage_actif": {
+      "heating_active": {
         "name": "Chauffage actif"
       },
-      "donnees_pretes": {
+      "data_ready": {
         "name": "Données prêtes"
       }
     }
