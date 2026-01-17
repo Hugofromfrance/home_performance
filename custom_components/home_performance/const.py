@@ -1,4 +1,5 @@
 """Constants for Home Performance integration."""
+
 import json
 from pathlib import Path
 
@@ -37,7 +38,7 @@ CONF_WEATHER_ENTITY = "weather_entity"  # Entité météo pour vent (partagée)
 CONF_ROOM_ORIENTATION = "room_orientation"  # Orientation principale de la pièce (N, NE, E, SE, S, SO, O, NO)
 
 # Room orientations
-ORIENTATIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+ORIENTATIONS = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 
 # Notification settings
 CONF_WINDOW_NOTIFICATION_ENABLED = "window_notification_enabled"
@@ -70,3 +71,27 @@ SENSOR_AVG_DELTA_T = "avg_delta_t"  # ΔT moyen
 # Binary sensors
 BINARY_SENSOR_WINDOW_OPEN = "window_open_detected"
 BINARY_SENSOR_DATA_READY = "data_ready"
+
+# Standardized entity_id suffixes (English, for new installations)
+# Existing users keep their current entity_id via Entity Registry
+SENSOR_ENTITY_SUFFIXES = {
+    "k_coefficient": "k_coefficient",
+    "k_per_m2": "k_per_m2",
+    "k_per_m3": "k_per_m3",
+    "daily_energy": "daily_estimated_energy",
+    "heating_time": "heating_time_24h",
+    "heating_ratio": "heating_ratio_24h",
+    "energy_performance": "energy_performance",
+    "avg_delta_t": "avg_delta_t_24h",
+    "data_hours": "data_hours",
+    "analysis_remaining": "analysis_remaining",
+    "analysis_progress": "analysis_progress",
+    "insulation_rating": "insulation_rating",
+    "measured_energy_daily": "measured_energy_daily",
+}
+
+BINARY_SENSOR_ENTITY_SUFFIXES = {
+    "window_open": "window_open",
+    "heating_active": "heating_active",
+    "data_ready": "data_ready",
+}

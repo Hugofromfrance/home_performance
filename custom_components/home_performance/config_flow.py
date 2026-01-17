@@ -1,38 +1,38 @@
 """Config flow for Home Performance integration."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import selector
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
-    DOMAIN,
-    CONF_INDOOR_TEMP_SENSOR,
-    CONF_OUTDOOR_TEMP_SENSOR,
-    CONF_HEATING_ENTITY,
-    CONF_HEATER_POWER,
-    CONF_POWER_SENSOR,
     CONF_ENERGY_SENSOR,
-    CONF_ZONE_NAME,
+    CONF_HEATER_POWER,
+    CONF_HEATING_ENTITY,
+    CONF_INDOOR_TEMP_SENSOR,
+    CONF_NOTIFICATION_DELAY,
+    CONF_NOTIFY_DEVICE,
+    CONF_OUTDOOR_TEMP_SENSOR,
+    CONF_POWER_SENSOR,
+    CONF_POWER_THRESHOLD,
+    CONF_ROOM_ORIENTATION,
     CONF_SURFACE,
     CONF_VOLUME,
-    CONF_POWER_THRESHOLD,
-    CONF_WINDOW_SENSOR,
     CONF_WEATHER_ENTITY,
-    CONF_ROOM_ORIENTATION,
-    ORIENTATIONS,
     CONF_WINDOW_NOTIFICATION_ENABLED,
-    CONF_NOTIFY_DEVICE,
-    CONF_NOTIFICATION_DELAY,
-    DEFAULT_POWER_THRESHOLD,
+    CONF_WINDOW_SENSOR,
+    CONF_ZONE_NAME,
     DEFAULT_NOTIFICATION_DELAY,
+    DEFAULT_POWER_THRESHOLD,
+    DOMAIN,
+    ORIENTATIONS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -126,9 +126,7 @@ def get_schema_step_dimensions(hass: HomeAssistant, default_weather: str | None 
                     device_class="power",
                 )
             ),
-            vol.Optional(
-                CONF_POWER_THRESHOLD, default=DEFAULT_POWER_THRESHOLD
-            ): selector.NumberSelector(
+            vol.Optional(CONF_POWER_THRESHOLD, default=DEFAULT_POWER_THRESHOLD): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1,
                     max=1000,
@@ -174,9 +172,7 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._data: dict[str, Any] = {}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle the initial step - zone configuration."""
         errors: dict[str, str] = {}
 
@@ -222,9 +218,7 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={"name": "Home Performance"},
         )
 
-    async def async_step_dimensions(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_dimensions(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle the room dimensions configuration step."""
         if user_input is not None:
             self._data.update(user_input)
@@ -264,9 +258,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         """Initialize options flow."""
         self._config_entry = config_entry
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Manage the options."""
         errors: dict[str, str] = {}
 
@@ -328,30 +320,22 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         surface_value = current.get(CONF_SURFACE)
         if surface_value is not None:
             schema_dict[vol.Optional(CONF_SURFACE, default=surface_value)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box"
-                )
+                selector.NumberSelectorConfig(min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box")
             )
         else:
             schema_dict[vol.Optional(CONF_SURFACE)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box"
-                )
+                selector.NumberSelectorConfig(min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box")
             )
 
         # Volume - only set default if value exists
         volume_value = current.get(CONF_VOLUME)
         if volume_value is not None:
             schema_dict[vol.Optional(CONF_VOLUME, default=volume_value)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box"
-                )
+                selector.NumberSelectorConfig(min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box")
             )
         else:
             schema_dict[vol.Optional(CONF_VOLUME)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box"
-                )
+                selector.NumberSelectorConfig(min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box")
             )
 
         # Power sensor - only set default if value exists (EntitySelector doesn't handle None)
@@ -420,25 +404,19 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         # === NOTIFICATION OPTIONS ===
         # Enable window notifications
         notification_enabled = current.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
-        schema_dict[vol.Optional(CONF_WINDOW_NOTIFICATION_ENABLED, default=notification_enabled)] = selector.BooleanSelector()
+        schema_dict[vol.Optional(CONF_WINDOW_NOTIFICATION_ENABLED, default=notification_enabled)] = (
+            selector.BooleanSelector()
+        )
 
         # Notify device - only show if notifications are or will be enabled
         notify_device_value = current.get(CONF_NOTIFY_DEVICE)
         if notify_device_value is not None:
             schema_dict[vol.Optional(CONF_NOTIFY_DEVICE, default=notify_device_value)] = selector.DeviceSelector(
-                selector.DeviceSelectorConfig(
-                    filter=selector.DeviceFilterSelectorConfig(
-                        integration="mobile_app"
-                    )
-                )
+                selector.DeviceSelectorConfig(filter=selector.DeviceFilterSelectorConfig(integration="mobile_app"))
             )
         else:
             schema_dict[vol.Optional(CONF_NOTIFY_DEVICE)] = selector.DeviceSelector(
-                selector.DeviceSelectorConfig(
-                    filter=selector.DeviceFilterSelectorConfig(
-                        integration="mobile_app"
-                    )
-                )
+                selector.DeviceSelectorConfig(filter=selector.DeviceFilterSelectorConfig(integration="mobile_app"))
             )
 
         # Notification delay

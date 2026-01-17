@@ -401,24 +401,27 @@ class HomePerformanceCard extends LitElement {
       .replace(/^_+|_+$/g, '');
   }
 
-  // Entity name mappings: French (primary) -> English (fallback)
-  // This handles systems where HA generates entity IDs from translated names
+  // Entity name mappings: NEW standardized name first, then legacy variants for backward compatibility
+  // New installations use first entry (English), existing users match via fallbacks (French/legacy)
   _entityMappings = {
-    // Binary sensors
-    "donnees_pretes": ["donnees_pretes", "data_ready"],
-    "fenetre_ouverte": ["fenetre_ouverte", "window_open"],
-    // Sensors
-    "coefficient_k": ["coefficient_k", "k_coefficient"],
-    "k_par_m3": ["k_par_m3", "k_per_m3"],
-    "note_d_isolation": ["note_d_isolation", "insulation_rating", "note_isolation"],
-    "performance_energetique": ["performance_energetique", "energy_performance"],
-    "energie_mesuree_jour": ["energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
-    "energie_24h_estimee": ["energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy", "daily_estimated_energy"],
-    "temps_de_chauffe_24h": ["temps_de_chauffe_24h", "heating_time_24h", "daily_heating_time"],
-    "ratio_de_chauffe": ["ratio_de_chauffe", "heating_ratio"],
-    "dt_moyen_24h": ["dt_moyen_24h", "average_delta_t", "avg_delta_t_24h", "average_dt_24h"],
-    "progression_analyse": ["progression_analyse", "analysis_progress"],
-    "temps_restant_analyse": ["temps_restant_analyse", "analysis_time_remaining"],
+    // Binary sensors - standardized first, then legacy
+    "donnees_pretes": ["data_ready", "donnees_pretes"],
+    "fenetre_ouverte": ["window_open", "fenetre_ouverte"],
+    "chauffage_actif": ["heating_active", "chauffage_actif"],
+    // Sensors - standardized first, then legacy variants
+    "coefficient_k": ["k_coefficient", "coefficient_k"],
+    "k_par_m2": ["k_per_m2", "k_par_m2"],
+    "k_par_m3": ["k_per_m3", "k_par_m3"],
+    "note_d_isolation": ["insulation_rating", "note_d_isolation", "note_isolation"],
+    "performance_energetique": ["energy_performance", "performance_energetique"],
+    "energie_mesuree_jour": ["measured_energy_daily", "energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
+    "energie_24h_estimee": ["daily_estimated_energy", "energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy"],
+    "temps_de_chauffe_24h": ["heating_time_24h", "temps_de_chauffe_24h", "daily_heating_time"],
+    "ratio_de_chauffe": ["heating_ratio_24h", "ratio_de_chauffe", "taux_de_chauffe_24h", "heating_ratio"],
+    "dt_moyen_24h": ["avg_delta_t_24h", "dt_moyen_24h", "average_delta_t", "average_dt_24h"],
+    "progression_analyse": ["analysis_progress", "progression_analyse"],
+    "temps_restant_analyse": ["analysis_remaining", "temps_restant_analyse", "analysis_time_remaining"],
+    "heures_de_donnees": ["data_hours", "heures_de_donnees"],
   };
 
   _getEntityId(suffix) {
@@ -1097,7 +1100,7 @@ class HomePerformanceCard extends LitElement {
               <path fill="currentColor" d="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z"/>
             </svg>
             <span>${windDirection} ${Math.round(windSpeed)}</span>
-            ${roomOrientation ? html`<span class="badge-orientation">${roomOrientation}</span>` : ''}
+            ${roomOrientation ? html`<span class="badge-orientation">${roomOrientation.toUpperCase()}</span>` : ''}
           </div>
         ` : ''}
         <div class="badge-zone-name">${this.config.zone}</div>
@@ -1389,7 +1392,7 @@ class HomePerformanceCard extends LitElement {
               </svg>
               <span>${zone.windDirection} ${zone.windSpeed} km/h</span>
               ${zone.roomOrientation ? html`
-                <span class="multi-zone-orientation">${zone.roomOrientation}</span>
+                <span class="multi-zone-orientation">${zone.roomOrientation.toUpperCase()}</span>
                 <span class="multi-zone-exposure ${zone.windExposure}">${this._t('wind_exposure_' + (zone.windExposure || 'unknown'))}</span>
               ` : ''}
             </div>

@@ -153,60 +153,54 @@
   },
   "entity": {
     "sensor": {
-      "coefficient_k": {
+      "k_coefficient": {
         "name": "Coefficiente K"
       },
-      "k_par_m2": {
+      "k_per_m2": {
         "name": "K per m²"
       },
-      "k_par_m3": {
+      "k_per_m3": {
         "name": "K per m³"
       },
-      "energie_estimee_totale": {
-        "name": "Energia stimata totale"
-      },
-      "energie_estimee_journaliere": {
+      "daily_estimated_energy": {
         "name": "Energia stimata giornaliera"
       },
-      "energie_mesuree_journaliere": {
+      "daily_measured_energy": {
         "name": "Energia misurata giornaliera"
       },
-      "energie_mesuree_totale": {
-        "name": "Energia misurata totale"
+      "heating_time_24h": {
+        "name": "Tempo di riscaldamento (24h)"
       },
-      "temps_de_chauffe_24h": {
-        "name": "Tempo di riscaldamento / 24h"
+      "heating_ratio_24h": {
+        "name": "Rapporto di riscaldamento (24h)"
       },
-      "taux_de_chauffe_24h": {
-        "name": "Rapporto di riscaldamento / 24h"
-      },
-      "performance_energetique": {
+      "energy_performance": {
         "name": "Prestazione energetica"
       },
-      "dt_moyen_24h": {
-        "name": "ΔT medio 24h"
+      "avg_delta_t_24h": {
+        "name": "ΔT medio (24h)"
       },
-      "heures_de_donnees": {
+      "data_hours": {
         "name": "Ore di dati"
       },
-      "temps_d_analyse_restant": {
+      "analysis_remaining": {
         "name": "Tempo di analisi rimanente"
       },
-      "progression_analyse": {
+      "analysis_progress": {
         "name": "Avanzamento analisi"
       },
-      "note_d_isolation": {
+      "insulation_rating": {
         "name": "Valutazione isolamento"
       }
     },
     "binary_sensor": {
-      "fenetre_ouverte": {
+      "window_open": {
         "name": "Finestra aperta"
       },
-      "chauffage_actif": {
+      "heating_active": {
         "name": "Riscaldamento attivo"
       },
-      "donnees_pretes": {
+      "data_ready": {
         "name": "Dati pronti"
       }
     }
@@ -214,14 +208,14 @@
   "selector": {
     "room_orientation": {
       "options": {
-        "N": "Nord",
-        "NE": "Nord-Est",
-        "E": "Est",
-        "SE": "Sud-Est",
-        "S": "Sud",
-        "SW": "Sud-Ovest",
-        "W": "Ovest",
-        "NW": "Nord-Ovest"
+        "n": "Nord",
+        "ne": "Nord-Est",
+        "e": "Est",
+        "se": "Sud-Est",
+        "s": "Sud",
+        "sw": "Sud-Ovest",
+        "w": "Ovest",
+        "nw": "Nord-Ovest"
       }
     }
   }

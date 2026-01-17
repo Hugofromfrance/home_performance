@@ -95,7 +95,7 @@
   "entity": {
     "sensor": {
       "k_coefficient": {
-        "name": "Coefficient K"
+        "name": "K Coefficient"
       },
       "k_per_m2": {
         "name": "K per m²"
@@ -103,23 +103,32 @@
       "k_per_m3": {
         "name": "K per m³"
       },
-      "total_energy": {
-        "name": "Total Energy"
+      "daily_estimated_energy": {
+        "name": "Daily Estimated Energy"
       },
-      "daily_energy": {
-        "name": "Daily Energy"
+      "daily_measured_energy": {
+        "name": "Daily Measured Energy"
       },
-      "heating_time": {
+      "heating_time_24h": {
         "name": "Heating Time (24h)"
       },
-      "heating_ratio": {
-        "name": "Heating Ratio"
+      "heating_ratio_24h": {
+        "name": "Heating Ratio (24h)"
       },
-      "avg_delta_t": {
+      "energy_performance": {
+        "name": "Energy Performance"
+      },
+      "avg_delta_t_24h": {
         "name": "Average ΔT (24h)"
       },
       "data_hours": {
         "name": "Data Hours"
+      },
+      "analysis_remaining": {
+        "name": "Analysis Time Remaining"
+      },
+      "analysis_progress": {
+        "name": "Analysis Progress"
       },
       "insulation_rating": {
         "name": "Insulation Rating"
@@ -127,7 +136,7 @@
     },
     "binary_sensor": {
       "window_open": {
-        "name": "Window Open Detected"
+        "name": "Window Open"
       },
       "heating_active": {
         "name": "Heating Active"
@@ -140,14 +149,14 @@
   "selector": {
     "room_orientation": {
       "options": {
-        "N": "North",
-        "NE": "North-East",
-        "E": "East",
-        "SE": "South-East",
-        "S": "South",
-        "SW": "South-West",
-        "W": "West",
-        "NW": "North-West"
+        "n": "North",
+        "ne": "North-East",
+        "e": "East",
+        "se": "South-East",
+        "s": "South",
+        "sw": "South-West",
+        "w": "West",
+        "nw": "North-West"
       }
     }
   }

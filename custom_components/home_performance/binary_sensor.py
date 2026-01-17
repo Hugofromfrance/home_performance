@@ -1,4 +1,5 @@
 """Binary sensor platform for Home Performance."""
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DOMAIN, CONF_ZONE_NAME, MIN_DATA_HOURS, VERSION
+from .const import BINARY_SENSOR_ENTITY_SUFFIXES, DOMAIN, MIN_DATA_HOURS, VERSION
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,9 +39,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class HomePerformanceBaseBinarySensor(
-    CoordinatorEntity[HomePerformanceCoordinator], BinarySensorEntity
-):
+class HomePerformanceBaseBinarySensor(CoordinatorEntity[HomePerformanceCoordinator], BinarySensorEntity):
     """Base class for Home Performance binary sensors."""
 
     _attr_has_entity_name = True
@@ -52,12 +51,21 @@ class HomePerformanceBaseBinarySensor(
         sensor_type: str,
     ) -> None:
         """Initialize the binary sensor."""
-        super().__init__(coordinator)
         self._zone_name = zone_name
         self._sensor_type = sensor_type
         # Use slugify for consistent handling of special characters (ü, é, ç, etc.)
         zone_slug = slugify(zone_name, separator="_")
+        
+        # Set unique_id and suggested_object_id BEFORE super().__init__()
+        # to ensure they are available when the entity is registered
         self._attr_unique_id = f"home_performance_{zone_slug}_{sensor_type}"
+        
+        # Suggest standardized entity_id for new installations
+        # Existing users keep their current entity_id via Entity Registry
+        suffix = BINARY_SENSOR_ENTITY_SUFFIXES.get(sensor_type, sensor_type)
+        self._attr_suggested_object_id = f"home_performance_{zone_slug}_{suffix}"
+        
+        super().__init__(coordinator)
 
     @property
     def device_info(self) -> dict[str, Any]:
@@ -76,7 +84,7 @@ class WindowOpenSensor(HomePerformanceBaseBinarySensor):
 
     _attr_device_class = BinarySensorDeviceClass.WINDOW
     _attr_icon = "mdi:window-open-variant"
-    _attr_translation_key = "fenetre_ouverte"
+    _attr_name = "Window open"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -115,7 +123,7 @@ class HeatingActiveSensor(HomePerformanceBaseBinarySensor):
 
     _attr_device_class = BinarySensorDeviceClass.HEAT
     _attr_icon = "mdi:fire"
-    _attr_translation_key = "chauffage_actif"
+    _attr_name = "Heating active"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -148,7 +156,7 @@ class DataReadySensor(HomePerformanceBaseBinarySensor):
     """Binary sensor indicating if enough data has been collected."""
 
     _attr_icon = "mdi:database-check"
-    _attr_translation_key = "donnees_pretes"
+    _attr_name = "Data ready"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""

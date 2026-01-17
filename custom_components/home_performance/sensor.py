@@ -1,4 +1,5 @@
 """Sensor platform for Home Performance."""
+
 from __future__ import annotations
 
 import logging
@@ -10,13 +11,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTime, UnitOfTemperature, PERCENTAGE
+from homeassistant.const import PERCENTAGE, UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DOMAIN, CONF_ZONE_NAME, VERSION
+from .const import DOMAIN, SENSOR_ENTITY_SUFFIXES, VERSION
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -140,12 +141,21 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
         sensor_type: str,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator)
         self._zone_name = zone_name
         self._sensor_type = sensor_type
         # Use slugify for consistent handling of special characters (ü, é, ç, etc.)
         zone_slug = slugify(zone_name, separator="_")
+        
+        # Set unique_id and suggested_object_id BEFORE super().__init__()
+        # to ensure they are available when the entity is registered
         self._attr_unique_id = f"home_performance_{zone_slug}_{sensor_type}"
+
+        # Suggest standardized entity_id for new installations
+        # Existing users keep their current entity_id via Entity Registry
+        suffix = SENSOR_ENTITY_SUFFIXES.get(sensor_type, sensor_type)
+        self._attr_suggested_object_id = f"home_performance_{zone_slug}_{suffix}"
+        
+        super().__init__(coordinator)
 
     @property
     def device_info(self) -> dict[str, Any]:
@@ -165,7 +175,7 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = "W/°C"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:heat-wave"
-    _attr_translation_key = "coefficient_k"
+    _attr_name = "K coefficient"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -203,6 +213,7 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
 
         # Generate last 7 days
         from datetime import datetime, timedelta
+
         today = datetime.now().date()
 
         # First pass: get K_7j for each day (stored at archival time)
@@ -213,7 +224,7 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
             entry = history_by_date.get(date_str)
 
             k_value = None
-            is_today = (i == 0)
+            is_today = i == 0
 
             if is_today:
                 # Today: use current K_7j (not yet archived)
@@ -227,10 +238,12 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                     energy_wh = heater_power * entry.heating_hours
                     k_value = energy_wh / (entry.avg_delta_t * 24)
 
-            days_data.append({
-                "date": date_str,
-                "k": k_value,  # None if no valid data
-            })
+            days_data.append(
+                {
+                    "date": date_str,
+                    "k": k_value,  # None if no valid data
+                }
+            )
 
         # Second pass: fill gaps using carry-forward and backfill
         # Forward pass: carry-forward from first valid day
@@ -259,11 +272,13 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
         k_history = []
         for day_data in days_data:
             if day_data["k"] is not None:
-                k_history.append({
-                    "date": day_data["date"],
-                    "k": round(day_data["k"], 1),
-                    "estimated": day_data.get("estimated", False)
-                })
+                k_history.append(
+                    {
+                        "date": day_data["date"],
+                        "k": round(day_data["k"], 1),
+                        "estimated": day_data.get("estimated", False),
+                    }
+                )
 
         # Wind data (if weather entity configured)
         wind_speed = data.get("wind_speed")
@@ -298,7 +313,7 @@ class KPerM2Sensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = "W/(°C·m²)"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:square-outline"
-    _attr_translation_key = "k_par_m2"
+    _attr_name = "K per m²"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -329,7 +344,7 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = "W/(°C·m³)"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:cube-outline"
-    _attr_translation_key = "k_par_m3"
+    _attr_name = "K per m³"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -361,7 +376,7 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:lightning-bolt-outline"
-    _attr_translation_key = "energie_estimee_journaliere"
+    _attr_name = "Daily estimated energy"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -385,11 +400,7 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
             "heater_power_w": data.get("heater_power"),
             "calculation": "estimation",
             "window": "24h glissantes",
-            "heating_hours": (
-                round(data.get("heating_hours"), 1)
-                if data.get("heating_hours") is not None
-                else None
-            ),
+            "heating_hours": (round(data.get("heating_hours"), 1) if data.get("heating_hours") is not None else None),
         }
 
 
@@ -400,7 +411,7 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:clock-outline"
-    _attr_translation_key = "temps_de_chauffe_24h"
+    _attr_name = "Heating time 24h"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -426,7 +437,11 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
         return {
             "formatted": format_duration(hours),
             "source": "measured" if has_power_sensor else "estimated",
-            "detection": f"power > {power_threshold}W ({self.coordinator.power_sensor})" if has_power_sensor else f"state of {self.coordinator.heating_entity}",
+            "detection": (
+                f"power > {power_threshold}W ({self.coordinator.power_sensor})"
+                if has_power_sensor
+                else f"state of {self.coordinator.heating_entity}"
+            ),
             "power_threshold_w": power_threshold if has_power_sensor else None,
             "description": "Cumulative heating time over the last 24h",
         }
@@ -438,7 +453,7 @@ class HeatingRatioSensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:percent"
-    _attr_translation_key = "taux_de_chauffe_24h"
+    _attr_name = "Heating ratio 24h"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -469,7 +484,7 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
     """Sensor for energy performance evaluation based on French national statistics."""
 
     _attr_icon = "mdi:leaf"
-    _attr_translation_key = "performance_energetique"
+    _attr_name = "Energy performance"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -514,21 +529,14 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
             "level_display": level_descriptions.get(perf.get("level"), "En attente"),
             "saving_percent": perf.get("saving_percent"),
             "excellent_threshold_kwh": (
-                round(perf.get("excellent_threshold"), 1)
-                if perf.get("excellent_threshold") is not None
-                else None
+                round(perf.get("excellent_threshold"), 1) if perf.get("excellent_threshold") is not None else None
             ),
             "standard_threshold_kwh": (
-                round(perf.get("standard_threshold"), 1)
-                if perf.get("standard_threshold") is not None
-                else None
+                round(perf.get("standard_threshold"), 1) if perf.get("standard_threshold") is not None else None
             ),
             "daily_energy_kwh": round(daily_kwh, 2) if daily_kwh is not None else None,
             "heater_power_w": heater_power,
-            "description": (
-                "Evaluation based on national statistics. "
-                "Thresholds calculated based on heater power."
-            ),
+            "description": ("Evaluation based on national statistics. " "Thresholds calculated based on heater power."),
         }
 
 
@@ -545,7 +553,7 @@ class DeltaTSensor(HomePerformanceBaseSensor):
     # No device_class - this is a temperature delta, not absolute temperature
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:thermometer"
-    _attr_translation_key = "dt_moyen_24h"
+    _attr_name = "Avg delta T 24h"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -587,21 +595,9 @@ class DeltaTSensor(HomePerformanceBaseSensor):
         return {
             "description": "Average temperature difference between indoor and outdoor (rolling 24h window)",
             "window": "rolling 24h",
-            "current_delta_t": (
-                round(self._convert_delta(current_dt), 1)
-                if current_dt is not None
-                else None
-            ),
-            "indoor_temp": (
-                round(data.get("indoor_temp"), 1)
-                if data.get("indoor_temp") is not None
-                else None
-            ),
-            "outdoor_temp": (
-                round(data.get("outdoor_temp"), 1)
-                if data.get("outdoor_temp") is not None
-                else None
-            ),
+            "current_delta_t": (round(self._convert_delta(current_dt), 1) if current_dt is not None else None),
+            "indoor_temp": (round(data.get("indoor_temp"), 1) if data.get("indoor_temp") is not None else None),
+            "outdoor_temp": (round(data.get("outdoor_temp"), 1) if data.get("outdoor_temp") is not None else None),
             "unit_note": "Temperature delta (not absolute) - correctly converted for your unit system",
         }
 
@@ -613,7 +609,7 @@ class DataHoursSensor(HomePerformanceBaseSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:database-clock"
-    _attr_translation_key = "heures_de_donnees"
+    _attr_name = "Data hours"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -648,7 +644,7 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:timer-sand"
-    _attr_translation_key = "temps_d_analyse_restant"
+    _attr_name = "Analysis remaining"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -702,7 +698,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:progress-clock"
-    _attr_translation_key = "progression_analyse"
+    _attr_name = "Analysis progress"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -765,7 +761,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
     """
 
     _attr_icon = "mdi:home-thermometer"
-    _attr_translation_key = "note_d_isolation"
+    _attr_name = "Insulation rating"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -824,11 +820,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
             "season_description": season_descriptions.get(season, season),
             "k_value": round(k_value, 1) if k_value is not None else None,
             "k_source": k_source,
-            "k_per_m3": (
-                round(data.get("k_per_m3"), 2)
-                if data.get("k_per_m3") is not None
-                else None
-            ),
+            "k_per_m3": (round(data.get("k_per_m3"), 2) if data.get("k_per_m3") is not None else None),
             "temp_stable": insulation_status.get("temp_stable"),
             "message": message,
             "note": "Based on K/m³ or inferred if minimal heating needed",
@@ -851,7 +843,7 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:counter"
-    _attr_translation_key = "energie_mesuree_journaliere"
+    _attr_name = "Daily measured energy"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -901,5 +893,3 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
             "power_sensor": self.coordinator.power_sensor if not uses_external else None,
             "current_power_w": data.get("measured_power_w") if not uses_external else None,
         }
-
-
