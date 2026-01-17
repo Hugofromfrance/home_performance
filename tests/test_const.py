@@ -11,11 +11,13 @@ from custom_components.home_performance.const import (
     DEFAULT_POWER_THRESHOLD,
     DOMAIN,
     HISTORY_DAYS,
+    JSMODULES,
     MIN_DATA_HOURS,
     MIN_DELTA_T,
     MIN_HEATING_TIME_HOURS,
     ORIENTATIONS,
     SENSOR_ENTITY_SUFFIXES,
+    URL_BASE,
     VERSION,
     get_version,
 )
@@ -196,3 +198,54 @@ class TestGetVersion:
         with patch("builtins.open", mock_open(read_data=manifest_data)):
             result = get_version()
             assert result == "1.2.3"
+
+
+class TestFrontendConstants:
+    """Test frontend-related constants."""
+
+    def test_url_base_is_string(self):
+        """Test that URL_BASE is a non-empty string."""
+        assert isinstance(URL_BASE, str)
+        assert len(URL_BASE) > 0
+
+    def test_url_base_starts_with_slash(self):
+        """Test that URL_BASE starts with / for valid HTTP path."""
+        assert URL_BASE.startswith("/")
+
+    def test_url_base_no_trailing_slash(self):
+        """Test that URL_BASE has no trailing slash."""
+        assert not URL_BASE.endswith("/")
+
+    def test_url_base_value(self):
+        """Test URL_BASE has expected value."""
+        assert URL_BASE == "/home-performance"
+
+    def test_jsmodules_is_list(self):
+        """Test that JSMODULES is a list."""
+        assert isinstance(JSMODULES, list)
+
+    def test_jsmodules_not_empty(self):
+        """Test that JSMODULES has at least one module."""
+        assert len(JSMODULES) > 0
+
+    def test_jsmodules_structure(self):
+        """Test that each module in JSMODULES has required keys."""
+        required_keys = {"name", "filename", "version"}
+        for module in JSMODULES:
+            assert isinstance(module, dict)
+            assert required_keys.issubset(module.keys()), f"Module missing keys: {required_keys - module.keys()}"
+
+    def test_jsmodules_filename_is_js(self):
+        """Test that module filenames end with .js."""
+        for module in JSMODULES:
+            assert module["filename"].endswith(".js"), f"Filename {module['filename']} should end with .js"
+
+    def test_jsmodules_version_matches_integration(self):
+        """Test that module version matches integration VERSION."""
+        for module in JSMODULES:
+            assert module["version"] == VERSION, f"Module version {module['version']} != integration VERSION {VERSION}"
+
+    def test_jsmodules_contains_main_card(self):
+        """Test that JSMODULES contains the main card."""
+        filenames = [m["filename"] for m in JSMODULES]
+        assert "home-performance-card.js" in filenames
