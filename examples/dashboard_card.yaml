@@ -47,7 +47,7 @@
 #
 # (Mode YAML uniquement: si la ressource n'est pas auto-détectée,
 #  ajoutez-la manuellement: Paramètres → Tableaux de bord → ⋮ → Ressources
-#  URL: /home_performance/home-performance-card.js | Type: Module JavaScript)
+#  URL: /home-performance/home-performance-card.js | Type: Module JavaScript)
 
 # type: custom:home-performance-card
 # zone: Chambre Flavien          # Nom exact de votre zone
