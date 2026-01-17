@@ -10,14 +10,15 @@ import logging
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
-from homeassistant.components.http import StaticPathConfig
+from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
+from homeassistant.core import CoreState, HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN
+from .const import DOMAIN, VERSION
 from .coordinator import HomePerformanceCoordinator
+from .frontend import JSModuleRegistration
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -44,6 +45,48 @@ RESET_ALL_SCHEMA = vol.Schema(
 )
 
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the Home Performance component."""
+    hass.data.setdefault(DOMAIN, {})
+
+    # Register WebSocket command for version check
+    websocket_api.async_register_command(hass, websocket_get_version)
+
+    # Setup frontend registration
+    async def _async_setup_frontend() -> None:
+        """Register frontend resources after Home Assistant is started."""
+        module_register = JSModuleRegistration(hass)
+        await module_register.async_register()
+
+    if hass.state == CoreState.running:
+        await _async_setup_frontend()
+    else:
+        hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_STARTED,
+            lambda _: hass.async_create_task(_async_setup_frontend()),
+        )
+
+    return True
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/version",
+    }
+)
+@callback
+def websocket_get_version(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict,
+) -> None:
+    """Handle get version WebSocket command."""
+    connection.send_result(
+        msg["id"],
+        {"version": VERSION},
+    )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Performance from a config entry."""
     _LOGGER.debug("Setting up Home Performance integration for %s", entry.title)
@@ -54,11 +97,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
-
-    # Register frontend card (only once globally)
-    if "frontend_registered" not in hass.data[DOMAIN]:
-        await _async_register_frontend(hass)
-        hass.data[DOMAIN]["frontend_registered"] = True
 
     # Register services (only once globally)
     if "services_registered" not in hass.data[DOMAIN]:
@@ -93,7 +131,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         _LOGGER.info("Reset history service called for zone: %s", zone_name)
 
         # Find the coordinator for this zone
-        skip_keys = ("frontend_registered", "services_registered", "last_outdoor_temp_sensor")
+        skip_keys = ("services_registered", "last_outdoor_temp_sensor")
         found = False
         for entry_id, coordinator in hass.data[DOMAIN].items():
             if entry_id in skip_keys:
@@ -126,7 +164,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         _LOGGER.info("Reset all data service called for zone: %s", zone_name)
 
         # Find the coordinator for this zone
-        skip_keys = ("frontend_registered", "services_registered", "last_outdoor_temp_sensor")
+        skip_keys = ("services_registered", "last_outdoor_temp_sensor")
         found = False
         for entry_id, coordinator in hass.data[DOMAIN].items():
             if entry_id in skip_keys:
@@ -150,54 +188,6 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     )
 
     _LOGGER.info("Home Performance services registered")
-
-
-async def _async_register_frontend(hass: HomeAssistant) -> None:
-    """Register the frontend static path and Lovelace resource for the card."""
-    import os
-
-    www_path = os.path.join(os.path.dirname(__file__), "www")
-
-    if os.path.isdir(www_path):
-        try:
-            await hass.http.async_register_static_paths(
-                [StaticPathConfig("/home_performance", www_path, cache_headers=False)]
-            )
-            _LOGGER.info("Home Performance card registered at /home_performance/home-performance-card.js")
-
-            # Auto-register Lovelace resource (storage mode only)
-            await _async_register_lovelace_resource(hass)
-
-        except Exception as err:
-            _LOGGER.warning("Could not register frontend path: %s", err)
-
-
-async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
-    """Register the card as a Lovelace resource (storage mode only)."""
-    url = "/home_performance/home-performance-card.js"
-
-    try:
-        lovelace_data = hass.data.get("lovelace")
-        if lovelace_data is None:
-            _LOGGER.debug("Lovelace not loaded yet, skipping auto-registration")
-            return
-
-        resources = lovelace_data.get("resources")
-        if resources is None:
-            _LOGGER.debug("Lovelace resources not available (YAML mode?). " "Add resource manually: %s", url)
-            return
-
-        existing = await resources.async_get_resources()
-        for resource in existing:
-            if resource.get("url") == url:
-                _LOGGER.debug("Lovelace resource already registered: %s", url)
-                return
-
-        await resources.async_create_resource(url, "module")
-        _LOGGER.info("Lovelace resource auto-registered: %s", url)
-
-    except Exception as err:
-        _LOGGER.debug("Could not auto-register Lovelace resource (manual step may be needed): %s", err)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

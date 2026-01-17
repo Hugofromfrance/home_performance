@@ -1,9 +1,12 @@
 """Constants for Home Performance integration."""
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
+from typing import Final
 
-DOMAIN = "home_performance"
+DOMAIN: Final[str] = "home_performance"
 
 
 def get_version() -> str:
@@ -18,7 +21,19 @@ def get_version() -> str:
 
 
 # Version from manifest.json
-VERSION = get_version()
+VERSION: Final[str] = get_version()
+
+# URL de base pour les ressources frontend
+URL_BASE: Final[str] = "/home-performance"
+
+# Liste des modules JavaScript à enregistrer
+JSMODULES: Final[list[dict[str, str]]] = [
+    {
+        "name": "Home Performance Card",
+        "filename": "home-performance-card.js",
+        "version": VERSION,
+    },
+]
 
 # Configuration keys
 CONF_INDOOR_TEMP_SENSOR = "indoor_temp_sensor"
