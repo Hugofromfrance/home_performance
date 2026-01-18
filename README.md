@@ -338,6 +338,20 @@ If you use a YAML mode dashboard, manually add the resource:
 
 </details>
 
+### ⚠️ Upgrading from v1.3.x or earlier
+
+Starting with v1.4.0, the card resource URL has changed and is now **automatically managed**.
+
+| Mode | Action Required |
+|------|-----------------|
+| **Storage mode** (default) | ✅ **None** - Old resource is automatically removed and new one registered |
+| **YAML mode** | ⚠️ Update URL from `/home_performance/...` to `/home-performance/...` (underscore → hyphen) |
+
+**What happens automatically:**
+- Old manually-added resources (`/home_performance/home-performance-card.js`) are detected and removed
+- New resource is registered with version parameter (`/home-performance/home-performance-card.js?v=X.X.X`)
+- Version mismatch detection notifies you when frontend/backend versions differ
+
 ### Card Layouts
 
 Choose the layout that fits your dashboard style:

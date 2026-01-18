@@ -331,3 +331,75 @@ class TestJSModuleRegistrationUnregister:
 
         # Should not try to delete anything
         mock_lovelace.resources.async_delete_item.assert_not_called()
+
+
+class TestJSModuleRegistrationLegacyCleanup:
+    """Test JSModuleRegistration._async_cleanup_legacy_resources method."""
+
+    @pytest.mark.asyncio
+    async def test_cleanup_removes_legacy_underscore_url(self):
+        """Test that legacy resources with underscore URL are removed."""
+        legacy_resource = {
+            "id": "legacy-1",
+            "url": "/home_performance/home-performance-card.js",
+        }
+        mock_lovelace = MagicMock()
+        mock_lovelace.mode = "storage"
+        mock_lovelace.resources.loaded = True
+        mock_lovelace.resources.async_items = MagicMock(return_value=[legacy_resource])
+        mock_lovelace.resources.async_delete_item = AsyncMock()
+
+        mock_hass = MagicMock()
+        mock_hass.data = {"lovelace": mock_lovelace}
+
+        registration = JSModuleRegistration(mock_hass)
+
+        await registration._async_cleanup_legacy_resources()
+
+        mock_lovelace.resources.async_delete_item.assert_called_once_with("legacy-1")
+
+    @pytest.mark.asyncio
+    async def test_cleanup_ignores_new_url(self):
+        """Test that new resources with hyphen URL are not removed."""
+        new_resource = {
+            "id": "new-1",
+            "url": f"{URL_BASE}/home-performance-card.js?v=1.0",
+        }
+        mock_lovelace = MagicMock()
+        mock_lovelace.mode = "storage"
+        mock_lovelace.resources.loaded = True
+        mock_lovelace.resources.async_items = MagicMock(return_value=[new_resource])
+        mock_lovelace.resources.async_delete_item = AsyncMock()
+
+        mock_hass = MagicMock()
+        mock_hass.data = {"lovelace": mock_lovelace}
+
+        registration = JSModuleRegistration(mock_hass)
+
+        await registration._async_cleanup_legacy_resources()
+
+        mock_lovelace.resources.async_delete_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_handles_mixed_resources(self):
+        """Test cleanup with both legacy and new resources."""
+        resources = [
+            {"id": "legacy-1", "url": "/home_performance/home-performance-card.js"},
+            {"id": "new-1", "url": f"{URL_BASE}/home-performance-card.js?v=1.0"},
+            {"id": "other-1", "url": "/other-integration/card.js"},
+        ]
+        mock_lovelace = MagicMock()
+        mock_lovelace.mode = "storage"
+        mock_lovelace.resources.loaded = True
+        mock_lovelace.resources.async_items = MagicMock(return_value=resources)
+        mock_lovelace.resources.async_delete_item = AsyncMock()
+
+        mock_hass = MagicMock()
+        mock_hass.data = {"lovelace": mock_lovelace}
+
+        registration = JSModuleRegistration(mock_hass)
+
+        await registration._async_cleanup_legacy_resources()
+
+        # Should only delete the legacy resource
+        mock_lovelace.resources.async_delete_item.assert_called_once_with("legacy-1")

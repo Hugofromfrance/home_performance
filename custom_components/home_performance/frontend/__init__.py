@@ -68,6 +68,9 @@ class JSModuleRegistration:
         """Register or update JavaScript modules."""
         _LOGGER.debug("Installing JavaScript modules")
 
+        # Migration: remove old manually added resources (with underscore URL)
+        await self._async_cleanup_legacy_resources()
+
         # Get existing resources from this integration
         existing_resources = [r for r in self.lovelace.resources.async_items() if r["url"].startswith(URL_BASE)]
 
@@ -106,6 +109,24 @@ class JSModuleRegistration:
                         "url": f"{url}?v={module['version']}",
                     }
                 )
+
+    async def _async_cleanup_legacy_resources(self) -> None:
+        """Remove old manually added resources from previous versions.
+
+        This handles migration from:
+        - /home_performance/home-performance-card.js (old underscore URL)
+        to:
+        - /home-performance/home-performance-card.js (new hyphen URL)
+        """
+        legacy_prefixes = [
+            "/home_performance/",  # Old URL with underscore
+        ]
+
+        for resource in self.lovelace.resources.async_items():
+            url = resource.get("url", "")
+            if any(url.startswith(prefix) for prefix in legacy_prefixes):
+                _LOGGER.info("Removing legacy resource: %s", url)
+                await self.lovelace.resources.async_delete_item(resource["id"])
 
     async def async_unregister(self) -> None:
         """Unregister JavaScript modules (for cleanup on uninstall)."""
