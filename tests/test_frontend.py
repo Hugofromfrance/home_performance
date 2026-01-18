@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.home_performance.const import JSMODULES, URL_BASE, VERSION
-from custom_components.home_performance.frontend import JSModuleRegistration, WWW_PATH
+from custom_components.home_performance.const import URL_BASE, VERSION
+from custom_components.home_performance.frontend import WWW_PATH, JSModuleRegistration
 
 
 class TestWWWPath:
