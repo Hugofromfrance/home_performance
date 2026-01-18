@@ -146,9 +146,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._measured_energy_daily_kwh: float = 0.0
         self._last_external_energy: float | None = None  # For energy-based sources
 
-        # Energy sensor tracking (cumulative sensor - need to track start of day value)
-        self._energy_sensor_start_of_day: float | None = None  # Energy at midnight
-        self._energy_sensor_daily_kwh: float = 0.0  # Calculated daily consumption
+        # Energy sensor tracking (external daily energy counter)
+        # User provides a daily counter (e.g., Utility Meter) - we use its value directly
+        self._energy_sensor_daily_kwh: float = 0.0  # Value from external energy sensor
 
         # Daily counters (reset at midnight) - for minuit-minuit consistency
         self._last_daily_reset_date: str | None = None
@@ -552,11 +552,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if "delta_t_count_daily" in data:
                     self._delta_t_count_daily = data["delta_t_count_daily"]
 
-                # Restore energy sensor tracking
-                if "energy_sensor_start_of_day" in data:
-                    self._energy_sensor_start_of_day = data["energy_sensor_start_of_day"]
-                if "energy_sensor_daily_kwh" in data:
-                    self._energy_sensor_daily_kwh = data["energy_sensor_daily_kwh"]
+                # Note: energy_sensor_daily_kwh is NOT restored from storage
+                # It's read directly from the external energy sensor on each update
 
                 self._data_loaded = True
                 _LOGGER.info(
@@ -586,9 +583,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_seconds_daily": self._heating_seconds_daily,
                 "delta_t_sum_daily": self._delta_t_sum_daily,
                 "delta_t_count_daily": self._delta_t_count_daily,
-                # Energy sensor tracking
-                "energy_sensor_start_of_day": self._energy_sensor_start_of_day,
-                "energy_sensor_daily_kwh": self._energy_sensor_daily_kwh,
+                # Note: energy_sensor_daily_kwh is read directly from sensor, not stored
             }
             await self._store.async_save(data)
             self._last_save_time = dt_util.utcnow().timestamp()
@@ -661,16 +656,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Update measured energy from power sensor (if configured)
             measured_power = self._update_measured_energy(now)
 
-            # Get external energy sensor value (if configured) and calculate daily consumption
+            # Get external energy sensor value (if configured)
+            # If user configured an energy_sensor, we use its value DIRECTLY
+            # (user is responsible for providing a daily counter like Utility Meter)
             external_energy = self._get_external_energy()
-
-            # Update energy sensor daily consumption
-            if external_energy is not None and self._energy_sensor_start_of_day is not None:
-                self._energy_sensor_daily_kwh = max(0, external_energy - self._energy_sensor_start_of_day)
-            elif external_energy is not None and self._energy_sensor_start_of_day is None:
-                # First reading of the day, set start value
-                self._energy_sensor_start_of_day = external_energy
-                self._energy_sensor_daily_kwh = 0.0
+            if external_energy is not None:
+                self._energy_sensor_daily_kwh = external_energy
 
             # Get weather data (wind)
             weather_data = self._get_weather_data()
@@ -681,9 +672,15 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Calculate daily values (minuit-minuit)
             # Include ongoing heating session in the total
             heating_seconds = self._heating_seconds_daily
+            estimated_energy = self._estimated_energy_daily_kwh
             if self._is_heating_realtime and self._heating_start_time is not None:
                 # Add time from current ongoing heating session
-                heating_seconds += now - self._heating_start_time
+                ongoing_duration = now - self._heating_start_time
+                heating_seconds += ongoing_duration
+                # Add energy from current ongoing heating session
+                if self.heater_power is not None and self.heater_power > 0:
+                    ongoing_energy_kwh = (self.heater_power / 1000) * (ongoing_duration / 3600)
+                    estimated_energy += ongoing_energy_kwh
             heating_hours_daily = heating_seconds / 3600
 
             # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
@@ -711,7 +708,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_hours": heating_hours_daily,
                 "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
                 "avg_delta_t": avg_delta_t_rolling,
-                "daily_energy_kwh": self._estimated_energy_daily_kwh,
+                "daily_energy_kwh": estimated_energy,
                 # Cumulative energy (for Energy Dashboard)
                 "total_energy_kwh": analysis.get("total_energy_kwh"),
                 # Measured energy (from power sensor)
@@ -821,8 +818,14 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Calculate restored heating values
         # Include ongoing heating session in the total
         heating_seconds = self._heating_seconds_daily
+        estimated_energy = self._estimated_energy_daily_kwh
         if self._is_heating_realtime and self._heating_start_time is not None:
-            heating_seconds += time.time() - self._heating_start_time
+            ongoing_duration = time.time() - self._heating_start_time
+            heating_seconds += ongoing_duration
+            # Add energy from current ongoing heating session
+            if self.heater_power is not None and self.heater_power > 0:
+                ongoing_energy_kwh = (self.heater_power / 1000) * (ongoing_duration / 3600)
+                estimated_energy += ongoing_energy_kwh
         heating_hours_daily = heating_seconds / 3600
 
         # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
@@ -845,7 +848,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "heating_hours": heating_hours_daily,
             "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
             "avg_delta_t": avg_delta_t_rolling,
-            "daily_energy_kwh": self._estimated_energy_daily_kwh,
+            "daily_energy_kwh": estimated_energy,
             "total_energy_kwh": analysis.get("total_energy_kwh"),
             # Measured energy
             "measured_power_w": None,
@@ -925,16 +928,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._last_daily_reset_date = today
             self._daily_reset_datetime = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
-            # Capture energy sensor value at start of new day
-            if self.energy_sensor is not None:
-                current_energy = self._get_external_energy()
-                self._energy_sensor_start_of_day = current_energy
-                self._energy_sensor_daily_kwh = 0.0
-                _LOGGER.debug(
-                    "[%s] Energy sensor start of day: %.2f kWh",
-                    self.zone_name,
-                    current_energy if current_energy else 0.0,
-                )
+            # Note: energy_sensor_daily_kwh is read directly from external sensor
+            # No need to reset it here - the external Utility Meter handles its own reset
 
     def _archive_daily_data(self, date: str) -> None:
         """Archive a day's data to the thermal model's 7-day history.
