@@ -47,9 +47,7 @@ class JSModuleRegistration:
     async def _async_register_path(self) -> None:
         """Register the static HTTP path."""
         try:
-            await self.hass.http.async_register_static_paths(
-                [StaticPathConfig(URL_BASE, str(WWW_PATH), False)]
-            )
+            await self.hass.http.async_register_static_paths([StaticPathConfig(URL_BASE, str(WWW_PATH), False)])
             _LOGGER.debug("Static path registered: %s -> %s", URL_BASE, WWW_PATH)
         except RuntimeError:
             _LOGGER.debug("Static path already registered: %s", URL_BASE)
@@ -71,11 +69,7 @@ class JSModuleRegistration:
         _LOGGER.debug("Installing JavaScript modules")
 
         # Get existing resources from this integration
-        existing_resources = [
-            r
-            for r in self.lovelace.resources.async_items()
-            if r["url"].startswith(URL_BASE)
-        ]
+        existing_resources = [r for r in self.lovelace.resources.async_items() if r["url"].startswith(URL_BASE)]
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
@@ -121,11 +115,7 @@ class JSModuleRegistration:
         if not self.lovelace.resources.loaded:
             return
 
-        existing_resources = [
-            r
-            for r in self.lovelace.resources.async_items()
-            if r["url"].startswith(URL_BASE)
-        ]
+        existing_resources = [r for r in self.lovelace.resources.async_items() if r["url"].startswith(URL_BASE)]
 
         for resource in existing_resources:
             _LOGGER.info("Unregistering resource: %s", resource["url"])
