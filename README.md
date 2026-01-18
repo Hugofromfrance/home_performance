@@ -790,7 +790,7 @@ Needs optimization : beyond
 - [x] **Multi-zone card** - All zones in one card with List/Compare views
 - [x] **Long-term history** - 5 years of daily data storage
 - [x] **Wind data display** - Weather entity integration with wind exposure
-- [x] **Multiple heat source types** (electric, heat pump, gas, district heating) 🔥
+- [x] **Multiple heat source types** (electric, heat pump, gas boiler, gas furnace) 🔥
 
 ### 🔜 Next - Alerts & Notifications
 
