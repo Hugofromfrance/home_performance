@@ -377,6 +377,71 @@ class HomePerformanceCard extends LitElement {
     }
   }
 
+  connectedCallback() {
+    super.connectedCallback();
+    this._checkVersion();
+  }
+
+  updated(changedProps) {
+    super.updated?.(changedProps);
+    // Check version when hass becomes available
+    if (changedProps.has("hass") && this.hass && !this._versionChecked) {
+      this._checkVersion();
+    }
+  }
+
+  async _checkVersion() {
+    if (!this.hass || this._versionChecked) return;
+    this._versionChecked = true;
+
+    try {
+      const result = await this.hass.callWS({
+        type: "home_performance/version",
+      });
+
+      if (result && result.version && result.version !== CARD_VERSION) {
+        console.warn(
+          `[Home Performance] Version mismatch: Card v${CARD_VERSION}, Backend v${result.version}`
+        );
+        this._showVersionMismatchNotification(result.version);
+      }
+    } catch (err) {
+      // WebSocket command not available (older backend version)
+      console.debug("[Home Performance] Version check not available:", err);
+    }
+  }
+
+  _showVersionMismatchNotification(backendVersion) {
+    const event = new CustomEvent("hass-notification", {
+      bubbles: true,
+      composed: true,
+      detail: {
+        message: `Home Performance: Version mismatch detected!\nCard: v${CARD_VERSION} | Backend: v${backendVersion}\nPlease clear your cache and reload.`,
+        duration: 0, // Persistent notification
+        dismissable: true,
+        action: {
+          text: "Reload",
+          action: async () => {
+            // Clear caches if available
+            if ("caches" in window) {
+              try {
+                const cacheNames = await caches.keys();
+                await Promise.all(
+                  cacheNames.map((name) => caches.delete(name))
+                );
+              } catch (e) {
+                console.warn("[Home Performance] Could not clear caches:", e);
+              }
+            }
+            // Reload the page
+            window.location.reload(true);
+          },
+        },
+      },
+    });
+    this.dispatchEvent(event);
+  }
+
   getCardSize() {
     // Different sizes for different layouts
     switch (this.config?.layout) {

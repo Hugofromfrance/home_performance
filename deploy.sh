@@ -17,6 +17,7 @@ rm -f "$SOURCE_DIR/www/home-performance-card.js.bak"
 
 # Créer les dossiers si nécessaire
 ssh ha "mkdir -p /config/custom_components/home_performance/translations"
+ssh ha "mkdir -p /config/custom_components/home_performance/frontend"
 ssh ha "mkdir -p /config/custom_components/home_performance/www"
 
 # Copier les fichiers Python et JSON
@@ -25,6 +26,7 @@ scp "$SOURCE_DIR"/*.py ha:/config/custom_components/home_performance/
 scp "$SOURCE_DIR"/*.json ha:/config/custom_components/home_performance/
 scp "$SOURCE_DIR"/services.yaml ha:/config/custom_components/home_performance/
 scp "$SOURCE_DIR"/translations/*.json ha:/config/custom_components/home_performance/translations/
+scp "$SOURCE_DIR"/frontend/__init__.py ha:/config/custom_components/home_performance/frontend/
 
 # Copier la carte Lovelace custom
 echo "🎨 Copie de la carte Lovelace..."

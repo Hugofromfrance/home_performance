@@ -145,7 +145,7 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
         self._sensor_type = sensor_type
         # Use slugify for consistent handling of special characters (ü, é, ç, etc.)
         zone_slug = slugify(zone_name, separator="_")
-        
+
         # Set unique_id and suggested_object_id BEFORE super().__init__()
         # to ensure they are available when the entity is registered
         self._attr_unique_id = f"home_performance_{zone_slug}_{sensor_type}"
@@ -154,7 +154,7 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
         # Existing users keep their current entity_id via Entity Registry
         suffix = SENSOR_ENTITY_SUFFIXES.get(sensor_type, sensor_type)
         self._attr_suggested_object_id = f"home_performance_{zone_slug}_{suffix}"
-        
+
         super().__init__(coordinator)
 
     @property

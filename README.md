@@ -333,10 +333,24 @@ title: Bedroom Performance
 
 If you use a YAML mode dashboard, manually add the resource:
 - **Settings → Dashboards → ⋮ → Resources**
-- URL: `/home_performance/home-performance-card.js`
+- URL: `/home-performance/home-performance-card.js`
 - Type: `JavaScript Module`
 
 </details>
+
+### ⚠️ Upgrading from v1.3.x or earlier
+
+Starting with v1.4.0, the card resource URL has changed and is now **automatically managed**.
+
+| Mode | Action Required |
+|------|-----------------|
+| **Storage mode** (default) | ✅ **None** - Old resource is automatically removed and new one registered |
+| **YAML mode** | ⚠️ Update URL from `/home_performance/...` to `/home-performance/...` (underscore → hyphen) |
+
+**What happens automatically:**
+- Old manually-added resources (`/home_performance/home-performance-card.js`) are detected and removed
+- New resource is registered with version parameter (`/home-performance/home-performance-card.js?v=X.X.X`)
+- Version mismatch detection notifies you when frontend/backend versions differ
 
 ### Card Layouts
 
@@ -431,29 +445,33 @@ A comprehensive card that displays **all your zones in one place**. No need to s
 
 ### Clearing the Card Cache
 
-After updating the integration, your browser may still display the old card version due to caching. Here's how to force a refresh:
+After updating the integration, your browser may still display the old card version due to caching.
 
-#### Method 1: Hard Refresh (Quick)
+#### Automatic Version Mismatch Detection 🆕
+
+The card now **automatically detects version mismatches** between the frontend card and the backend integration. If a mismatch is detected, a notification will appear with a **"Reload"** button that clears the cache and refreshes the page.
+
+> **Note**: The resource URL now includes an automatic version parameter (`?v=X.X.X`) that updates with each integration update.
+
+#### Manual Cache Clearing
+
+If you need to manually clear the cache:
+
+**Method 1: Hard Refresh (Quick)**
 - **Windows/Linux**: `Ctrl + Shift + R` or `Ctrl + F5`
 - **Mac**: `Cmd + Shift + R`
 
-#### Method 2: Clear Browser Cache
+**Method 2: Clear Browser Cache**
 1. Open Developer Tools (`F12`)
 2. Right-click the refresh button → "Empty Cache and Hard Reload"
 
-#### Method 3: Version Parameter (Permanent Fix)
-Add a version parameter to your resource URL in **Settings → Dashboards → ⋮ → Resources**:
-
-```
-/home_performance/home-performance-card.js?v=1.2.0
-```
-
-Update the version number after each integration update.
+**Method 3: Mobile Companion App**
+- Go to app settings → Clear cache, or force-stop the app
 
 #### Verify Card Version
 Open the browser console (`F12` → Console tab) and look for:
 ```
-HOME-PERFORMANCE v1.2.0
+HOME-PERFORMANCE v1.3.0
 ```
 
 If you see an older version, the cache hasn't been cleared yet.
@@ -676,7 +694,7 @@ Needs optimization : beyond
 - [x] External HA energy counter support
 - [x] Precise heat detection via power sensor (event-driven)
 - [x] Real-time open window detection (event-driven)
-- [x] Built-in Lovelace card (auto-registered)
+- [x] Built-in Lovelace card (auto-registered with version management) 🆕
 - [x] Multiple card layouts (full, badge, pill) 🎄
 - [x] Celsius/Fahrenheit automatic support
 - [x] Data persistence
