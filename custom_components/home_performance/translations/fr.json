@@ -63,7 +63,7 @@
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée (W) pour détection précise du chauffage et intégration de l'énergie",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
-          "energy_sensor": "Compteur d'énergie (kWh) - le plus précis pour le calcul du K. Obligatoire pour PAC/gaz/chauffage urbain, utilise power_sensor ou heater_power sinon",
+          "energy_sensor": "Compteur d'énergie journalier (kWh) qui se remet à zéro à minuit (ex: Utility Meter). Le plus précis pour le calcul du K. Obligatoire pour PAC/gaz, utilise power_sensor ou heater_power sinon",
           "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise (remplace la détection par température)",
           "weather_entity": "Entité météo pour les données de vent (partagée entre zones)",
           "room_orientation": "Orientation principale de la façade pour déterminer l'exposition au vent"
@@ -123,7 +123,7 @@
           "volume": "Volume pour calculer le coefficient K par m³",
           "power_sensor": "Capteur de puissance instantanée (W) pour détection précise du chauffage",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
-          "energy_sensor": "Compteur d'énergie (kWh) - le plus précis pour le calcul du K. Obligatoire pour PAC/gaz/chauffage urbain, prioritaire",
+          "energy_sensor": "Compteur d'énergie journalier (kWh) qui se remet à zéro à minuit (ex: Utility Meter). Le plus précis pour le calcul du K. Obligatoire pour PAC/gaz, prioritaire",
           "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise",
           "window_notification_enabled": "Envoyer une notification push quand la fenêtre est ouverte et le chauffage actif",
           "notify_device": "Sélectionnez l'appareil mobile pour recevoir les notifications",

@@ -41,7 +41,7 @@
           "volume": "Volume of the zone (surface × ceiling height)",
           "power_threshold": "Power above which heating is considered active (default: 50W)",
           "power_sensor": "Real-time power sensor (W) for precise heating detection and energy calculation",
-          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Required for heat pump/gas/district heating, optional for electric",
+          "energy_sensor": "Daily energy counter (kWh) that resets at midnight (e.g., Utility Meter). Most accurate for K calculation. Required for heat pump/gas, optional for electric",
           "window_sensor": "Optional: physical window/door contact sensor for accurate open detection",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
@@ -85,7 +85,7 @@
           "volume": "Volume to calculate K coefficient per m³",
           "power_threshold": "Power above which heating is considered active (default: 50W)",
           "power_sensor": "Real-time power sensor (W) for precise heating detection",
-          "energy_sensor": "Energy meter (kWh) - most accurate for K calculation. Required for heat pump/gas/district heating, takes priority",
+          "energy_sensor": "Daily energy counter (kWh) that resets at midnight (e.g., Utility Meter). Most accurate for K calculation. Required for heat pump/gas, takes priority",
           "window_sensor": "Optional: physical window/door contact sensor for accurate open detection",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
