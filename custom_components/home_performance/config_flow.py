@@ -14,6 +14,7 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_EFFICIENCY_FACTOR,
+    CONF_ENABLE_DYNAMIC_COP,
     CONF_ENERGY_SENSOR,
     CONF_HEAT_SOURCE_TYPE,
     CONF_HEATER_POWER,
@@ -32,6 +33,7 @@ from .const import (
     CONF_WINDOW_SENSOR,
     CONF_ZONE_NAME,
     DEFAULT_EFFICIENCY_FACTORS,
+    DEFAULT_ENABLE_DYNAMIC_COP,
     DEFAULT_HEAT_SOURCE_TYPE,
     DEFAULT_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
@@ -559,6 +561,11 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 mode="box",
             )
         )
+
+        # Dynamic COP - only for heat pumps
+        if display_heat_source == HEAT_SOURCE_HEATPUMP:
+            dynamic_cop_enabled = current.get(CONF_ENABLE_DYNAMIC_COP, DEFAULT_ENABLE_DYNAMIC_COP)
+            schema_dict[vol.Optional(CONF_ENABLE_DYNAMIC_COP, default=dynamic_cop_enabled)] = selector.BooleanSelector()
 
         # Window sensor - only set default if value exists
         window_sensor_value = current.get(CONF_WINDOW_SENSOR)

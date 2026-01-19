@@ -21,6 +21,7 @@ from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
     CONF_EFFICIENCY_FACTOR,
+    CONF_ENABLE_DYNAMIC_COP,
     CONF_ENERGY_SENSOR,
     CONF_HEAT_SOURCE_TYPE,
     CONF_HEATER_POWER,
@@ -39,13 +40,17 @@ from .const import (
     CONF_WINDOW_SENSOR,
     CONF_ZONE_NAME,
     DEFAULT_EFFICIENCY_FACTORS,
+    DEFAULT_ENABLE_DYNAMIC_COP,
     DEFAULT_HEAT_SOURCE_TYPE,
     DEFAULT_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    HEAT_SOURCE_HEATPUMP,
     HEAT_SOURCE_MIGRATION,
     HEAT_SOURCES_REQUIRING_ENERGY,
+    MIN_DELTA_T,
+    MIN_HEATING_TIME_HOURS,
 )
 from .models import ThermalDataPoint, ThermalLossModel
 
@@ -104,6 +109,13 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             CONF_EFFICIENCY_FACTOR, DEFAULT_EFFICIENCY_FACTORS.get(self.heat_source_type, 1.0)
         )
 
+        # Dynamic COP calculation (only for heat pumps)
+        self.enable_dynamic_cop: bool = (
+            self.heat_source_type == HEAT_SOURCE_HEATPUMP
+            and config.get(CONF_ENABLE_DYNAMIC_COP, DEFAULT_ENABLE_DYNAMIC_COP)
+            and self.energy_sensor is not None
+        )
+
         # For energy-based sources, energy_sensor should be used for K calculation
         self._uses_energy_based_calculation = (
             self.heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY and self.energy_sensor is not None
@@ -157,6 +169,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._heating_seconds_daily: float = 0.0  # Heating time since midnight
         self._delta_t_sum_daily: float = 0.0  # Sum of ΔT for daily average
         self._delta_t_count_daily: int = 0  # Count of samples for daily average
+        self._indoor_temp_min_daily: float | None = None  # Min indoor temp since midnight
+        self._indoor_temp_max_daily: float | None = None  # Max indoor temp since midnight
 
         # Daily wind tracking (for history archival)
         self._wind_speed_sum_daily: float = 0.0  # Sum of wind speed for daily average
@@ -643,7 +657,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Update daily counters (minuit-minuit)
             delta_t = indoor_temp - outdoor_temp
-            self._update_daily_counters(now, heating_on, delta_t)
+            self._update_daily_counters(now, heating_on, delta_t, indoor_temp)
 
             # Update tracking values
             self._last_indoor_temp = indoor_temp
@@ -686,6 +700,18 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
             # (plus stable que le calcul depuis minuit)
             avg_delta_t_rolling = analysis.get("avg_delta_t") or delta_t
+
+            # Calculate dynamic COP for heat pumps (if enabled)
+            measured_cop = None
+            cop_status = None
+            if self.enable_dynamic_cop:
+                measured_cop, cop_status = self._calculate_dynamic_cop(
+                    k_coefficient=analysis.get("k_coefficient"),
+                    avg_delta_t=avg_delta_t_rolling,
+                    heating_hours=heating_hours_daily,
+                    energy_consumed=self._energy_sensor_daily_kwh,
+                    data_ready=analysis.get("data_ready", False),
+                )
 
             # Periodically save data to persistent storage
             await self._async_maybe_save()
@@ -735,6 +761,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "derived_power": analysis.get("derived_power"),
                 "heat_source_type": self.heat_source_type,
                 "efficiency_factor": self.efficiency_factor,
+                "enable_dynamic_cop": self.enable_dynamic_cop,
+                "measured_cop": measured_cop,
+                "cop_status": cop_status,
                 "surface": self.surface,
                 "volume": self.volume,
                 "power_threshold": self.power_threshold,
@@ -788,6 +817,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "derived_power": None,
             "heat_source_type": self.heat_source_type,
             "efficiency_factor": self.efficiency_factor,
+            "enable_dynamic_cop": self.enable_dynamic_cop,
+            "measured_cop": None,
+            "cop_status": "waiting_data" if self.enable_dynamic_cop else None,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
@@ -873,6 +905,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "derived_power": analysis.get("derived_power"),
             "heat_source_type": self.heat_source_type,
             "efficiency_factor": self.efficiency_factor,
+            "enable_dynamic_cop": self.enable_dynamic_cop,
+            "measured_cop": None,
+            "cop_status": "waiting_data" if self.enable_dynamic_cop else None,
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
@@ -924,6 +959,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._heating_seconds_daily = 0.0
             self._delta_t_sum_daily = 0.0
             self._delta_t_count_daily = 0
+            self._indoor_temp_min_daily = None
+            self._indoor_temp_max_daily = None
             self._reset_daily_wind_counters()
             self._last_daily_reset_date = today
             self._daily_reset_datetime = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -980,12 +1017,17 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Get current K_7j BEFORE adding today's data (this is the score we had today)
         current_k_7d = self.thermal_model.k_coefficient_7d
 
+        # Calculate temperature variation (for stability check in K_7d calculation)
+        temp_variation = None
+        if self._indoor_temp_min_daily is not None and self._indoor_temp_max_daily is not None:
+            temp_variation = self._indoor_temp_max_daily - self._indoor_temp_min_daily
+
         # Get wind averages for the day
         avg_wind_speed, dominant_wind_direction = self._get_daily_wind_averages()
 
         _LOGGER.info(
             "[%s] 📦 Archiving daily data for %s: heating=%.1fh, ΔT=%.1f°C, "
-            "energy=%.2f kWh [%s], samples=%d, k_7d=%.1f, wind=%.1f km/h %s",
+            "energy=%.2f kWh [%s], samples=%d, temp_var=%.1f°C, k_7d=%.1f, wind=%.1f km/h %s",
             self.zone_name,
             date,
             heating_hours,
@@ -993,6 +1035,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             energy_kwh,
             energy_source,
             self._delta_t_count_daily,
+            temp_variation if temp_variation else 0.0,
             current_k_7d if current_k_7d else 0.0,
             avg_wind_speed if avg_wind_speed else 0.0,
             dominant_wind_direction if dominant_wind_direction else "N/A",
@@ -1008,6 +1051,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             avg_outdoor_temp=avg_outdoor,
             sample_count=self._delta_t_count_daily,
             k_7d=current_k_7d,
+            temp_variation=temp_variation,
             avg_wind_speed=avg_wind_speed,
             dominant_wind_direction=dominant_wind_direction,
         )
@@ -1047,6 +1091,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._delta_t_sum_daily = 0.0
         self._delta_t_count_daily = 0
         self._estimated_energy_daily_kwh = 0.0
+        self._indoor_temp_min_daily = None
+        self._indoor_temp_max_daily = None
         self._reset_daily_wind_counters()
 
         # Reset measured energy counters
@@ -1069,7 +1115,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         _LOGGER.info("[%s] ✅ Complete reset finished - zone ready for fresh calibration", self.zone_name)
 
-    def _update_daily_counters(self, now: float, heating_on: bool, delta_t: float) -> None:
+    def _update_daily_counters(self, now: float, heating_on: bool, delta_t: float, indoor_temp: float) -> None:
         """Update daily counters (minuit-minuit)."""
         if self._last_update is not None:
             time_delta_seconds = now - self._last_update
@@ -1088,6 +1134,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Update ΔT average (always done via polling)
         self._delta_t_sum_daily += delta_t
         self._delta_t_count_daily += 1
+
+        # Track indoor temperature min/max for stability calculation
+        if self._indoor_temp_min_daily is None or indoor_temp < self._indoor_temp_min_daily:
+            self._indoor_temp_min_daily = indoor_temp
+        if self._indoor_temp_max_daily is None or indoor_temp > self._indoor_temp_max_daily:
+            self._indoor_temp_max_daily = indoor_temp
 
     def _update_wind_counters(self, weather_data: dict[str, Any]) -> None:
         """Update daily wind counters for history archival."""
@@ -1147,6 +1199,61 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return temp_value
         except (ValueError, TypeError):
             return None
+
+    def _calculate_dynamic_cop(
+        self,
+        k_coefficient: float | None,
+        avg_delta_t: float | None,
+        heating_hours: float,
+        energy_consumed: float,
+        data_ready: bool,
+    ) -> tuple[float | None, str]:
+        """Calculate dynamic COP for heat pumps.
+
+        Formula: COP = Thermal_energy / Electrical_energy
+        Where: Thermal_energy = K × ΔT × hours (in Wh, then converted to kWh)
+
+        Returns:
+            Tuple of (measured_cop, status_message)
+        """
+        # Check prerequisites
+        if not data_ready or k_coefficient is None:
+            return None, "waiting_calibration"
+
+        if avg_delta_t is None or avg_delta_t < MIN_DELTA_T:
+            return None, "insufficient_delta_t"
+
+        if heating_hours < MIN_HEATING_TIME_HOURS:
+            return None, "insufficient_heating_time"
+
+        if energy_consumed <= 0:
+            return None, "no_energy_data"
+
+        # Calculate thermal energy needed (in kWh)
+        # K is in W/°C, so K × ΔT × hours = Wh, divide by 1000 for kWh
+        thermal_energy_kwh = (k_coefficient * avg_delta_t * heating_hours) / 1000
+
+        # COP = Thermal output / Electrical input
+        cop = thermal_energy_kwh / energy_consumed
+
+        # Sanity check: COP should be between 1.0 and 7.0 for heat pumps
+        if cop < 1.0:
+            _LOGGER.warning(
+                "[%s] Calculated COP %.2f is below 1.0 - check sensor configuration",
+                self.zone_name,
+                cop,
+            )
+            return cop, "low_cop_warning"
+
+        if cop > 7.0:
+            _LOGGER.warning(
+                "[%s] Calculated COP %.2f is unusually high - check sensor configuration",
+                self.zone_name,
+                cop,
+            )
+            return cop, "high_cop_warning"
+
+        return cop, "ok"
 
     def _get_external_energy(self) -> float | None:
         """Get energy value from external energy sensor (if configured)."""

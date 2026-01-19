@@ -210,6 +210,14 @@ The K coefficient is a **physical constant** of your room's insulation. It measu
 
 The insulation rating is calculated over a **7-day rolling window** for stability. This prevents rating changes at midnight and smooths out anomalous days (open window, guests, etc.).
 
+**Days are included in the K_7d calculation if:**
+- ΔT ≥ 5°C (sufficient temperature difference)
+- AND one of:
+  - Heating time ≥ 30 min (normal case)
+  - OR: Heating time ≥ 6 min AND stable indoor temperature (excellent insulation case)
+
+> 💡 This "smart filtering" rewards days with little heating but stable temperature, instead of ignoring them.
+
 The rating automatically adapts to all situations:
 
 | Situation | Display | Description |

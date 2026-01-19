@@ -81,6 +81,7 @@ HEAT_SOURCES_REQUIRING_ENERGY = [
 
 # Efficiency factor configuration
 CONF_EFFICIENCY_FACTOR = "efficiency_factor"  # Multiplier: electric consumption → heat output
+CONF_ENABLE_DYNAMIC_COP = "enable_dynamic_cop"  # Enable dynamic COP calculation for heat pumps
 
 # Default efficiency factors by heat source type
 # - Electric: 1.0 (100% efficient, all electricity becomes heat)
@@ -113,6 +114,7 @@ DEFAULT_NOTIFICATION_DELAY = 2  # minutes
 DEFAULT_HEAT_SOURCE_TYPE = HEAT_SOURCE_ELECTRIC
 DEFAULT_EFFICIENCY_FACTOR = 1.0
 DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
+DEFAULT_ENABLE_DYNAMIC_COP = False  # Disabled by default, user must opt-in
 
 # Timing
 DEFAULT_SCAN_INTERVAL = 60  # seconds
@@ -153,6 +155,7 @@ SENSOR_ENTITY_SUFFIXES = {
     "analysis_progress": "analysis_progress",
     "insulation_rating": "insulation_rating",
     "measured_energy_daily": "measured_energy_daily",
+    "measured_cop": "measured_cop",
 }
 
 BINARY_SENSOR_ENTITY_SUFFIXES = {

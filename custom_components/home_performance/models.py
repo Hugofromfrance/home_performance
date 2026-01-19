@@ -121,6 +121,8 @@ class DailyHistoryEntry:
     avg_outdoor_temp: float  # Average outdoor temperature
     sample_count: int  # Number of samples (data points)
     k_7d: float | None = None  # K_7j at the time of archival (for historical graph)
+    # Temperature stability (for "excellent isolation" inference)
+    temp_variation: float | None = None  # Indoor temp variation (max - min) in °C
     # Weather data (for future analysis)
     avg_wind_speed: float | None = None  # Average wind speed that day (km/h)
     dominant_wind_direction: str | None = None  # Most frequent wind direction
@@ -138,6 +140,8 @@ class DailyHistoryEntry:
         }
         if self.k_7d is not None:
             result["k_7d"] = self.k_7d
+        if self.temp_variation is not None:
+            result["temp_variation"] = self.temp_variation
         if self.avg_wind_speed is not None:
             result["avg_wind_speed"] = self.avg_wind_speed
         if self.dominant_wind_direction is not None:
@@ -156,6 +160,7 @@ class DailyHistoryEntry:
             avg_outdoor_temp=data.get("avg_outdoor_temp", 0.0),
             sample_count=data.get("sample_count", 0),
             k_7d=data.get("k_7d"),
+            temp_variation=data.get("temp_variation"),
             avg_wind_speed=data.get("avg_wind_speed"),
             dominant_wind_direction=data.get("dominant_wind_direction"),
         )
@@ -493,6 +498,7 @@ class ThermalLossModel:
         avg_outdoor_temp: float,
         sample_count: int,
         k_7d: float | None = None,
+        temp_variation: float | None = None,
         avg_wind_speed: float | None = None,
         dominant_wind_direction: str | None = None,
     ) -> None:
@@ -510,6 +516,7 @@ class ThermalLossModel:
             avg_outdoor_temp: Average outdoor temperature
             sample_count: Number of data samples
             k_7d: The K_7j score at time of archival (for historical graph)
+            temp_variation: Indoor temperature variation (max - min) in °C
             avg_wind_speed: Average wind speed that day (km/h)
             dominant_wind_direction: Most frequent wind direction (N, NE, E, SE, S, SW, W, NW)
         """
@@ -536,6 +543,7 @@ class ThermalLossModel:
             avg_outdoor_temp=avg_outdoor_temp,
             sample_count=sample_count,
             k_7d=k_7d,
+            temp_variation=temp_variation,
             avg_wind_speed=avg_wind_speed,
             dominant_wind_direction=dominant_wind_direction,
         )
@@ -582,10 +590,35 @@ class ThermalLossModel:
             self._daily_history[-HISTORY_DAYS:] if len(self._daily_history) > HISTORY_DAYS else self._daily_history
         )
 
-        # Filter valid days (sufficient ΔT and heating time)
-        valid_days = [
-            d for d in recent_history if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
-        ]
+        # Filter valid days for K calculation
+        # A day is valid if:
+        # 1. ΔT >= MIN_DELTA_T (sufficient temperature difference)
+        # 2. AND one of:
+        #    a) heating_hours >= MIN_HEATING_TIME_HOURS (normal case: enough heating data)
+        #    b) heating_hours >= 0.1h AND temp_stable (excellent isolation: little heating needed)
+        #
+        # This allows days with little heating but stable temperature to contribute
+        # to the K_7d calculation, rewarding excellent insulation.
+        valid_days = []
+        for d in recent_history:
+            if d.avg_delta_t < MIN_DELTA_T:
+                continue  # Not enough ΔT
+
+            # Check if day has enough heating data OR is "excellent isolation" case
+            has_enough_heating = d.heating_hours >= MIN_HEATING_TIME_HOURS
+            temp_stable = d.temp_variation is not None and d.temp_variation < TEMP_STABILITY_THRESHOLD
+            has_minimal_heating = d.heating_hours >= 0.1  # At least 6 minutes
+
+            if has_enough_heating or (has_minimal_heating and temp_stable):
+                valid_days.append(d)
+            else:
+                _LOGGER.debug(
+                    "[%s] Day %s filtered: heating=%.2fh, temp_variation=%s",
+                    self.zone_name,
+                    d.date,
+                    d.heating_hours,
+                    f"{d.temp_variation:.1f}°C" if d.temp_variation else "N/A",
+                )
 
         if not valid_days:
             _LOGGER.debug(

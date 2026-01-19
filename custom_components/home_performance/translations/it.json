@@ -108,6 +108,7 @@
           "power_sensor": "Sensore di potenza",
           "power_threshold": "Soglia rilevamento riscaldamento",
           "energy_sensor": "Contatore energia esterno",
+          "enable_dynamic_cop": "Abilita calcolo COP dinamico",
           "window_sensor": "Sensore finestra/porta",
           "window_notification_enabled": "Attiva avvisi finestra aperta",
           "notify_device": "Dispositivo mobile per notifiche",
@@ -124,6 +125,7 @@
           "power_sensor": "Sensore di potenza istantanea (potenza > soglia = riscaldamento attivo)",
           "power_threshold": "Potenza in Watt oltre la quale il riscaldamento è considerato attivo (predefinito: 50W)",
           "energy_sensor": "Contatore energia giornaliero (kWh) che si azzera a mezzanotte (es: Utility Meter). Il più preciso per il calcolo K. Obbligatorio per pompa di calore/gas, prioritario",
+          "enable_dynamic_cop": "Calcola il COP reale dai dati misurati (richiede contatore energia). Se disabilitato, usa il fattore di efficienza statico",
           "window_sensor": "Sensore fisico finestra/porta per rilevamento apertura preciso",
           "window_notification_enabled": "Invia notifica push quando la finestra è aperta e il riscaldamento è attivo",
           "notify_device": "Seleziona il dispositivo mobile per ricevere le notifiche",
@@ -192,6 +194,9 @@
       },
       "insulation_rating": {
         "name": "Valutazione isolamento"
+      },
+      "measured_cop": {
+        "name": "COP misurato"
       }
     },
     "binary_sensor": {

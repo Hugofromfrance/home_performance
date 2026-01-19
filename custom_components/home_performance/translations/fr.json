@@ -108,6 +108,7 @@
           "power_sensor": "Capteur de puissance",
           "power_threshold": "Seuil de détection chauffe",
           "energy_sensor": "Compteur d'énergie",
+          "enable_dynamic_cop": "Activer le calcul dynamique du COP",
           "window_sensor": "Capteur d'ouverture fenêtre/porte",
           "window_notification_enabled": "Activer les alertes fenêtre ouverte",
           "notify_device": "Appareil mobile pour notifications",
@@ -124,6 +125,7 @@
           "power_sensor": "Capteur de puissance instantanée (W) pour détection précise du chauffage",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
           "energy_sensor": "Compteur d'énergie journalier (kWh) qui se remet à zéro à minuit (ex: Utility Meter). Le plus précis pour le calcul du K. Obligatoire pour PAC/gaz, prioritaire",
+          "enable_dynamic_cop": "Calcule le COP réel à partir des mesures (nécessite un compteur d'énergie). Si désactivé, utilise le facteur d'efficacité statique",
           "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise",
           "window_notification_enabled": "Envoyer une notification push quand la fenêtre est ouverte et le chauffage actif",
           "notify_device": "Sélectionnez l'appareil mobile pour recevoir les notifications",
@@ -192,6 +194,9 @@
       },
       "insulation_rating": {
         "name": "Note d'isolation"
+      },
+      "measured_cop": {
+        "name": "COP mesuré"
       }
     },
     "binary_sensor": {

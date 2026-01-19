@@ -702,6 +702,131 @@ class TestThermalLossModel7DayK:
         assert model.k_coefficient == 30.0
 
 
+class TestThermalLossModel7DayKFiltering:
+    """Test 7-day K coefficient filtering logic for excellent isolation days."""
+
+    def test_day_with_little_heating_but_stable_temp_is_valid(self, zone_name: str, heater_power: float):
+        """Test that a day with little heating but stable temperature is included in K_7d."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add days with normal heating
+        for i in range(5):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=6.0,
+                avg_delta_t=10.0,
+                energy_kwh=9.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,  # Stable temperature
+            )
+
+        # Add a day with little heating but stable temperature (excellent isolation)
+        model.add_daily_summary(
+            date="2025-01-16",
+            heating_hours=0.2,  # Only 12 minutes (< 0.5h threshold, but >= 0.1h)
+            avg_delta_t=10.0,  # Sufficient ΔT
+            energy_kwh=0.3,  # Low energy
+            avg_indoor_temp=20.0,
+            avg_outdoor_temp=10.0,
+            sample_count=1440,
+            temp_variation=1.0,  # Very stable (< 3°C threshold)
+        )
+
+        # K_7d should be calculated and include this day
+        assert model.k_coefficient_7d is not None
+        assert model.history_days_count == 6
+
+    def test_day_with_little_heating_and_unstable_temp_is_filtered(self, zone_name: str, heater_power: float):
+        """Test that a day with little heating and unstable temperature is filtered out."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add days with normal heating
+        for i in range(5):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=6.0,
+                avg_delta_t=10.0,
+                energy_kwh=9.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,
+            )
+
+        k_7d_before = model.k_coefficient_7d
+
+        # Add a day with little heating and UNSTABLE temperature
+        model.add_daily_summary(
+            date="2025-01-16",
+            heating_hours=0.2,  # Only 12 minutes
+            avg_delta_t=10.0,
+            energy_kwh=0.3,
+            avg_indoor_temp=20.0,
+            avg_outdoor_temp=10.0,
+            sample_count=1440,
+            temp_variation=5.0,  # Unstable (>= 3°C threshold)
+        )
+
+        # K_7d should NOT change (day should be filtered)
+        # Note: Day is still added to history, but not used in calculation
+        assert model.k_coefficient_7d == k_7d_before
+
+    def test_day_with_very_little_heating_is_filtered(self, zone_name: str, heater_power: float):
+        """Test that a day with almost no heating is filtered even with stable temp."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add days with normal heating
+        for i in range(5):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=6.0,
+                avg_delta_t=10.0,
+                energy_kwh=9.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,
+            )
+
+        k_7d_before = model.k_coefficient_7d
+
+        # Add a day with almost no heating (< 0.1h = 6 min minimum)
+        model.add_daily_summary(
+            date="2025-01-16",
+            heating_hours=0.05,  # Only 3 minutes (< 0.1h minimum)
+            avg_delta_t=10.0,
+            energy_kwh=0.1,
+            avg_indoor_temp=20.0,
+            avg_outdoor_temp=10.0,
+            sample_count=1440,
+            temp_variation=1.0,  # Stable but not enough heating
+        )
+
+        # K_7d should NOT change (day should be filtered due to < 0.1h)
+        assert model.k_coefficient_7d == k_7d_before
+
+    def test_backward_compat_day_without_temp_variation(self, zone_name: str, heater_power: float):
+        """Test backward compatibility: days without temp_variation use normal filtering."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add day without temp_variation (old data format)
+        model.add_daily_summary(
+            date="2025-01-10",
+            heating_hours=6.0,  # Enough heating
+            avg_delta_t=10.0,
+            energy_kwh=9.0,
+            avg_indoor_temp=20.0,
+            avg_outdoor_temp=10.0,
+            sample_count=1440,
+            temp_variation=None,  # No temp_variation data
+        )
+
+        # Should still be valid (normal heating threshold met)
+        assert model.k_coefficient_7d is not None
+
+
 class TestThermalLossModelSeasonStatus:
     """Test season status detection."""
 

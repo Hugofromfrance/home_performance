@@ -108,6 +108,7 @@
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
           "energy_sensor": "Energy meter",
+          "enable_dynamic_cop": "Enable dynamic COP calculation",
           "window_sensor": "Window/Door sensor",
           "window_notification_enabled": "Enable window open alerts",
           "notify_device": "Mobile device for notifications",
@@ -124,6 +125,7 @@
           "power_sensor": "Real-time power sensor (W) for precise heating detection",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
           "energy_sensor": "Daily energy counter (kWh) that resets at midnight (e.g., Utility Meter). Most accurate for K calculation. Required for heat pump/gas, takes priority",
+          "enable_dynamic_cop": "Calculate real COP from measured data (requires energy sensor). When disabled, uses static efficiency factor",
           "window_sensor": "Physical window/door contact sensor for accurate open detection",
           "window_notification_enabled": "Send push notification when window is open and heating is active",
           "notify_device": "Select the mobile device to receive notifications",
@@ -192,6 +194,9 @@
       },
       "insulation_rating": {
         "name": "Insulation Rating"
+      },
+      "measured_cop": {
+        "name": "Measured COP"
       }
     },
     "binary_sensor": {

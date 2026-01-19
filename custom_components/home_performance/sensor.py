@@ -138,6 +138,10 @@ async def async_setup_entry(
     if coordinator.power_sensor or coordinator.energy_sensor:
         entities.append(MeasuredEnergyDailySensor(coordinator, zone_name))
 
+    # Add measured COP sensor if dynamic COP is enabled (heat pumps only)
+    if coordinator.enable_dynamic_cop:
+        entities.append(MeasuredCOPSensor(coordinator, zone_name))
+
     async_add_entities(entities)
 
 
@@ -390,11 +394,15 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
 
 
 class DailyEnergySensor(HomePerformanceBaseSensor):
-    """Sensor for daily energy consumption (rolling 24h window, estimated)."""
+    """Sensor for daily energy consumption (rolling 24h window, estimated).
+
+    Uses state_class TOTAL (not TOTAL_INCREASING) because this is a daily
+    counter that resets at midnight, similar to a Utility Meter.
+    """
 
     _attr_native_unit_of_measurement = "kWh"
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:lightning-bolt-outline"
     _attr_name = "Daily estimated energy"
 
@@ -920,4 +928,65 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
             "energy_sensor": self.coordinator.energy_sensor if uses_external else None,
             "power_sensor": self.coordinator.power_sensor if not uses_external else None,
             "current_power_w": data.get("measured_power_w") if not uses_external else None,
+        }
+
+
+class MeasuredCOPSensor(HomePerformanceBaseSensor):
+    """Sensor for measured COP (Coefficient of Performance) for heat pumps.
+
+    Calculates real-world COP based on:
+    - K coefficient (thermal loss)
+    - Temperature difference (ΔT)
+    - Heating time
+    - Actual energy consumption (from energy sensor)
+
+    Formula: COP = Thermal_energy_output / Electrical_energy_input
+    Where: Thermal_energy = K × ΔT × hours
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:heat-pump"
+    _attr_name = "Measured COP"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "measured_cop")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the measured COP value."""
+        if self.coordinator.data:
+            cop = self.coordinator.data.get("measured_cop")
+            if cop is not None:
+                return round(cop, 2)
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        cop_status = data.get("cop_status")
+
+        # Map status to user-friendly messages
+        status_messages = {
+            "ok": "COP calculated successfully",
+            "waiting_calibration": "Waiting for K coefficient calibration",
+            "insufficient_delta_t": "Temperature difference too low (need ΔT ≥ 5°C)",
+            "insufficient_heating_time": "Not enough heating time (need ≥ 30 min)",
+            "no_energy_data": "No energy consumption data",
+            "low_cop_warning": "COP unusually low - check sensor configuration",
+            "high_cop_warning": "COP unusually high - check sensor configuration",
+            "waiting_data": "Waiting for measurement data",
+        }
+
+        return {
+            "description": "Real-time COP calculated from actual measurements",
+            "status": cop_status,
+            "status_message": status_messages.get(cop_status, "Unknown status"),
+            "static_efficiency_factor": self.coordinator.efficiency_factor,
+            "k_coefficient": data.get("k_coefficient"),
+            "avg_delta_t": data.get("avg_delta_t"),
+            "heating_hours": data.get("heating_hours"),
+            "energy_consumed_kwh": data.get("external_energy_daily_kwh"),
+            "note": "COP = Thermal output / Electrical input. Typical values: 2.5-4.5",
         }
