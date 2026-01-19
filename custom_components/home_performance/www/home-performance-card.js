@@ -93,7 +93,8 @@ class HomePerformanceCard extends LitElement {
       ready: "Ready",
 
       // Editor
-      editor_zone: "Zone (e.g.: Living Room, Bedroom)",
+      editor_zone: "Zone",
+      editor_select_zone: "Select a zone",
       editor_title: "Title",
       editor_card_style: "Card style",
       editor_full: "Full",
@@ -197,7 +198,8 @@ class HomePerformanceCard extends LitElement {
       ready: "Prêt",
 
       // Editor
-      editor_zone: "Zone (ex: Salon, Chambre)",
+      editor_zone: "Zone",
+      editor_select_zone: "Sélectionner une zone",
       editor_title: "Titre",
       editor_card_style: "Style de carte",
       editor_full: "Complète",
@@ -301,7 +303,8 @@ class HomePerformanceCard extends LitElement {
       ready: "Pronto",
 
       // Editor
-      editor_zone: "Zona (es: Soggiorno, Camera)",
+      editor_zone: "Zona",
+      editor_select_zone: "Seleziona una zona",
       editor_title: "Titolo",
       editor_card_style: "Stile scheda",
       editor_full: "Completa",
@@ -3098,6 +3101,58 @@ class HomePerformanceCardEditor extends LitElement {
     return translations[key] !== undefined ? translations[key] : key;
   }
 
+  // Get available Home Performance zones from devices
+  _getAvailableZones() {
+    if (!this.hass) return [];
+
+    const zones = [];
+    const seen = new Set();
+    
+    // Method 1: Find zones from devices (most reliable)
+    // Devices are named "Home Performance - {Zone Name}"
+    if (this.hass.devices) {
+      Object.values(this.hass.devices).forEach((device) => {
+        if (device.name && device.name.startsWith("Home Performance - ")) {
+          const zoneName = device.name.replace("Home Performance - ", "");
+          if (!seen.has(zoneName)) {
+            zones.push({ slug: zoneName, displayName: zoneName });
+            seen.add(zoneName);
+          }
+        }
+      });
+    }
+
+    // Method 2: Fallback - find from entities if devices not available
+    if (zones.length === 0) {
+      const knownSuffixes = ['k_coefficient', 'coefficient_k', 'k_per_m2', 'k_per_m3'];
+      
+      Object.keys(this.hass.states).forEach((entityId) => {
+        for (const suffix of knownSuffixes) {
+          // Try standard pattern: sensor.home_performance_{zone}_{suffix}
+          let match = entityId.match(new RegExp(`^sensor\\.home_performance_(.+?)_${suffix}$`));
+          // Try legacy pattern: sensor.{zone}_{suffix}
+          if (!match) {
+            match = entityId.match(new RegExp(`^sensor\\.(.+?)_${suffix}$`));
+          }
+          
+          if (match && !seen.has(match[1])) {
+            const slug = match[1];
+            const displayName = slug
+              .split("_")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+            zones.push({ slug, displayName });
+            seen.add(slug);
+            break;
+          }
+        }
+      });
+    }
+
+    console.log("[Home Performance] Available zones:", zones);
+    return zones.sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }
+
   setConfig(config) {
     this.config = config;
   }
@@ -3133,19 +3188,57 @@ class HomePerformanceCardEditor extends LitElement {
     this.dispatchEvent(event);
   }
 
+  _onZoneSelected(ev) {
+    const newConfig = { ...this.config, zone: ev.target.value };
+    const event = new CustomEvent("config-changed", {
+      detail: { config: newConfig },
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(event);
+  }
+
   render() {
     if (!this.hass || !this.config) {
       return html``;
     }
 
+    const isMultiZone = this.config.layout === "multi";
+    const zones = this._getAvailableZones();
+
     return html`
       <div class="editor">
-        <ha-textfield
-          label="${this._t('editor_zone')}"
-          .value=${this.config.zone || ""}
-          .configValue=${"zone"}
-          @input=${this.configChanged}
-        ></ha-textfield>
+        ${!isMultiZone
+          ? html`
+              ${zones.length > 0
+                ? html`
+                    <div class="zone-selector">
+                      <label>${this._t('editor_zone')}</label>
+                      <select @change=${this._onZoneSelected}>
+                        <option value="" ?selected=${!this.config.zone}>-- ${this._t('editor_select_zone')} --</option>
+                        ${zones.map(
+                          (zone) => html`
+                            <option
+                              value=${zone.displayName}
+                              ?selected=${this.config.zone === zone.displayName}
+                            >
+                              ${zone.displayName}
+                            </option>
+                          `
+                        )}
+                      </select>
+                    </div>
+                  `
+                : html`
+                    <ha-textfield
+                      label="${this._t('editor_zone')}"
+                      .value=${this.config.zone || ""}
+                      .configValue=${"zone"}
+                      @input=${this.configChanged}
+                    ></ha-textfield>
+                  `}
+            `
+          : ""}
 
         <ha-textfield
           label="${this._t('editor_title')}"
@@ -3229,6 +3322,44 @@ class HomePerformanceCardEditor extends LitElement {
         padding: 16px;
       }
       ha-textfield { width: 100%; }
+
+      .zone-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .zone-selector label {
+        font-size: 12px;
+        color: var(--primary-color);
+        font-weight: 500;
+      }
+
+      .zone-selector select {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        border: 1px solid var(--divider-color);
+        border-radius: 4px;
+        background: var(--card-background-color, #1c1c1c);
+        color: var(--primary-text-color);
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+      }
+
+      .zone-selector select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .zone-selector select option {
+        background: var(--card-background-color, #1c1c1c);
+        color: var(--primary-text-color);
+        padding: 8px;
+      }
 
       .layout-selector label {
         display: block;
