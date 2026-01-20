@@ -165,6 +165,24 @@ class TestOrientations:
         expected = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
         assert set(ORIENTATIONS) == set(expected)
 
+    def test_orientations_are_lowercase(self):
+        """Test ORIENTATIONS are all lowercase for case-insensitive matching.
+
+        This is important for backward compatibility with legacy data
+        that may have been stored in uppercase (e.g., "N" instead of "n").
+        The config_flow and coordinator normalize values to lowercase.
+        """
+        for orientation in ORIENTATIONS:
+            assert orientation == orientation.lower()
+            assert orientation.isalpha() or orientation.isalnum()
+
+    def test_legacy_uppercase_can_be_normalized(self):
+        """Test that uppercase legacy values can be normalized to match ORIENTATIONS."""
+        legacy_values = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        for legacy in legacy_values:
+            normalized = legacy.lower()
+            assert normalized in ORIENTATIONS, f"{legacy} should normalize to a valid orientation"
+
 
 class TestGetVersion:
     """Test get_version function."""

@@ -626,15 +626,30 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             )
 
         # Room orientation
+        # Normalize to lowercase for case-insensitive matching with ORIENTATIONS (legacy data fix)
         room_orientation_value = current.get(CONF_ROOM_ORIENTATION)
         if room_orientation_value is not None:
-            schema_dict[vol.Optional(CONF_ROOM_ORIENTATION, default=room_orientation_value)] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=ORIENTATIONS,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    translation_key="room_orientation",
+            room_orientation_value = room_orientation_value.lower()
+            # Only use as default if it's a valid orientation
+            if room_orientation_value in ORIENTATIONS:
+                schema_dict[vol.Optional(CONF_ROOM_ORIENTATION, default=room_orientation_value)] = (
+                    selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=ORIENTATIONS,
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                            translation_key="room_orientation",
+                        )
+                    )
                 )
-            )
+            else:
+                # Invalid legacy value, show empty selector
+                schema_dict[vol.Optional(CONF_ROOM_ORIENTATION)] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ORIENTATIONS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="room_orientation",
+                    )
+                )
         else:
             schema_dict[vol.Optional(CONF_ROOM_ORIENTATION)] = selector.SelectSelector(
                 selector.SelectSelectorConfig(
