@@ -138,9 +138,10 @@ async def async_setup_entry(
     if coordinator.power_sensor or coordinator.energy_sensor:
         entities.append(MeasuredEnergyDailySensor(coordinator, zone_name))
 
-    # Add measured COP sensor if dynamic COP is enabled (heat pumps only)
+    # Add measured COP sensors if dynamic COP is enabled (heat pumps only)
     if coordinator.enable_dynamic_cop:
         entities.append(MeasuredCOPSensor(coordinator, zone_name))
+        entities.append(COP7dSensor(coordinator, zone_name))
 
     async_add_entities(entities)
 
@@ -990,3 +991,72 @@ class MeasuredCOPSensor(HomePerformanceBaseSensor):
             "energy_consumed_kwh": data.get("external_energy_daily_kwh"),
             "note": "COP = Thermal output / Electrical input. Typical values: 2.5-4.5",
         }
+
+
+class COP7dSensor(HomePerformanceBaseSensor):
+    """Sensor for 7-day average COP (used for auto-calibration).
+
+    This sensor shows the rolling 7-day average of measured COP values.
+    When dynamic COP is enabled, this value is used as the effective
+    efficiency factor for K coefficient calculations instead of the
+    static factor configured in settings.
+
+    This provides automatic adaptation to:
+    - Seasonal variations (COP changes with outdoor temperature)
+    - Heat pump performance changes over time
+    - Different operating conditions
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:chart-line"
+    _attr_name = "COP 7d Average"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "cop_7d")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the 7-day average COP value."""
+        if self.coordinator.data:
+            cop_7d = self.coordinator.data.get("cop_7d")
+            if cop_7d is not None:
+                return round(cop_7d, 2)
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+
+        # Determine status
+        cop_7d = data.get("cop_7d")
+        measured_cop = data.get("measured_cop")
+        static_factor = self.coordinator.efficiency_factor
+
+        if cop_7d is not None:
+            status = "active"
+            status_message = "Using COP 7d for K calculations"
+        elif measured_cop is not None:
+            status = "collecting"
+            status_message = "Collecting data (need 3+ days with valid COP)"
+        else:
+            status = "waiting"
+            status_message = "Waiting for first COP measurement"
+
+        return {
+            "description": "7-day rolling average COP used for K calculations",
+            "status": status,
+            "status_message": status_message,
+            "static_efficiency_factor": static_factor,
+            "effective_efficiency": data.get("effective_efficiency"),
+            "measured_cop_24h": measured_cop,
+            "days_with_cop_data": self._count_days_with_cop(),
+            "is_active": cop_7d is not None,
+            "note": "After 3+ days of valid COP data, this value replaces the static factor",
+        }
+
+    def _count_days_with_cop(self) -> int:
+        """Count days in history with valid COP measurements."""
+        history = self.coordinator.thermal_model.daily_history
+        return sum(1 for entry in history if entry.measured_cop is not None and entry.measured_cop > 0)

@@ -601,8 +601,53 @@ The efficiency factor converts consumed energy (electricity, gas) to actual ther
 | Gas furnace | 0.85 | 0.78 - 0.90 | US-style forced air systems |
 
 > **💡 Tips**:
-> - For **heat pumps**, use your unit's actual COP (Coefficient of Performance) if known
+> - For **heat pumps**, use your unit's actual COP (Coefficient of Performance) if known, or enable Dynamic COP (see below)
 > - For **gas systems**, check your equipment's AFUE rating and convert to decimal (e.g., 92% AFUE = 0.92)
+
+### 🔄 Dynamic COP (Heat Pumps Only)
+
+For heat pumps, the COP (Coefficient of Performance) varies significantly based on:
+- **Outdoor temperature** (COP drops when it's very cold)
+- **Operating mode** (heating, defrost cycles)
+- **System age and maintenance**
+
+Instead of using a fixed efficiency factor, you can enable **Dynamic COP** which automatically measures and adapts the COP based on your real consumption data.
+
+#### How it works
+
+| Phase | Behavior |
+|-------|----------|
+| **Days 1-7** | Uses the static efficiency factor you configured (e.g., 3.0) |
+| **Day 8+** | Uses the **COP 7d average** (rolling 7-day measured COP) for K calculations |
+
+#### Created Sensors
+
+When Dynamic COP is enabled, two additional sensors are created:
+
+| Sensor | Description |
+|--------|-------------|
+| `sensor.home_performance_{zone}_measured_cop` | Real-time COP calculated from the last 24h of data |
+| `sensor.home_performance_{zone}_cop_7d` | 7-day rolling average COP (used for auto-calibration) |
+
+#### Benefits
+
+- ✅ **Seasonal adaptation**: COP automatically adjusts between winter (lower) and spring (higher)
+- ✅ **Performance monitoring**: Detect if your heat pump loses efficiency over time
+- ✅ **Accurate K calculation**: Uses real measured efficiency instead of assumed values
+- ✅ **Zero configuration**: Once enabled, everything is automatic
+
+#### How to Enable
+
+1. Go to **Settings → Integrations → Home Performance**
+2. Click **Configure** on your zone
+3. Select **Heat Pump** as heat source type
+4. Submit → A second step appears: **"Heat Pump Options"**
+5. Enable **"Enable dynamic COP calculation"**
+6. Submit
+
+> **Requirements**: An energy sensor (daily counter) is required for COP calculation. Without it, the COP cannot be measured.
+
+> **Note**: The static efficiency factor remains as a fallback if not enough data is available (first 7 days, or if heating was minimal).
 
 ### Configuration by Heat Source Type
 
@@ -617,7 +662,8 @@ Energy sensor: (optional - for measured vs estimated energy)
 ```
 Heat source type: Heat pump
 Heater power: 17600  (optional - declared power for estimation fallback)
-Energy sensor: sensor.heatpump_energy  (optional but recommended for accuracy)
+Energy sensor: sensor.heatpump_energy  (recommended - required for Dynamic COP)
+Enable dynamic COP: Yes  (optional - auto-calibrate efficiency from measurements)
 ```
 
 #### Gas Boiler (European)

@@ -194,6 +194,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._notification_task: asyncio.Task | None = None  # Delayed notification task
         self._last_notification_time: float | None = None  # Cooldown tracking
 
+        # Dynamic COP tracking (for heat pumps)
+        self._last_measured_cop: float | None = None  # Last calculated COP (for archiving)
+
         # Persistence - use slugify for consistent handling of special characters
         zone_slug = slugify(self.zone_name, separator="_")
         self._store = Store(
@@ -630,6 +633,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Check for daily reset (midnight)
             self._check_daily_reset(now_dt)
 
+            # Dynamic COP: Update model's efficiency factor based on setting
+            if self.enable_dynamic_cop:
+                # Use COP_7d if available, otherwise keep static factor
+                cop_7d_from_model = self.thermal_model.cop_7d
+                if cop_7d_from_model is not None:
+                    self.thermal_model.update_efficiency_factor(cop_7d_from_model)
+            else:
+                # Dynamic COP disabled: always use static factor (reset if was modified)
+                self.thermal_model.update_efficiency_factor(self.efficiency_factor)
+
             # Create data point and add to model (for K coefficient - still uses rolling 24h)
             data_point = ThermalDataPoint(
                 timestamp=now,
@@ -704,6 +717,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Calculate dynamic COP for heat pumps (if enabled)
             measured_cop = None
             cop_status = None
+            cop_7d = None
+            effective_efficiency = self.efficiency_factor  # Default to static factor
+
             if self.enable_dynamic_cop:
                 measured_cop, cop_status = self._calculate_dynamic_cop(
                     k_coefficient=analysis.get("k_coefficient"),
@@ -712,6 +728,22 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     energy_consumed=self._energy_sensor_daily_kwh,
                     data_ready=analysis.get("data_ready", False),
                 )
+                # Store for archiving at midnight
+                if measured_cop is not None:
+                    self._last_measured_cop = measured_cop
+
+                # Get 7-day average COP from thermal model
+                cop_7d = self.thermal_model.cop_7d
+
+                # Use COP_7d as effective efficiency if available (auto-calibration)
+                if cop_7d is not None:
+                    effective_efficiency = cop_7d
+                    _LOGGER.debug(
+                        "[%s] Using dynamic COP_7d=%.2f as efficiency factor (static=%.2f)",
+                        self.zone_name,
+                        cop_7d,
+                        self.efficiency_factor,
+                    )
 
             # Periodically save data to persistent storage
             await self._async_maybe_save()
@@ -761,8 +793,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "derived_power": analysis.get("derived_power"),
                 "heat_source_type": self.heat_source_type,
                 "efficiency_factor": self.efficiency_factor,
+                "effective_efficiency": effective_efficiency,
                 "enable_dynamic_cop": self.enable_dynamic_cop,
                 "measured_cop": measured_cop,
+                "cop_7d": cop_7d,
                 "cop_status": cop_status,
                 "surface": self.surface,
                 "volume": self.volume,
@@ -817,8 +851,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "derived_power": None,
             "heat_source_type": self.heat_source_type,
             "efficiency_factor": self.efficiency_factor,
+            "effective_efficiency": self.efficiency_factor,
             "enable_dynamic_cop": self.enable_dynamic_cop,
             "measured_cop": None,
+            "cop_7d": None,
             "cop_status": "waiting_data" if self.enable_dynamic_cop else None,
             "surface": self.surface,
             "volume": self.volume,
@@ -905,8 +941,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "derived_power": analysis.get("derived_power"),
             "heat_source_type": self.heat_source_type,
             "efficiency_factor": self.efficiency_factor,
+            "effective_efficiency": self.thermal_model.cop_7d or self.efficiency_factor,
             "enable_dynamic_cop": self.enable_dynamic_cop,
             "measured_cop": None,
+            "cop_7d": self.thermal_model.cop_7d,
             "cop_status": "waiting_data" if self.enable_dynamic_cop else None,
             "surface": self.surface,
             "volume": self.volume,
@@ -1041,6 +1079,12 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dominant_wind_direction if dominant_wind_direction else "N/A",
         )
 
+        # Get current measured COP (for heat pump dynamic efficiency)
+        # This is calculated from today's data and will be used for COP_7d
+        current_measured_cop = None
+        if self.enable_dynamic_cop and self._last_measured_cop is not None:
+            current_measured_cop = self._last_measured_cop
+
         # Add to thermal model history (with the K_7j score we had at this moment)
         self.thermal_model.add_daily_summary(
             date=date,
@@ -1054,6 +1098,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             temp_variation=temp_variation,
             avg_wind_speed=avg_wind_speed,
             dominant_wind_direction=dominant_wind_direction,
+            measured_cop=current_measured_cop,
         )
 
         # Log history status after archiving

@@ -108,7 +108,6 @@
           "power_sensor": "Capteur de puissance",
           "power_threshold": "Seuil de détection chauffe",
           "energy_sensor": "Compteur d'énergie",
-          "enable_dynamic_cop": "Activer le calcul dynamique du COP",
           "window_sensor": "Capteur d'ouverture fenêtre/porte",
           "window_notification_enabled": "Activer les alertes fenêtre ouverte",
           "notify_device": "Appareil mobile pour notifications",
@@ -125,13 +124,22 @@
           "power_sensor": "Capteur de puissance instantanée (W) pour détection précise du chauffage",
           "power_threshold": "Puissance en Watts au-dessus de laquelle le chauffage est considéré actif (défaut : 50W)",
           "energy_sensor": "Compteur d'énergie journalier (kWh) qui se remet à zéro à minuit (ex: Utility Meter). Le plus précis pour le calcul du K. Obligatoire pour PAC/gaz, prioritaire",
-          "enable_dynamic_cop": "Calcule le COP réel à partir des mesures (nécessite un compteur d'énergie). Si désactivé, utilise le facteur d'efficacité statique",
           "window_sensor": "Capteur physique fenêtre/porte pour une détection d'ouverture précise",
           "window_notification_enabled": "Envoyer une notification push quand la fenêtre est ouverte et le chauffage actif",
           "notify_device": "Sélectionnez l'appareil mobile pour recevoir les notifications",
           "notification_delay": "Attendre ce nombre de minutes avant d'alerter (évite les alertes pour les ouvertures rapides)",
           "weather_entity": "Entité météo pour les données de vent (partagée entre zones)",
           "room_orientation": "Orientation principale de la façade pour déterminer l'exposition au vent"
+        }
+      },
+      "heatpump_options": {
+        "title": "Options Pompe à Chaleur",
+        "description": "Configurez les paramètres spécifiques à la pompe à chaleur.",
+        "data": {
+          "enable_dynamic_cop": "Activer le calcul dynamique du COP"
+        },
+        "data_description": {
+          "enable_dynamic_cop": "Calcule le COP réel à partir des données d'énergie mesurées au lieu d'utiliser un facteur d'efficacité statique. Nécessite un compteur d'énergie."
         }
       },
       "notifications": {
@@ -197,6 +205,9 @@
       },
       "measured_cop": {
         "name": "COP mesuré"
+      },
+      "cop_7d": {
+        "name": "COP moyen 7j"
       }
     },
     "binary_sensor": {

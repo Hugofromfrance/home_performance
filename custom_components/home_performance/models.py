@@ -126,6 +126,8 @@ class DailyHistoryEntry:
     # Weather data (for future analysis)
     avg_wind_speed: float | None = None  # Average wind speed that day (km/h)
     dominant_wind_direction: str | None = None  # Most frequent wind direction
+    # Dynamic COP for heat pumps (measured that day)
+    measured_cop: float | None = None  # COP calculated from actual measurements
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for persistence."""
@@ -146,6 +148,8 @@ class DailyHistoryEntry:
             result["avg_wind_speed"] = self.avg_wind_speed
         if self.dominant_wind_direction is not None:
             result["dominant_wind_direction"] = self.dominant_wind_direction
+        if self.measured_cop is not None:
+            result["measured_cop"] = self.measured_cop
         return result
 
     @classmethod
@@ -163,6 +167,7 @@ class DailyHistoryEntry:
             temp_variation=data.get("temp_variation"),
             avg_wind_speed=data.get("avg_wind_speed"),
             dominant_wind_direction=data.get("dominant_wind_direction"),
+            measured_cop=data.get("measured_cop"),
         )
 
 
@@ -320,6 +325,46 @@ class ThermalLossModel:
         if self.k_coefficient is None or self.volume is None:
             return None
         return self.k_coefficient / self.volume
+
+    @property
+    def cop_7d(self) -> float | None:
+        """Get the 7-day average COP for heat pumps.
+
+        Calculates the average of measured_cop values from the last 7 days
+        of daily history. Only includes days where COP was successfully measured.
+
+        Returns:
+            Average COP over 7 days, or None if not enough data.
+        """
+        if not self._daily_history:
+            return None
+
+        # Get COP values from last 7 days (most recent entries)
+        recent_entries = self._daily_history[-HISTORY_DAYS:]
+        cop_values = [
+            entry.measured_cop for entry in recent_entries if entry.measured_cop is not None and entry.measured_cop > 0
+        ]
+
+        if not cop_values:
+            return None
+
+        # Need at least 3 days of data for a meaningful average
+        if len(cop_values) < 3:
+            return None
+
+        return sum(cop_values) / len(cop_values)
+
+    def update_efficiency_factor(self, new_factor: float) -> None:
+        """Update the efficiency factor dynamically.
+
+        Used for heat pumps with dynamic COP calculation where the
+        effective COP changes based on measured data.
+
+        Args:
+            new_factor: The new efficiency factor (COP for heat pumps)
+        """
+        if new_factor > 0:
+            self.efficiency_factor = new_factor
 
     @property
     def total_energy_kwh(self) -> float:
@@ -501,6 +546,7 @@ class ThermalLossModel:
         temp_variation: float | None = None,
         avg_wind_speed: float | None = None,
         dominant_wind_direction: str | None = None,
+        measured_cop: float | None = None,
     ) -> None:
         """Archive a day's data into the rolling 7-day history.
 
@@ -519,6 +565,7 @@ class ThermalLossModel:
             temp_variation: Indoor temperature variation (max - min) in °C
             avg_wind_speed: Average wind speed that day (km/h)
             dominant_wind_direction: Most frequent wind direction (N, NE, E, SE, S, SW, W, NW)
+            measured_cop: Measured COP for heat pumps (for dynamic efficiency)
         """
         # Don't add if we don't have meaningful data
         if sample_count < 10:
@@ -546,6 +593,7 @@ class ThermalLossModel:
             temp_variation=temp_variation,
             avg_wind_speed=avg_wind_speed,
             dominant_wind_direction=dominant_wind_direction,
+            measured_cop=measured_cop,
         )
         self._daily_history.append(entry)
 

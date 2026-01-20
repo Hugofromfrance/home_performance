@@ -73,7 +73,6 @@
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
           "energy_sensor": "Energy meter",
-          "enable_dynamic_cop": "Enable dynamic COP calculation",
           "window_sensor": "Window/Door Sensor",
           "weather_entity": "Weather Entity",
           "room_orientation": "Room Orientation"
@@ -87,10 +86,19 @@
           "power_threshold": "Power above which heating is considered active (default: 50W)",
           "power_sensor": "Real-time power sensor (W) for precise heating detection",
           "energy_sensor": "Daily energy counter (kWh) that resets at midnight (e.g., Utility Meter). Most accurate for K calculation. Required for heat pump/gas, takes priority",
-          "enable_dynamic_cop": "Calculate real COP from measured data (requires energy sensor). When disabled, uses static efficiency factor",
           "window_sensor": "Optional: physical window/door contact sensor for accurate open detection",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
+        }
+      },
+      "heatpump_options": {
+        "title": "Heat Pump Options",
+        "description": "Configure heat pump specific settings.",
+        "data": {
+          "enable_dynamic_cop": "Enable dynamic COP calculation"
+        },
+        "data_description": {
+          "enable_dynamic_cop": "Calculate real COP from measured energy data instead of using static efficiency factor. Requires an energy sensor."
         }
       }
     },
@@ -142,6 +150,9 @@
       },
       "measured_cop": {
         "name": "Measured COP"
+      },
+      "cop_7d": {
+        "name": "COP 7d Average"
       }
     },
     "binary_sensor": {

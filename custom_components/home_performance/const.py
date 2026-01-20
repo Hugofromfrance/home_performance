@@ -156,6 +156,7 @@ SENSOR_ENTITY_SUFFIXES = {
     "insulation_rating": "insulation_rating",
     "measured_energy_daily": "measured_energy_daily",
     "measured_cop": "measured_cop",
+    "cop_7d": "cop_7d",
 }
 
 BINARY_SENSOR_ENTITY_SUFFIXES = {

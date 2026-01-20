@@ -367,9 +367,10 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         self._config_entry = config_entry
+        self._data: dict[str, Any] = {}
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Manage the options."""
+        """Manage the options - Step 1: General options."""
         errors: dict[str, str] = {}
 
         # Get current values from data or options
@@ -402,17 +403,15 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 errors[CONF_WINDOW_SENSOR] = "entity_not_found"
 
             if not errors:
-                # Keep None values to allow removing sensors (override data with options)
-                # But remove keys that are None AND not in current config (truly optional)
-                cleaned_input = {}
-                for k, v in user_input.items():
-                    if v is not None:
-                        cleaned_input[k] = v
-                    elif k in current and current[k] is not None:
-                        # User cleared a previously set value - explicitly set to None
-                        # This allows removing a power_sensor or energy_sensor
-                        cleaned_input[k] = None
-                return self.async_create_entry(title="", data=cleaned_input)
+                # Store data for potential step 2
+                self._data = user_input.copy()
+
+                # If heat pump selected, go to step 2 for dynamic COP option
+                if new_heat_source == HEAT_SOURCE_HEATPUMP:
+                    return await self.async_step_heatpump_options()
+
+                # Otherwise, finalize directly
+                return self._create_entry(current)
 
         # Migrate legacy heat source types to new ones for display
         # (the actual migration happens in coordinator on load)
@@ -519,6 +518,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             )
         )
 
+        # === ENERGY CONFIGURATION GROUP ===
         # Energy sensor - required for non-electric sources, optional for electric
         energy_sensor_value = current.get(CONF_ENERGY_SENSOR)
         if heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY:
@@ -548,7 +548,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 )
             )
 
-        # Efficiency factor - default based on heat source type
+        # Efficiency factor - right after energy sensor for UX clarity
         efficiency_value = current.get(CONF_EFFICIENCY_FACTOR)
         if efficiency_value is None:
             # Use default for the heat source type
@@ -562,10 +562,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             )
         )
 
-        # Dynamic COP - only for heat pumps
-        if display_heat_source == HEAT_SOURCE_HEATPUMP:
-            dynamic_cop_enabled = current.get(CONF_ENABLE_DYNAMIC_COP, DEFAULT_ENABLE_DYNAMIC_COP)
-            schema_dict[vol.Optional(CONF_ENABLE_DYNAMIC_COP, default=dynamic_cop_enabled)] = selector.BooleanSelector()
+        # Note: enable_dynamic_cop is shown in step 2 only for heat pumps
 
         # Window sensor - only set default if value exists
         window_sensor_value = current.get(CONF_WINDOW_SENSOR)
@@ -652,3 +649,39 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(schema_dict),
             errors=errors,
         )
+
+    async def async_step_heatpump_options(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Step 2: Heat pump specific options (dynamic COP)."""
+        current = {**self._config_entry.data, **self._config_entry.options}
+
+        if user_input is not None:
+            # Merge heat pump options into collected data
+            self._data.update(user_input)
+            return self._create_entry(current)
+
+        # Build schema for heat pump options
+        dynamic_cop_enabled = current.get(CONF_ENABLE_DYNAMIC_COP, DEFAULT_ENABLE_DYNAMIC_COP)
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_ENABLE_DYNAMIC_COP, default=dynamic_cop_enabled): selector.BooleanSelector(),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="heatpump_options",
+            data_schema=schema,
+        )
+
+    def _create_entry(self, current: dict[str, Any]) -> FlowResult:
+        """Create the config entry with collected data."""
+        # Keep None values to allow removing sensors (override data with options)
+        # But remove keys that are None AND not in current config (truly optional)
+        cleaned_input = {}
+        for k, v in self._data.items():
+            if v is not None:
+                cleaned_input[k] = v
+            elif k in current and current[k] is not None:
+                # User cleared a previously set value - explicitly set to None
+                # This allows removing a power_sensor or energy_sensor
+                cleaned_input[k] = None
+        return self.async_create_entry(title="", data=cleaned_input)
