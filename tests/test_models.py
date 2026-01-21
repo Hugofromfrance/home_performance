@@ -1085,3 +1085,243 @@ class TestThermalLossModelEfficiencyFactor:
         new_model.from_dict(data)
 
         assert new_model.efficiency_factor == 0.85
+
+
+class TestThermalLossModelOptimalRating:
+    """Test Level S (Optimal) rating for 7 perfect days."""
+
+    def test_optimal_rating_with_7_perfect_days(self, zone_name: str, heater_power: float, volume: float):
+        """Test that 7 consecutive perfect days result in 'optimal' rating."""
+        model = ThermalLossModel(
+            zone_name=zone_name,
+            heater_power=heater_power,
+            volume=volume,
+        )
+
+        # Add 7 days of perfect conditions:
+        # - A+ rating (K/m³ < 0.25)
+        # - Minimal heating (< 30 min)
+        # - Stable temperature (< 2°C variation)
+        # - Comfortable temperature (≥ 17°C)
+        for i in range(7):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=0.2,  # 12 minutes (< 0.5h, minimal)
+                avg_delta_t=10.0,
+                energy_kwh=0.3,
+                avg_indoor_temp=20.0,  # Comfortable (≥ 17°C)
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,  # Stable (< 2°C)
+            )
+
+        # Set a very good K coefficient (A+ level: K/m³ < 0.25)
+        # With volume=50, K < 12.5 gives K/m³ < 0.25
+        model._k_coefficient = 10.0
+        model._k_coefficient_7d = 10.0
+
+        # Should return 'optimal' for 7 perfect days
+        assert model.get_insulation_rating() == "optimal"
+
+    def test_not_optimal_with_less_than_7_days(self, zone_name: str, heater_power: float, volume: float):
+        """Test that less than 7 days does not give 'optimal' rating."""
+        model = ThermalLossModel(
+            zone_name=zone_name,
+            heater_power=heater_power,
+            volume=volume,
+        )
+
+        # Add only 5 perfect days
+        for i in range(5):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=0.2,
+                avg_delta_t=10.0,
+                energy_kwh=0.3,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,
+            )
+
+        model._k_coefficient = 10.0
+        model._k_coefficient_7d = 10.0
+
+        # Should return 'excellent', not 'optimal'
+        assert model.get_insulation_rating() == "excellent"
+
+    def test_not_optimal_with_too_much_heating(self, zone_name: str, heater_power: float, volume: float):
+        """Test that days with too much heating don't count as perfect."""
+        model = ThermalLossModel(
+            zone_name=zone_name,
+            heater_power=heater_power,
+            volume=volume,
+        )
+
+        # Add 7 days with significant heating (not perfect)
+        for i in range(7):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=2.0,  # 2 hours (> 0.5h threshold)
+                avg_delta_t=10.0,
+                energy_kwh=3.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,
+            )
+
+        model._k_coefficient = 10.0
+        model._k_coefficient_7d = 10.0
+
+        # Should return 'excellent', not 'optimal' (days had too much heating)
+        assert model.get_insulation_rating() == "excellent"
+
+
+class TestThermalLossModelPerfectDaysComfort:
+    """Test perfect days filtering with MIN_COMFORT_TEMP threshold."""
+
+    def test_perfect_day_requires_comfortable_temp(self, zone_name: str, heater_power: float):
+        """Test that a 'perfect' day must have comfortable indoor temp (≥ 17°C)."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add normal days with heating (to establish K_min)
+        for i in range(3):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=6.0,
+                avg_delta_t=10.0,
+                energy_kwh=9.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,
+            )
+
+        k_7d_before = model.k_coefficient_7d
+
+        # Add a day with minimal heating, stable temp, but TOO COLD (< 17°C)
+        model.add_daily_summary(
+            date="2025-01-15",
+            heating_hours=0.05,  # Almost no heating
+            avg_delta_t=10.0,
+            energy_kwh=0.1,
+            avg_indoor_temp=15.0,  # Too cold! (< 17°C)
+            avg_outdoor_temp=5.0,
+            sample_count=1440,
+            temp_variation=1.0,  # Stable
+        )
+
+        # K_7d should NOT change - cold day is not "perfect"
+        # (Day is filtered out from K calculation)
+        assert model.k_coefficient_7d == k_7d_before
+
+    def test_perfect_day_with_comfortable_temp_is_counted(self, zone_name: str, heater_power: float):
+        """Test that a perfect day with comfortable temp is included in K calculation."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add normal days with heating
+        for i in range(3):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=6.0,
+                avg_delta_t=10.0,
+                energy_kwh=9.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+                temp_variation=1.5,
+            )
+
+        # Add a perfect day: minimal heating, stable AND comfortable temp
+        model.add_daily_summary(
+            date="2025-01-15",
+            heating_hours=0.05,  # Almost no heating
+            avg_delta_t=10.0,
+            energy_kwh=0.1,
+            avg_indoor_temp=19.0,  # Comfortable (≥ 17°C)
+            avg_outdoor_temp=9.0,
+            sample_count=1440,
+            temp_variation=1.0,  # Stable
+        )
+
+        # K_7d should be calculated and include 4 days
+        assert model.k_coefficient_7d is not None
+        assert model.history_days_count == 4
+
+
+class TestThermalLossModelLastKDate:
+    """Test last_k_date property tracking."""
+
+    def test_last_k_date_initially_none(self, zone_name: str, heater_power: float):
+        """Test that last_k_date is None initially."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        assert model.last_k_date is None
+
+    def test_last_k_date_set_after_k_calculation(self, zone_name: str, heater_power: float):
+        """Test that last_k_date is set after K calculation."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add enough data for K calculation
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            hour = minute // 60
+            heating_on = hour < 6
+
+            model.add_data_point(
+                ThermalDataPoint(
+                    timestamp=ts,
+                    indoor_temp=20.0,
+                    outdoor_temp=5.0,
+                    heating_on=heating_on,
+                )
+            )
+
+        # K should be calculated
+        assert model.k_coefficient_24h is not None
+        # last_k_date should be set to today
+        assert model.last_k_date is not None
+
+    def test_last_k_date_in_analysis(self, zone_name: str, heater_power: float):
+        """Test that last_k_date is included in get_analysis output."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+
+        # Add history to trigger K_7d calculation
+        for i in range(5):
+            model.add_daily_summary(
+                date=f"2025-01-{10 + i:02d}",
+                heating_hours=6.0,
+                avg_delta_t=10.0,
+                energy_kwh=9.0,
+                avg_indoor_temp=20.0,
+                avg_outdoor_temp=10.0,
+                sample_count=1440,
+            )
+
+        analysis = model.get_analysis()
+        assert "last_k_date" in analysis
+
+    def test_last_k_date_cleared_on_clear_all(self, zone_name: str, heater_power: float):
+        """Test that last_k_date is cleared on clear_all."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        model._last_k_date = "2025-01-15"
+
+        model.clear_all()
+
+        assert model.last_k_date is None
+
+    def test_last_k_date_preserved_in_serialization(self, zone_name: str, heater_power: float):
+        """Test that last_k_date is preserved in to_dict/from_dict."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        model._last_k_date = "2025-01-15"
+
+        # Serialize
+        data = model.to_dict()
+        assert data.get("last_k_date") == "2025-01-15"
+
+        # Deserialize
+        new_model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        new_model.from_dict(data)
+
+        assert new_model.last_k_date == "2025-01-15"
