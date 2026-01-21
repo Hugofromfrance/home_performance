@@ -263,10 +263,19 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                     if energy_wh is not None:
                         k_value = energy_wh / (entry.avg_delta_t * 24)
 
+            # Get heating_hours for excellence badge calculation
+            heating_hours = None
+            if is_today:
+                # Today: use current heating_hours from coordinator data
+                heating_hours = data.get("heating_hours")
+            elif entry:
+                heating_hours = entry.heating_hours
+
             days_data.append(
                 {
                     "date": date_str,
                     "k": k_value,  # None if no valid data
+                    "heating_hours": heating_hours,
                 }
             )
 
@@ -297,13 +306,19 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
         k_history = []
         for day_data in days_data:
             if day_data["k"] is not None:
-                k_history.append(
-                    {
-                        "date": day_data["date"],
-                        "k": round(day_data["k"], 1),
-                        "estimated": day_data.get("estimated", False),
-                    }
-                )
+                entry_data = {
+                    "date": day_data["date"],
+                    "k": round(day_data["k"], 1),
+                    "estimated": day_data.get("estimated", False),
+                }
+                # Include heating_hours if available
+                if day_data.get("heating_hours") is not None:
+                    entry_data["heating_hours"] = round(day_data["heating_hours"], 2)
+                k_history.append(entry_data)
+
+        # Check if we're at optimal level (Level S)
+        insulation_status = data.get("insulation_status", {})
+        is_optimal = insulation_status.get("rating") == "optimal"
 
         # Wind data (if weather entity configured)
         wind_speed = data.get("wind_speed")
@@ -318,6 +333,17 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
             "k_7d": round(k_7d, 1) if k_7d is not None else None,
             "k_per_m3_24h": k_per_m3_24h,
             "k_history_7d": k_history,
+            "is_optimal": is_optimal,
+            # Temperature variation (for warning display)
+            "temp_variation": (
+                round(data.get("temp_variation"), 1) if data.get("temp_variation") is not None else None
+            ),
+            "indoor_temp_min": (
+                round(data.get("indoor_temp_min"), 1) if data.get("indoor_temp_min") is not None else None
+            ),
+            "indoor_temp_max": (
+                round(data.get("indoor_temp_max"), 1) if data.get("indoor_temp_max") is not None else None
+            ),
             "interpretation": (
                 "Lower K = better insulation. "
                 "Typical values: 10-20 (well insulated), 20-40 (average), 40+ (poorly insulated)"
@@ -836,8 +862,9 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
         k_value = insulation_status.get("k_value")
 
         rating_descriptions = {
+            "optimal": "Level S - Optimal performance",
             "excellent": "Very well insulated",
-            "excellent_inferred": "🏆 Excellent (inferred)",
+            "excellent_inferred": "Excellent (inferred)",
             "good": "Well insulated",
             "average": "Average insulation",
             "poor": "Poorly insulated",
@@ -858,6 +885,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
             "k_value": round(k_value, 1) if k_value is not None else None,
             "k_source": k_source,
             "k_per_m3": (round(data.get("k_per_m3"), 2) if data.get("k_per_m3") is not None else None),
+            "last_k_date": data.get("last_k_date"),
             "temp_stable": insulation_status.get("temp_stable"),
             "message": message,
             "note": "Based on K/m³ or inferred if minimal heating needed",

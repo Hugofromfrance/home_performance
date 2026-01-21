@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Performance - Prototypes Excellence (Tous Layouts)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.2.96/css/materialdesignicons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --text-primary: #e4e4e7;
+      --text-secondary: #a1a1aa;
+      --border-color: rgba(255,255,255,0.08);
+      --excellence-color: #10b981;
+      --trophy-color: #fbbf24;
+      /* Nouveau niveau S - Optimal */
+      --optimal-color: #0ea5e9;
+      --optimal-gradient: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f0f1a;
+      color: var(--text-primary);
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 1.5em;
+      color: #10b981;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      font-size: 0.9em;
+    }
+
+    .condition-box {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 0 auto 30px;
+      max-width: 500px;
+      text-align: center;
+      font-size: 0.85em;
+    }
+
+    .condition-box strong {
+      color: var(--trophy-color);
+    }
+
+    /* Section headers */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 40px 0 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-color);
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .section-header h2 {
+      font-size: 1.1em;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .section-header .badge {
+      background: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      font-weight: 600;
+    }
+
+    /* Layout containers */
+    .layout-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 600px;
+      margin: 0 auto 30px;
+    }
+
+    .layout-item {
+      background: var(--bg-primary);
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+    }
+
+    .layout-item.highlight {
+      border-color: var(--excellence-color);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+    }
+
+    .layout-label {
+      font-size: 0.75em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .layout-label .new {
+      background: var(--excellence-color);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.8em;
+    }
+
+    /* ========================================
+       BADGE LAYOUT
+       ======================================== */
+    .badge-card {
+      background: var(--bg-primary);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+      border: 1px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+      min-width: 120px;
+    }
+
+    .badge-accent-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--excellence-color);
+    }
+
+    .badge-score-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--excellence-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 8px;
+    }
+
+    .badge-score-letter {
+      font-size: 1.3em;
+      font-weight: 800;
+      color: white;
+    }
+
+    .badge-rating-label {
+      font-size: 0.8em;
+      color: var(--excellence-color);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .badge-sparkline-wrapper {
+      height: 24px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .badge-sparkline-placeholder {
+      width: 60px;
+      height: 20px;
+      background: linear-gradient(90deg, transparent 0%, rgba(16,185,129,0.3) 50%, transparent 100%);
+      border-radius: 2px;
+    }
+
+    .badge-zone-name {
+      font-size: 0.85em;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .badge-k-value {
+      font-size: 1.1em;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .badge-k-unit {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+      font-weight: 400;
+      margin-left: 2px;
+    }
+
+    /* Badge Excellence - Mini Trophy */
+    .badge-excellence {
+      width: 36px;
+      height: 36px;
+      margin: 0 auto 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 8px;
+    }
+
+    .badge-trophy {
+      font-size: 20px;
+      color: var(--trophy-color);
+      filter: drop-shadow(0 1px 2px rgba(251, 191, 36, 0.4));
+    }
+
+    @keyframes trophy-glow {
+      0%, 100% { filter: drop-shadow(0 1px 2px rgba(251, 191, 36, 0.4)); }
+      50% { filter: drop-shadow(0 2px 8px rgba(251, 191, 36, 0.6)); }
+    }
+
+    .badge-excellence-text {
+      font-size: 0.65em;
+      color: var(--trophy-color);
+      font-weight: 600;
+    }
+
+    /* ========================================
+       PILL LAYOUT
+       ======================================== */
+    .pill-card {
+      background: var(--bg-primary);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pill-accent-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--excellence-color);
+    }
+
+    .pill-score-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--excellence-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .pill-score-letter {
+      font-size: 1em;
+      font-weight: 800;
+      color: white;
+    }
+
+    .pill-zone-section {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pill-zone-name {
+      font-size: 0.9em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .pill-zone-rating {
+      font-size: 0.75em;
+      color: var(--excellence-color);
+    }
+
+    .pill-sparkline-wrapper {
+      width: 80px;
+      height: 24px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pill-separator {
+      width: 1px;
+      height: 30px;
+      background: var(--border-color);
+    }
+
+    .pill-stats-section {
+      display: flex;
+      gap: 12px;
+    }
+
+    .pill-stat {
+      text-align: center;
+    }
+
+    .pill-stat-value {
+      font-size: 0.95em;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .pill-stat-label {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+    }
+
+    /* Pill Excellence */
+    .pill-excellence {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(251, 191, 36, 0.1);
+      border-radius: 6px;
+      border: 1px solid rgba(251, 191, 36, 0.2);
+    }
+
+    .pill-excellence-simple {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 6px;
+    }
+
+    .pill-excellence-simple .pill-trophy {
+      font-size: 18px;
+      color: var(--trophy-color);
+      filter: drop-shadow(0 1px 2px rgba(251, 191, 36, 0.4));
+    }
+
+    .pill-trophy {
+      font-size: 16px;
+      color: var(--trophy-color);
+    }
+
+    .pill-excellence-text {
+      font-size: 0.7em;
+      color: var(--trophy-color);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ========================================
+       MULTI-ZONE LAYOUT
+       ======================================== */
+    .multi-zone-row {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .multi-zone-score {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--excellence-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9em;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .multi-zone-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .multi-zone-name {
+      font-size: 0.85em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .multi-zone-rating {
+      font-size: 0.7em;
+      color: var(--excellence-color);
+    }
+
+    .multi-zone-stats {
+      display: flex;
+      gap: 16px;
+    }
+
+    .multi-zone-stat {
+      text-align: center;
+    }
+
+    .multi-zone-stat-value {
+      font-size: 0.85em;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .multi-zone-stat-label {
+      font-size: 0.6em;
+      color: var(--text-secondary);
+    }
+
+    .multi-zone-sparkline {
+      width: 60px;
+      height: 32px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Multi Excellence Badge */
+    .multi-excellence-badge {
+      width: 60px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 6px;
+    }
+
+    .multi-trophy {
+      font-size: 16px;
+      color: var(--trophy-color);
+      filter: drop-shadow(0 1px 2px rgba(251, 191, 36, 0.4));
+    }
+
+    .multi-excellence-text {
+      font-size: 0.65em;
+      color: var(--trophy-color);
+      font-weight: 600;
+    }
+
+    /* ========================================
+       FULL LAYOUT - Card Preview
+       ======================================== */
+    .full-section {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    .full-card-preview {
+      background: var(--bg-primary);
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      margin-bottom: 30px;
+    }
+
+    .full-card-header {
+      background: var(--bg-secondary);
+      padding: 12px 16px;
+    }
+
+    .full-card-title {
+      font-size: 1.1em;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .full-card-subtitle {
+      font-size: 0.85em;
+      color: var(--text-secondary);
+    }
+
+    .full-card-content {
+      padding: 12px;
+    }
+
+    .full-score-section {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .full-score-card {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      text-align: center;
+    }
+
+    .full-score-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 6px;
+    }
+
+    .full-score-icon .mdi {
+      font-size: 18px;
+    }
+
+    .full-score-values {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .full-score-main {
+      font-size: 1.3em;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .full-score-unit {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+    }
+
+    .full-score-sub {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+    }
+
+    .full-score-info {
+      margin-bottom: 4px;
+    }
+
+    .full-score-label {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 4px;
+    }
+
+    .full-score-rating {
+      font-size: 0.9em;
+      font-weight: 600;
+    }
+
+    .full-score-desc {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+    }
+
+    .full-temp-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0.85em;
+      color: var(--text-primary);
+    }
+
+    .full-temp-row .mdi {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .full-metrics-section {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .full-section-title {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .full-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .full-metric {
+      text-align: center;
+    }
+
+    .full-metric-label {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      margin-bottom: 2px;
+    }
+
+    .full-metric-label .mdi {
+      font-size: 12px;
+    }
+
+    .full-metric-value {
+      font-size: 0.95em;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .full-metric-sub {
+      font-size: 0.6em;
+      color: var(--text-secondary);
+    }
+
+    .full-wind-section {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85em;
+      color: var(--text-primary);
+    }
+
+    .full-wind-section .mdi {
+      color: var(--text-secondary);
+    }
+
+    .full-wind-badge {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-weight: 500;
+    }
+
+    /* Excellence section for Full Layout */
+    .full-excellence-section {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .full-excellence-badge {
+      width: 64px;
+      height: 64px;
+      margin: 12px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(251, 191, 36, 0.15);
+      border: 2px solid rgba(251, 191, 36, 0.4);
+      border-radius: 12px;
+    }
+
+    .full-excellence-badge .mdi {
+      font-size: 36px;
+      color: var(--trophy-color);
+      filter: drop-shadow(0 2px 4px rgba(251, 191, 36, 0.4));
+    }
+
+    .full-excellence-text {
+      font-size: 0.85em;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    .prototype {
+      background: var(--bg-primary);
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+
+    .prototype-header {
+      background: var(--bg-secondary);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .prototype-title {
+      font-weight: 600;
+      font-size: 1em;
+    }
+
+    .prototype-badge {
+      background: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      font-weight: 600;
+    }
+
+    .prototype-content {
+      padding: 16px;
+    }
+
+    /* Option 1: Thermal Shield */
+    .thermal-shield-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .thermal-shield {
+      position: relative;
+      width: 90px;
+      height: 90px;
+      flex-shrink: 0;
+    }
+
+    .shield-gauge {
+      width: 100%;
+      height: 100%;
+    }
+
+    .shield-value {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.1em;
+      font-weight: 700;
+      color: #10b981;
+    }
+
+    .shield-info {
+      flex: 1;
+    }
+
+    .shield-title {
+      font-size: 1em;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .shield-subtitle {
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .shield-stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .shield-stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .shield-stat .mdi {
+      font-size: 14px;
+      color: #10b981;
+    }
+
+    /* Option 2: Comparison */
+    .delta-vs-heating-container {
+      padding: 12px;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+    }
+
+    .comparison-chart {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 16px;
+      height: 100px;
+      margin-bottom: 12px;
+    }
+
+    .comparison-bar-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 60px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .comparison-bar {
+      width: 100%;
+      border-radius: 6px 6px 0 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 4px;
+      min-height: 15px;
+    }
+
+    .comparison-bar.delta-bar {
+      background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+      height: 85px;
+    }
+
+    .comparison-bar.heating-bar {
+      background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+      height: 15px;
+    }
+
+    .comparison-bar .bar-value {
+      font-size: 0.8em;
+      font-weight: 700;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .comparison-label {
+      font-size: 0.8em;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 6px;
+    }
+
+    .comparison-sublabel {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+    }
+
+    .comparison-separator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+      padding-bottom: 25px;
+    }
+
+    .comparison-arrow {
+      color: #10b981;
+      font-size: 24px;
+      animation: pulse-arrow 2s infinite;
+    }
+
+    @keyframes pulse-arrow {
+      0%, 100% { opacity: 0.5; transform: translateX(0); }
+      50% { opacity: 1; transform: translateX(4px); }
+    }
+
+    .comparison-text {
+      font-size: 0.7em;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .comparison-message {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(16, 185, 129, 0.1);
+      border-radius: 8px;
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .comparison-message .mdi {
+      font-size: 20px;
+      color: #fbbf24;
+      flex-shrink: 0;
+    }
+
+    .comparison-message strong {
+      color: #10b981;
+      font-weight: 600;
+    }
+
+    /* Option 3: Excellence */
+    .excellence-indicator {
+      padding: 16px;
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      text-align: center;
+    }
+
+    .excellence-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .excellence-icon {
+      margin-bottom: 8px;
+      filter: drop-shadow(0 2px 4px rgba(251, 191, 36, 0.3));
+    }
+
+    .excellence-title {
+      font-size: 1.05em;
+      font-weight: 700;
+      color: #fbbf24;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .excellence-stats {
+      margin-bottom: 12px;
+    }
+
+    .excellence-stat.main-stat {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .excellence-stat.main-stat .stat-value {
+      font-size: 2.2em;
+      font-weight: 800;
+      color: #10b981;
+      line-height: 1;
+    }
+
+    .excellence-stat.main-stat .stat-label {
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .excellence-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .excellence-stat-grid .excellence-stat {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      padding: 10px 6px;
+    }
+
+    .excellence-stat-grid .excellence-stat .mdi {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .excellence-stat-grid .stat-value {
+      font-size: 1.1em;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .excellence-stat-grid .stat-label {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .excellence-message {
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      font-style: italic;
+      line-height: 1.4;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* ========================================
+       NIVEAU S - OPTIMAL STYLES
+       ======================================== */
+    
+    /* Badge Score Optimal */
+    .badge-score-optimal {
+      background: var(--optimal-gradient) !important;
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    }
+
+    .badge-card-optimal {
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.1);
+    }
+
+    /* Pill Score Optimal */
+    .pill-score-optimal {
+      background: var(--optimal-gradient) !important;
+      box-shadow: 0 0 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .pill-card-optimal {
+      box-shadow: 0 0 15px rgba(14, 165, 233, 0.1);
+    }
+
+    /* Multi-zone Optimal */
+    .multi-zone-score-optimal {
+      background: var(--optimal-gradient) !important;
+      box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
+    }
+
+    .multi-zone-row-optimal {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, var(--bg-secondary) 100%);
+    }
+
+    /* Full Card Optimal */
+    .full-card-optimal {
+      box-shadow: 0 0 30px rgba(14, 165, 233, 0.15);
+    }
+
+    .full-header-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .optimal-badge-letter {
+      width: 36px;
+      height: 36px;
+      background: var(--optimal-gradient);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
+    }
+
+    .optimal-streak-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: rgba(14, 165, 233, 0.1);
+      border-radius: 6px;
+      font-size: 0.8em;
+      color: var(--optimal-color);
+    }
+
+    .optimal-streak-info .mdi {
+      font-size: 16px;
+    }
+
+    /* Comparison note */
+    .comparison-note {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      font-size: 0.75em;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ========================================
+       HIÉRARCHIE DES NIVEAUX
+       ======================================== */
+    .levels-hierarchy {
+      background: var(--bg-primary);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+
+    .level-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .level-row:last-child {
+      border-bottom: none;
+    }
+
+    .level-row.level-s {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+      border-bottom: 2px solid var(--optimal-color);
+    }
+
+    .level-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1em;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .level-badge-s {
+      background: var(--optimal-gradient);
+      box-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
+    }
+
+    .level-info {
+      flex: 1;
+    }
+
+    .level-name {
+      font-size: 0.95em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .level-row.level-s .level-name {
+      color: var(--optimal-color);
+    }
+
+    .level-desc {
+      font-size: 0.75em;
+      color: var(--text-secondary);
+    }
+
+    .level-color-sample {
+      width: 8px;
+      height: 32px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Niveau S - Optimal</h1>
+  <p class="subtitle">Nouveau niveau de performance au-delà de A+ pour les pièces exceptionnelles</p>
+  
+  <div class="condition-box">
+    <strong>Condition d'accès au niveau S :</strong> 7 jours consécutifs avec note A+ ET moins de 30 minutes de chauffe par jour
+  </div>
+
+  <!-- ==================== BADGE LAYOUT ==================== -->
+  <div class="section-header">
+    <h2>Layout Badge</h2>
+    <span class="badge">Compact vertical</span>
+  </div>
+
+  <div class="layout-comparison">
+    <div class="layout-item">
+      <div class="layout-label">Niveau A+ (Excellent)</div>
+      <div class="badge-card">
+        <div class="badge-accent-bar"></div>
+        <div class="badge-score-circle">
+          <span class="badge-score-letter">A+</span>
+        </div>
+        <div class="badge-rating-label">EXCELLENT</div>
+        <div class="badge-sparkline-wrapper">
+          <div class="badge-sparkline-placeholder"></div>
+        </div>
+        <div class="badge-zone-name">Chambre Flavien</div>
+        <div class="badge-k-value">8.2<span class="badge-k-unit">W/°C</span></div>
+      </div>
+    </div>
+
+    <div class="layout-item highlight" style="border-color: var(--optimal-color);">
+      <div class="layout-label">Niveau S (Optimal) <span class="new" style="background: var(--optimal-color);">NEW</span></div>
+      <div class="badge-card badge-card-optimal">
+        <div class="badge-accent-bar" style="background: var(--optimal-gradient);"></div>
+        <div class="badge-score-circle badge-score-optimal">
+          <span class="badge-score-letter">S</span>
+        </div>
+        <div class="badge-rating-label" style="color: var(--optimal-color);">OPTIMAL</div>
+        <div class="badge-sparkline-wrapper">
+          <svg width="60" height="20" viewBox="0 0 60 20">
+            <polyline points="0,10 10,10 20,10 30,10 40,10 50,10 60,10" 
+                      fill="none" stroke="var(--optimal-color)" stroke-width="2" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="badge-zone-name">Chambre Alina</div>
+        <div class="badge-k-value">4.1<span class="badge-k-unit">W/°C</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PILL LAYOUT ==================== -->
+  <div class="section-header">
+    <h2>Layout Pill</h2>
+    <span class="badge">Horizontal compact</span>
+  </div>
+
+  <div style="max-width: 500px; margin: 0 auto 30px;">
+    <div class="layout-item" style="margin-bottom: 12px;">
+      <div class="layout-label">Niveau A+ (Excellent)</div>
+      <div class="pill-card">
+        <div class="pill-accent-bar"></div>
+        <div class="pill-score-badge">
+          <span class="pill-score-letter">A+</span>
+        </div>
+        <div class="pill-zone-section">
+          <div class="pill-zone-name">Chambre Flavien</div>
+          <div class="pill-zone-rating">Excellent</div>
+        </div>
+        <div class="pill-sparkline-wrapper">
+          <div class="badge-sparkline-placeholder"></div>
+        </div>
+        <div class="pill-separator"></div>
+        <div class="pill-stats-section">
+          <div class="pill-stat">
+            <div class="pill-stat-value">8.2</div>
+            <div class="pill-stat-label">W/°C</div>
+          </div>
+          <div class="pill-stat">
+            <div class="pill-stat-value">13°</div>
+            <div class="pill-stat-label">ΔT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout-item highlight" style="border-color: var(--optimal-color);">
+      <div class="layout-label">Niveau S (Optimal) <span class="new" style="background: var(--optimal-color);">NEW</span></div>
+      <div class="pill-card pill-card-optimal">
+        <div class="pill-accent-bar" style="background: var(--optimal-gradient);"></div>
+        <div class="pill-score-badge pill-score-optimal">
+          <span class="pill-score-letter">S</span>
+        </div>
+        <div class="pill-zone-section">
+          <div class="pill-zone-name">Chambre Alina</div>
+          <div class="pill-zone-rating" style="color: var(--optimal-color);">Optimal</div>
+        </div>
+        <div class="pill-sparkline-wrapper">
+          <svg width="80" height="24" viewBox="0 0 80 24">
+            <polyline points="0,12 13,12 26,12 40,12 53,12 66,12 80,12" 
+                      fill="none" stroke="var(--optimal-color)" stroke-width="2" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="pill-separator"></div>
+        <div class="pill-stats-section">
+          <div class="pill-stat">
+            <div class="pill-stat-value">4.1</div>
+            <div class="pill-stat-label">W/°C</div>
+          </div>
+          <div class="pill-stat">
+            <div class="pill-stat-value">13°</div>
+            <div class="pill-stat-label">ΔT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MULTI-ZONE LAYOUT ==================== -->
+  <div class="section-header">
+    <h2>Layout Multi-Zone</h2>
+    <span class="badge">Liste de pièces</span>
+  </div>
+
+  <div style="max-width: 500px; margin: 0 auto 30px;">
+    <div class="layout-label" style="margin-bottom: 8px;">Comparaison des niveaux dans une liste</div>
+    
+    <!-- Niveau S - Optimal -->
+    <div class="multi-zone-row multi-zone-row-optimal" style="border: 1px solid rgba(14, 165, 233, 0.4);">
+      <div class="multi-zone-score multi-zone-score-optimal">S</div>
+      <div class="multi-zone-info">
+        <div class="multi-zone-name">Chambre Alina</div>
+        <div class="multi-zone-rating" style="color: var(--optimal-color);">Optimal</div>
+      </div>
+      <div class="multi-zone-stats">
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">4.1</div>
+          <div class="multi-zone-stat-label">W/°C</div>
+        </div>
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">0.016</div>
+          <div class="multi-zone-stat-label">kWh</div>
+        </div>
+      </div>
+      <div class="multi-zone-sparkline">
+        <svg width="60" height="24" viewBox="0 0 60 24">
+          <polyline points="0,12 10,12 20,12 30,12 40,12 50,12 60,12" 
+                    fill="none" stroke="var(--optimal-color)" stroke-width="2" opacity="0.6"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Niveau A+ - Excellent -->
+    <div class="multi-zone-row" style="border: 1px solid rgba(16, 185, 129, 0.3);">
+      <div class="multi-zone-score">A+</div>
+      <div class="multi-zone-info">
+        <div class="multi-zone-name">Chambre Flavien</div>
+        <div class="multi-zone-rating">Excellent</div>
+      </div>
+      <div class="multi-zone-stats">
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">8.2</div>
+          <div class="multi-zone-stat-label">W/°C</div>
+        </div>
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">0.95</div>
+          <div class="multi-zone-stat-label">kWh</div>
+        </div>
+      </div>
+      <div class="multi-zone-sparkline">
+        <svg width="60" height="24" viewBox="0 0 60 24">
+          <polyline points="0,14 10,12 20,13 30,11 40,12 50,10 60,11" 
+                    fill="none" stroke="var(--excellence-color)" stroke-width="2" opacity="0.6"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Niveau B - Moyen -->
+    <div class="multi-zone-row">
+      <div class="multi-zone-score" style="background: #eab308;">B</div>
+      <div class="multi-zone-info">
+        <div class="multi-zone-name">Salon</div>
+        <div class="multi-zone-rating" style="color: #eab308;">Moyen</div>
+      </div>
+      <div class="multi-zone-stats">
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">28.5</div>
+          <div class="multi-zone-stat-label">W/°C</div>
+        </div>
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">3.2</div>
+          <div class="multi-zone-stat-label">kWh</div>
+        </div>
+      </div>
+      <div class="multi-zone-sparkline">
+        <svg width="60" height="24" viewBox="0 0 60 24">
+          <polyline points="0,8 10,14 20,10 30,16 40,12 50,18 60,14" 
+                    fill="none" stroke="#eab308" stroke-width="2" opacity="0.6"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Niveau A - Bon -->
+    <div class="multi-zone-row">
+      <div class="multi-zone-score" style="background: #22c55e;">A</div>
+      <div class="multi-zone-info">
+        <div class="multi-zone-name">Bureau</div>
+        <div class="multi-zone-rating" style="color: #22c55e;">Bon</div>
+      </div>
+      <div class="multi-zone-stats">
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">12.3</div>
+          <div class="multi-zone-stat-label">W/°C</div>
+        </div>
+        <div class="multi-zone-stat">
+          <div class="multi-zone-stat-value">1.45</div>
+          <div class="multi-zone-stat-label">kWh</div>
+        </div>
+      </div>
+      <div class="multi-zone-sparkline">
+        <svg width="60" height="24" viewBox="0 0 60 24">
+          <polyline points="0,12 10,10 20,14 30,11 40,13 50,10 60,12" 
+                    fill="none" stroke="#22c55e" stroke-width="2" opacity="0.6"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== FULL LAYOUT - NIVEAU S ==================== -->
+  <div class="section-header">
+    <h2>Layout Full - Niveau S</h2>
+    <span class="badge">Carte complète</span>
+  </div>
+
+  <div class="full-section">
+
+    <!-- CARTE COMPLETE NIVEAU S -->
+    <div class="full-card-preview full-card-optimal">
+      <div class="full-card-header" style="border-bottom: 2px solid var(--optimal-color);">
+        <div>
+          <div class="full-card-title">Chambre Alina</div>
+          <div class="full-card-subtitle">Performance Thermique</div>
+        </div>
+        <div class="full-header-badge">
+          <span class="optimal-badge-letter">S</span>
+        </div>
+      </div>
+      
+      <div class="full-card-content">
+        <!-- Score section -->
+        <div class="full-score-section">
+          <div class="full-score-card" style="border-color: rgba(14, 165, 233, 0.3);">
+            <div class="full-score-icon" style="background: rgba(14, 165, 233, 0.15);">
+              <span class="mdi mdi-shield-star" style="color: var(--optimal-color);"></span>
+            </div>
+            <div class="full-score-info">
+              <div class="full-score-values">
+                <span class="full-score-main">4.1</span>
+                <span class="full-score-unit">W/°C</span>
+              </div>
+              <div class="full-score-sub">0.23 W/m³</div>
+            </div>
+            <div class="full-score-label">ISOLATION</div>
+            <div class="full-score-rating" style="color: var(--optimal-color);">Optimal</div>
+            <div class="full-score-desc">Performance maximale</div>
+          </div>
+          
+          <div class="full-score-card">
+            <div class="full-score-icon" style="background: rgba(14, 165, 233, 0.15);">
+              <span class="mdi mdi-leaf" style="color: var(--optimal-color);"></span>
+            </div>
+            <div class="full-score-label">PERFORMANCE</div>
+            <div class="full-score-rating" style="color: var(--optimal-color);">Optimale</div>
+            <div class="full-score-desc">-60% vs moyenne</div>
+          </div>
+          
+          <div class="full-score-card">
+            <div class="full-score-icon" style="background: rgba(99, 102, 241, 0.15);">
+              <span class="mdi mdi-thermometer" style="color: #6366f1;"></span>
+            </div>
+            <div class="full-score-label">TEMPÉRATURES</div>
+            <div class="full-temp-row"><span class="mdi mdi-home"></span> 19.2°C</div>
+            <div class="full-temp-row"><span class="mdi mdi-tree"></span> 7.6°C</div>
+          </div>
+        </div>
+
+        <!-- Technical details -->
+        <div class="full-metrics-section">
+          <div class="full-section-title">DÉTAILS TECHNIQUES</div>
+          <div class="full-metrics-grid">
+            <div class="full-metric">
+              <div class="full-metric-label"><span class="mdi mdi-heat-wave"></span> K instantané</div>
+              <div class="full-metric-value">2.1 W/°C</div>
+              <div class="full-metric-sub">0.12 W/(°C·m³)</div>
+            </div>
+            <div class="full-metric">
+              <div class="full-metric-label"><span class="mdi mdi-lightning-bolt"></span> Énergie/jour</div>
+              <div class="full-metric-value">0.016 kWh</div>
+              <div class="full-metric-sub">(mesurée)</div>
+            </div>
+            <div class="full-metric">
+              <div class="full-metric-label"><span class="mdi mdi-radiator"></span> Temps chauffe</div>
+              <div class="full-metric-value">0min</div>
+              <div class="full-metric-sub">sur 24h</div>
+            </div>
+            <div class="full-metric">
+              <div class="full-metric-label"><span class="mdi mdi-thermometer"></span> Écart moyen</div>
+              <div class="full-metric-value">13.9°C</div>
+              <div class="full-metric-sub">Int. - Ext.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wind -->
+        <div class="full-wind-section">
+          <span class="mdi mdi-weather-windy"></span>
+          <span>S 21.6 km/h</span>
+          <span class="full-wind-badge">Abritée</span>
+        </div>
+
+        <!-- K History avec niveau S (graphique plat = stabilité) -->
+        <div class="full-excellence-section" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%);">
+          <div class="full-section-title">HISTORIQUE K (7 JOURS)</div>
+          <svg width="100%" height="80" viewBox="0 0 280 80" style="display: block; margin-top: 8px;">
+            <!-- Barres du graphique (plates = stabilité optimale) -->
+            <rect x="10" y="25" width="30" height="50" fill="var(--optimal-color)" rx="4" opacity="0.7"/>
+            <rect x="50" y="25" width="30" height="50" fill="var(--optimal-color)" rx="4" opacity="0.7"/>
+            <rect x="90" y="25" width="30" height="50" fill="var(--optimal-color)" rx="4" opacity="0.7"/>
+            <rect x="130" y="25" width="30" height="50" fill="var(--optimal-color)" rx="4" opacity="0.7"/>
+            <rect x="170" y="25" width="30" height="50" fill="var(--optimal-color)" rx="4" opacity="0.7"/>
+            <rect x="210" y="25" width="30" height="50" fill="var(--optimal-color)" rx="4" opacity="0.7"/>
+            <rect x="250" y="25" width="30" height="50" fill="var(--optimal-color)" rx="4" opacity="0.8"/>
+            <!-- Valeurs -->
+            <text x="25" y="45" fill="white" font-size="9" text-anchor="middle" font-weight="600">4.1</text>
+            <text x="65" y="45" fill="white" font-size="9" text-anchor="middle" font-weight="600">4.2</text>
+            <text x="105" y="45" fill="white" font-size="9" text-anchor="middle" font-weight="600">4.1</text>
+            <text x="145" y="45" fill="white" font-size="9" text-anchor="middle" font-weight="600">4.0</text>
+            <text x="185" y="45" fill="white" font-size="9" text-anchor="middle" font-weight="600">4.1</text>
+            <text x="225" y="45" fill="white" font-size="9" text-anchor="middle" font-weight="600">4.1</text>
+            <text x="265" y="45" fill="white" font-size="9" text-anchor="middle" font-weight="600">4.1</text>
+            <!-- Jours -->
+            <text x="25" y="78" fill="#a1a1aa" font-size="8" text-anchor="middle">L</text>
+            <text x="65" y="78" fill="#a1a1aa" font-size="8" text-anchor="middle">M</text>
+            <text x="105" y="78" fill="#a1a1aa" font-size="8" text-anchor="middle">M</text>
+            <text x="145" y="78" fill="#a1a1aa" font-size="8" text-anchor="middle">J</text>
+            <text x="185" y="78" fill="#a1a1aa" font-size="8" text-anchor="middle">V</text>
+            <text x="225" y="78" fill="#a1a1aa" font-size="8" text-anchor="middle">S</text>
+            <text x="265" y="78" fill="#a1a1aa" font-size="8" text-anchor="middle">D</text>
+          </svg>
+          <div class="optimal-streak-info">
+            <span class="mdi mdi-check-circle"></span>
+            <span>7 jours consécutifs de performance optimale</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== COMPARAISON A+ vs S ==================== -->
+  <div class="section-header">
+    <h2>Comparaison A+ vs S</h2>
+    <span class="badge">Côte à côte</span>
+  </div>
+
+  <div class="layout-comparison">
+    <div class="layout-item">
+      <div class="layout-label">Niveau A+ (Excellent)</div>
+      <div class="badge-card">
+        <div class="badge-accent-bar"></div>
+        <div class="badge-score-circle">
+          <span class="badge-score-letter">A+</span>
+        </div>
+        <div class="badge-rating-label">EXCELLENT</div>
+        <div class="badge-sparkline-wrapper">
+          <svg width="60" height="20" viewBox="0 0 60 20">
+            <polyline points="0,14 10,10 20,12 30,8 40,11 50,9 60,10" 
+                      fill="none" stroke="#10b981" stroke-width="2" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="badge-zone-name">Chambre Flavien</div>
+        <div class="badge-k-value">8.2<span class="badge-k-unit">W/°C</span></div>
+      </div>
+      <div class="comparison-note">
+        ✓ Très bonne isolation<br>
+        ✓ Peu de chauffage nécessaire
+      </div>
+    </div>
+
+    <div class="layout-item highlight" style="border-color: var(--optimal-color);">
+      <div class="layout-label">Niveau S (Optimal) <span class="new" style="background: var(--optimal-color);">NEW</span></div>
+      <div class="badge-card badge-card-optimal">
+        <div class="badge-accent-bar" style="background: var(--optimal-gradient);"></div>
+        <div class="badge-score-circle badge-score-optimal">
+          <span class="badge-score-letter">S</span>
+        </div>
+        <div class="badge-rating-label" style="color: var(--optimal-color);">OPTIMAL</div>
+        <div class="badge-sparkline-wrapper">
+          <svg width="60" height="20" viewBox="0 0 60 20">
+            <polyline points="0,10 10,10 20,10 30,10 40,10 50,10 60,10" 
+                      fill="none" stroke="var(--optimal-color)" stroke-width="2" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="badge-zone-name">Chambre Alina</div>
+        <div class="badge-k-value">4.1<span class="badge-k-unit">W/°C</span></div>
+      </div>
+      <div class="comparison-note" style="color: var(--optimal-color);">
+        ★ Isolation parfaite<br>
+        ★ Quasi-autonome thermiquement<br>
+        ★ 7j consécutifs &lt;30min chauffe
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== HIÉRARCHIE DES NIVEAUX ==================== -->
+  <div class="section-header">
+    <h2>Hiérarchie Complète des Niveaux</h2>
+    <span class="badge">Échelle de notation</span>
+  </div>
+
+  <div style="max-width: 500px; margin: 0 auto 30px;">
+    <div class="levels-hierarchy">
+      <div class="level-row level-s">
+        <div class="level-badge level-badge-s">S</div>
+        <div class="level-info">
+          <div class="level-name">Optimal</div>
+          <div class="level-desc">7j consécutifs A+ avec &lt;30min chauffe/jour</div>
+        </div>
+        <div class="level-color-sample" style="background: var(--optimal-gradient);"></div>
+      </div>
+      <div class="level-row">
+        <div class="level-badge" style="background: #10b981;">A+</div>
+        <div class="level-info">
+          <div class="level-name">Excellent</div>
+          <div class="level-desc">Très bien isolé, faible consommation</div>
+        </div>
+        <div class="level-color-sample" style="background: #10b981;"></div>
+      </div>
+      <div class="level-row">
+        <div class="level-badge" style="background: #22c55e;">A</div>
+        <div class="level-info">
+          <div class="level-name">Bon</div>
+          <div class="level-desc">Bien isolé</div>
+        </div>
+        <div class="level-color-sample" style="background: #22c55e;"></div>
+      </div>
+      <div class="level-row">
+        <div class="level-badge" style="background: #eab308;">B</div>
+        <div class="level-info">
+          <div class="level-name">Moyen</div>
+          <div class="level-desc">Isolation standard</div>
+        </div>
+        <div class="level-color-sample" style="background: #eab308;"></div>
+      </div>
+      <div class="level-row">
+        <div class="level-badge" style="background: #f97316;">C</div>
+        <div class="level-info">
+          <div class="level-name">Passable</div>
+          <div class="level-desc">À améliorer</div>
+        </div>
+        <div class="level-color-sample" style="background: #f97316;"></div>
+      </div>
+      <div class="level-row">
+        <div class="level-badge" style="background: #ef4444;">D</div>
+        <div class="level-info">
+          <div class="level-name">Critique</div>
+          <div class="level-desc">Isolation insuffisante</div>
+        </div>
+        <div class="level-color-sample" style="background: #ef4444;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fin du prototype -->
+
+</body>
+</html>

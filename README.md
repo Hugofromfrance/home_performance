@@ -222,11 +222,36 @@ The rating automatically adapts to all situations:
 
 | Situation | Display | Description |
 |-----------|---------|-------------|
-| K calculated | **A to G** | Rating based on K/m³ coefficient |
+| 7 perfect days | **S - Optimal** | Exceptional: 7 consecutive days with minimal heating and stable comfortable temperature |
+| K calculated | **A+ to G** | Rating based on K/m³ coefficient |
 | Low heating + stable T° | **🏆 Excellent (inferred)** | Excellent insulation automatically inferred |
 | Summer mode (T° out > T° in) | **☀️ Summer mode** | Measurement impossible + last K conserved |
 | Shoulder season (ΔT < 5°C) | **🌤️ Shoulder season** | Insufficient ΔT + last K conserved |
 | Data collection | **Waiting** | < 12h of data |
+
+#### 🏅 Level S - Optimal (NEW)
+
+The highest rating **S (Optimal)** is awarded when your room demonstrates exceptional thermal performance over **7 consecutive days**:
+
+| Criteria | Threshold | Description |
+|----------|-----------|-------------|
+| Rating | A+ | Must maintain A+ rating for all 7 days |
+| Heating time | < 30 min/day | Minimal heating required |
+| Temperature stability | < 2°C variation | Indoor temperature remains stable |
+| Comfort | ≥ 17°C | Room maintains comfortable temperature |
+
+> **Note**: This isn't just "no heating" - the room must maintain a comfortable temperature (≥17°C) without significant heating. A cold room with no heating won't qualify.
+
+#### "Perfect Days" in K Calculation
+
+Days are categorized for the K_7d calculation:
+
+| Day Type | Criteria | K Value Used |
+|----------|----------|--------------|
+| **Calculable** | Heating ≥ 30 min | Calculated from energy/ΔT |
+| **Perfect** | Heating < 6 min + stable T° (< 2°C) + comfortable (≥ 17°C) | Uses K_min from calculable days |
+
+This ensures rooms with excellent insulation (needing little heating) still get accurate K values instead of being ignored.
 
 #### Automatically Inferred Insulation 🏆
 
@@ -242,6 +267,39 @@ If after **24h** of observation:
 #### Last Valid K Conservation
 
 In summer or shoulder season, the integration **keeps the last calculated K coefficient** and displays it with the appropriate season message. You thus keep a useful reference all year round.
+
+#### ⚠️ Temperature Variation Warning
+
+The Lovelace card displays a **warning indicator** when indoor temperature conditions suggest the K score may be biased:
+
+| Condition | Display | Meaning |
+|-----------|---------|---------|
+| Variation > 3°C | ⚠️ Warning | Large temperature swings bias K |
+| Min temp < 17.5°C | ⚠️ Warning | Room was allowed to get too cold |
+| Both OK | No warning | Stable, comfortable temperature, reliable K |
+
+**Why does this matter?**
+
+Large temperature swings (e.g., 15°C at night → 21°C during the day) or letting the room get cold can bias the K calculation. If you let the temperature drop significantly when not heating, the calculated K will appear better than actual insulation quality.
+
+The warning helps you understand that:
+- The K value may not reflect true insulation performance
+- Consider maintaining more stable temperatures for accurate measurement
+
+**Display by layout:**
+- **Full**: Orange banner with details (variation range)
+- **Badge**: 2-line indicator "⚠️ VARIATION ±X°C"
+- **Pill/Multi-zone**: Compact ⚠️ icon
+
+#### K Date Indicator
+
+When the K coefficient was calculated on a previous day (not today), the card displays the date:
+
+```
+Excellent (K du 19/01)
+```
+
+This helps understand that the current K value comes from historical data, not today's measurements (useful for rooms with minimal recent heating).
 
 #### 🔄 Reset After Insulation Work
 

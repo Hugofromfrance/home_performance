@@ -172,6 +172,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._indoor_temp_min_daily: float | None = None  # Min indoor temp since midnight
         self._indoor_temp_max_daily: float | None = None  # Max indoor temp since midnight
 
+        # Rolling 24h temperature tracking (for accurate variation display)
+        self._indoor_temp_history_24h: list[tuple[float, float]] = []  # [(timestamp, temp), ...]
+
         # Daily wind tracking (for history archival)
         self._wind_speed_sum_daily: float = 0.0  # Sum of wind speed for daily average
         self._wind_speed_count_daily: int = 0  # Count of wind samples
@@ -569,6 +572,20 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if "delta_t_count_daily" in data:
                     self._delta_t_count_daily = data["delta_t_count_daily"]
 
+                # Restore rolling 24h temperature history (purge old entries)
+                if "indoor_temp_history_24h" in data:
+                    now_ts = time.time()
+                    cutoff = now_ts - 86400  # 24h in seconds
+                    # Convert to list of tuples and filter old entries
+                    self._indoor_temp_history_24h = [
+                        (ts, temp) for ts, temp in data["indoor_temp_history_24h"]
+                        if ts > cutoff
+                    ]
+                    _LOGGER.debug(
+                        "Restored %d temperature samples for 24h variation",
+                        len(self._indoor_temp_history_24h)
+                    )
+
                 # Note: energy_sensor_daily_kwh is NOT restored from storage
                 # It's read directly from the external energy sensor on each update
 
@@ -600,6 +617,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "heating_seconds_daily": self._heating_seconds_daily,
                 "delta_t_sum_daily": self._delta_t_sum_daily,
                 "delta_t_count_daily": self._delta_t_count_daily,
+                # Rolling 24h temperature history
+                "indoor_temp_history_24h": self._indoor_temp_history_24h,
                 # Note: energy_sensor_daily_kwh is read directly from sensor, not stored
             }
             await self._store.async_save(data)
@@ -801,9 +820,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "surface": self.surface,
                 "volume": self.volume,
                 "power_threshold": self.power_threshold,
+                # Temperature variation (for warning display) - rolling 24h
+                **self._get_temp_variation_24h(),
                 # Insulation rating (with season/inference support)
                 "insulation_rating": self.thermal_model.get_insulation_rating(),
-                "insulation_status": self.thermal_model.get_insulation_status(),
+                "insulation_status": self._get_insulation_status_with_optimal(),
                 "last_valid_k": self.thermal_model.last_valid_k,
                 # Weather data (wind)
                 "wind_speed": weather_data.get("wind_speed"),
@@ -859,6 +880,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
+            # Temperature variation (rolling 24h)
+            **self._get_temp_variation_24h(),
             "insulation_rating": None,
             "insulation_status": {
                 "status": "waiting_data",
@@ -949,9 +972,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "surface": self.surface,
             "volume": self.volume,
             "power_threshold": self.power_threshold,
+            # Temperature variation (rolling 24h)
+            **self._get_temp_variation_24h(),
             # Restored insulation rating (with season/inference support)
             "insulation_rating": self.thermal_model.get_insulation_rating(),
-            "insulation_status": self.thermal_model.get_insulation_status(),
+            "insulation_status": self._get_insulation_status_with_optimal(),
             "last_valid_k": self.thermal_model.last_valid_k,
             # Weather data (get current)
             **self._get_weather_data(),
@@ -1180,11 +1205,20 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._delta_t_sum_daily += delta_t
         self._delta_t_count_daily += 1
 
-        # Track indoor temperature min/max for stability calculation
+        # Track indoor temperature min/max for stability calculation (daily)
         if self._indoor_temp_min_daily is None or indoor_temp < self._indoor_temp_min_daily:
             self._indoor_temp_min_daily = indoor_temp
         if self._indoor_temp_max_daily is None or indoor_temp > self._indoor_temp_max_daily:
             self._indoor_temp_max_daily = indoor_temp
+
+        # Track indoor temperature for rolling 24h variation (for warning display)
+        now_ts = time.time()
+        self._indoor_temp_history_24h.append((now_ts, indoor_temp))
+        # Purge entries older than 24 hours
+        cutoff = now_ts - 86400  # 24h in seconds
+        self._indoor_temp_history_24h = [
+            (ts, temp) for ts, temp in self._indoor_temp_history_24h if ts > cutoff
+        ]
 
     def _update_wind_counters(self, weather_data: dict[str, Any]) -> None:
         """Update daily wind counters for history archival."""
@@ -1313,6 +1347,25 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (ValueError, TypeError):
             return None
 
+    def _get_temp_variation_24h(self) -> dict[str, Any]:
+        """Get temperature variation over the last 24 hours (rolling window)."""
+        if not self._indoor_temp_history_24h:
+            return {
+                "temp_variation": None,
+                "indoor_temp_min": None,
+                "indoor_temp_max": None,
+            }
+
+        temps = [temp for _, temp in self._indoor_temp_history_24h]
+        temp_min = min(temps)
+        temp_max = max(temps)
+
+        return {
+            "temp_variation": temp_max - temp_min,
+            "indoor_temp_min": temp_min,
+            "indoor_temp_max": temp_max,
+        }
+
     def _get_weather_data(self) -> dict[str, Any]:
         """Get weather data (wind speed, bearing, direction) from weather entity."""
         result = {
@@ -1360,6 +1413,123 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             result["wind_exposure"] = self._calculate_wind_exposure(result["wind_direction"], self.room_orientation)
 
         return result
+
+    def _get_insulation_status_with_optimal(self) -> dict[str, Any]:
+        """Get insulation status with optimal level upgrade.
+
+        If the last 7 days all have:
+        - Rating excellent or excellent_inferred
+        - Less than 30 minutes of heating per day
+
+        Then upgrade the rating to "optimal" (Level S).
+        """
+        # Get base insulation status
+        status = self.thermal_model.get_insulation_status()
+
+        try:
+            # Check if we can upgrade to optimal
+            current_rating = status.get("rating", "")
+            _LOGGER.info(
+                "[%s] 🔍 Optimal check: current_rating=%s",
+                self.zone_name,
+                current_rating,
+            )
+            if current_rating not in ["excellent", "excellent_inferred"]:
+                return status
+
+            # Check 7-day history for excellence streak
+            history = self.thermal_model.daily_history
+            _LOGGER.info(
+                "[%s] 🔍 Optimal check: history has %d days",
+                self.zone_name,
+                len(history) if history else 0,
+            )
+            if not history or len(history) < 6:
+                _LOGGER.info(
+                    "[%s] ❌ Optimal check: not enough history days (need 6, have %d)",
+                    self.zone_name,
+                    len(history) if history else 0,
+                )
+                return status
+
+            # Get last 7 days
+            from datetime import datetime, timedelta
+
+            today = datetime.now().date()
+            last_7_days = []
+
+            for i in range(7):
+                day = today - timedelta(days=i)
+                day_str = day.strftime("%Y-%m-%d")
+                entry = next((e for e in history if e.date == day_str), None)
+                if entry:
+                    last_7_days.append(entry)
+
+            _LOGGER.info(
+                "[%s] 🔍 Optimal check: found %d matching days in last 7",
+                self.zone_name,
+                len(last_7_days),
+            )
+
+            # Need at least 6 historical days (today may not be archived yet)
+            if len(last_7_days) < 6:
+                _LOGGER.info(
+                    "[%s] ❌ Optimal check: not enough matching days (need 6, have %d)",
+                    self.zone_name,
+                    len(last_7_days),
+                )
+                return status
+
+            # Check all days have < 30 minutes heating
+            days_over_threshold = [
+                (entry.date, entry.heating_hours)
+                for entry in last_7_days
+                if entry.heating_hours >= 0.5
+            ]
+
+            all_low_heating = len(days_over_threshold) == 0
+
+            # Also check today's heating (not yet archived)
+            # Get today's heating hours from the current aggregation
+            analysis = self.thermal_model.get_analysis()
+            today_heating_hours = analysis.get("heating_hours") if analysis else None
+            if today_heating_hours is not None and today_heating_hours >= 0.5:
+                all_low_heating = False
+                _LOGGER.info(
+                    "[%s] ❌ Optimal check: today has %.2f hours heating (>= 0.5)",
+                    self.zone_name,
+                    today_heating_hours,
+                )
+
+            if days_over_threshold:
+                _LOGGER.info(
+                    "[%s] ❌ Optimal check: %d days with >= 30min heating: %s",
+                    self.zone_name,
+                    len(days_over_threshold),
+                    days_over_threshold,
+                )
+            else:
+                _LOGGER.info(
+                    "[%s] ✅ Optimal check: all %d days have < 30min heating, today=%.2f",
+                    self.zone_name,
+                    len(last_7_days),
+                    today_heating_hours or 0,
+                )
+
+            if all_low_heating:
+                # Upgrade to optimal!
+                _LOGGER.info(
+                    "[%s] 🏆 Upgrading to OPTIMAL level (Level S) - 7 days of excellence!",
+                    self.zone_name,
+                )
+                status = dict(status)  # Copy to avoid modifying original
+                status["rating"] = "optimal"
+                status["message"] = "Niveau S - 7 jours de performance optimale"
+
+        except Exception as err:
+            _LOGGER.warning("[%s] Could not check optimal level: %s", self.zone_name, err)
+
+        return status
 
     def _calculate_wind_exposure(self, wind_direction: str, room_orientation: str) -> str:
         """Calculate if room is exposed or sheltered based on wind direction.

@@ -34,8 +34,11 @@ class HomePerformanceCard extends LitElement {
       temperatures: "TEMPERATURES",
       technical_details: "TECHNICAL DETAILS",
       history_title: "K HISTORY (7 DAYS)",
+      excellence_title: "7-DAY PERFORMANCE",
 
       // Insulation ratings
+      optimal: "Optimal",
+      optimal_desc: "Level S - 7 days perfect",
       excellent: "Excellent",
       excellent_desc: "Very well insulated",
       good: "Good",
@@ -46,7 +49,7 @@ class HomePerformanceCard extends LitElement {
       poor_desc: "Needs improvement",
       very_poor: "Critical",
       very_poor_desc: "Insufficient insulation",
-      excellent_inferred: "🏆 Excellent",
+      excellent_inferred: "Excellent",
       excellent_inferred_desc: "Minimal heating needed",
       summer_mode: "☀️ Summer mode",
       summer_mode_desc: "Measurement not possible",
@@ -124,6 +127,11 @@ class HomePerformanceCard extends LitElement {
       wind_exposure_exposed: "Exposed",
       wind_exposure_partial: "Partial",
       wind_exposure_sheltered: "Sheltered",
+
+      // Temperature variation warning
+      temp_variation: "VARIATION",
+      temp_variation_warning: "Temperature variation",
+      temp_variation_desc: "Score potentially underestimated",
       wind_exposure_unknown: "",
     },
     fr: {
@@ -139,8 +147,11 @@ class HomePerformanceCard extends LitElement {
       temperatures: "TEMPÉRATURES",
       technical_details: "DÉTAILS TECHNIQUES",
       history_title: "HISTORIQUE K (7 JOURS)",
+      excellence_title: "PERFORMANCE 7 JOURS",
 
       // Insulation ratings
+      optimal: "Optimal",
+      optimal_desc: "Niveau S - 7 jours parfaits",
       excellent: "Excellent",
       excellent_desc: "Très bien isolé",
       good: "Bon",
@@ -151,7 +162,7 @@ class HomePerformanceCard extends LitElement {
       poor_desc: "À améliorer",
       very_poor: "Critique",
       very_poor_desc: "Isolation insuffisante",
-      excellent_inferred: "🏆 Excellente",
+      excellent_inferred: "Excellente",
       excellent_inferred_desc: "Chauffe minimale nécessaire",
       summer_mode: "☀️ Mode été",
       summer_mode_desc: "Mesure impossible",
@@ -229,6 +240,11 @@ class HomePerformanceCard extends LitElement {
       wind_exposure_exposed: "Exposée",
       wind_exposure_partial: "Partielle",
       wind_exposure_sheltered: "Abritée",
+
+      // Temperature variation warning
+      temp_variation: "VARIATION",
+      temp_variation_warning: "Variation température",
+      temp_variation_desc: "Score potentiellement sous-estimé",
       wind_exposure_unknown: "",
     },
     it: {
@@ -244,8 +260,11 @@ class HomePerformanceCard extends LitElement {
       temperatures: "TEMPERATURE",
       technical_details: "DETTAGLI TECNICI",
       history_title: "STORICO K (7 GIORNI)",
+      excellence_title: "PRESTAZIONI 7 GIORNI",
 
       // Insulation ratings
+      optimal: "Ottimale",
+      optimal_desc: "Livello S - 7 giorni perfetti",
       excellent: "Eccellente",
       excellent_desc: "Molto ben isolato",
       good: "Buono",
@@ -256,7 +275,7 @@ class HomePerformanceCard extends LitElement {
       poor_desc: "Da migliorare",
       very_poor: "Critico",
       very_poor_desc: "Isolamento insufficiente",
-      excellent_inferred: "🏆 Eccellente",
+      excellent_inferred: "Eccellente",
       excellent_inferred_desc: "Riscaldamento minimo necessario",
       summer_mode: "☀️ Modalità estiva",
       summer_mode_desc: "Misurazione impossibile",
@@ -334,6 +353,11 @@ class HomePerformanceCard extends LitElement {
       wind_exposure_exposed: "Esposta",
       wind_exposure_partial: "Parziale",
       wind_exposure_sheltered: "Riparata",
+
+      // Temperature variation warning
+      temp_variation: "VARIAZIONE",
+      temp_variation_warning: "Variazione temperatura",
+      temp_variation_desc: "Punteggio potenzialmente sottostimato",
       wind_exposure_unknown: "",
     }
   };
@@ -649,6 +673,8 @@ class HomePerformanceCard extends LitElement {
 
   _getInsulationData(rating, insulationAttrs = {}) {
     const data = {
+      // Level S - Optimal (7 days of excellence with minimal heating)
+      optimal: { label: this._t('optimal'), color: "#0ea5e9", icon: "mdi:shield-star", desc: this._t('optimal_desc') },
       // Calculated ratings
       excellent: { label: this._t('excellent'), color: "#10b981", icon: "mdi:shield-check", desc: this._t('excellent_desc') },
       good: { label: this._t('good'), color: "#22c55e", icon: "mdi:shield-half-full", desc: this._t('good_desc') },
@@ -656,7 +682,7 @@ class HomePerformanceCard extends LitElement {
       poor: { label: this._t('poor'), color: "#f97316", icon: "mdi:shield-alert", desc: this._t('poor_desc') },
       very_poor: { label: this._t('very_poor'), color: "#ef4444", icon: "mdi:shield-off", desc: this._t('very_poor_desc') },
       // Inferred excellent
-      excellent_inferred: { label: this._t('excellent_inferred'), color: "#059669", icon: "mdi:trophy", desc: this._t('excellent_inferred_desc') },
+      excellent_inferred: { label: this._t('excellent_inferred'), color: "#059669", icon: "mdi:shield-check", desc: this._t('excellent_inferred_desc') },
     };
 
     // Get season and status from attributes
@@ -665,6 +691,7 @@ class HomePerformanceCard extends LitElement {
     const message = insulationAttrs.message;
     const kValue = insulationAttrs.k_value;
     const kSource = insulationAttrs.k_source;
+    const lastKDate = insulationAttrs.last_k_date;
 
     // Handle season-specific messages
     if (season === "summer") {
@@ -710,7 +737,25 @@ class HomePerformanceCard extends LitElement {
       return { label: this._t('waiting'), color: "#6b7280", icon: "mdi:shield-outline", desc: this._t('waiting_desc') };
     }
 
-    return data[rating] || { label: rating, color: "#6b7280", icon: "mdi:shield-outline", desc: "" };
+    // Get base rating data
+    const baseData = data[rating] || { label: rating, color: "#6b7280", icon: "mdi:shield-outline", desc: "" };
+
+    // Add date info if K is from a previous day
+    if (lastKDate && kValue) {
+      const today = new Date().toISOString().split('T')[0];
+      if (lastKDate !== today) {
+        // Format date as DD/MM
+        const dateParts = lastKDate.split('-');
+        const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
+        return {
+          ...baseData,
+          desc: `${baseData.desc} (K du ${formattedDate})`,
+          lastKDate: lastKDate,
+        };
+      }
+    }
+
+    return baseData;
   }
 
   _getPerformanceData(level) {
@@ -861,11 +906,19 @@ class HomePerformanceCard extends LitElement {
     // K history for sparkline
     const kHistory = this._getAttribute(kCoefEntityId, "k_history_7d") || [];
 
+    // Excellence badge
+    const excellenceBadge = this._getAttribute(kCoefEntityId, "excellence_badge") || false;
+
     // Wind data
     const windSpeed = this._getAttribute(kCoefEntityId, "wind_speed");
     const windDirection = this._getAttribute(kCoefEntityId, "wind_direction");
     const windExposure = this._getAttribute(kCoefEntityId, "wind_exposure");
     const roomOrientation = this._getAttribute(kCoefEntityId, "room_orientation");
+
+    // Temperature variation (for warning)
+    const tempVariation = this._getAttribute(kCoefEntityId, "temp_variation");
+    const indoorTempMin = this._getAttribute(kCoefEntityId, "indoor_temp_min");
+    const indoorTempMax = this._getAttribute(kCoefEntityId, "indoor_temp_max");
 
     // Restore original zone
     this.config.zone = savedZone;
@@ -893,12 +946,20 @@ class HomePerformanceCard extends LitElement {
       windExposure,
       roomOrientation,
       kHistory,
+      isOptimal: insulation === "optimal",
+      // Temperature variation warning (show if > 3°C)
+      tempVariation: this._isValidValue(tempVariation) ? parseFloat(tempVariation) : null,
+      indoorTempMin: this._isValidValue(indoorTempMin) ? parseFloat(indoorTempMin).toFixed(0) : null,
+      indoorTempMax: this._isValidValue(indoorTempMax) ? parseFloat(indoorTempMax).toFixed(0) : null,
+      hasTempWarning: (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+        (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5),
     };
   }
 
   // Get color for insulation rating
   _getInsulationColor(rating) {
     const colors = {
+      optimal: "#0ea5e9",
       excellent: "#10b981",
       good: "#22c55e",
       average: "#eab308",
@@ -992,7 +1053,7 @@ class HomePerformanceCard extends LitElement {
   }
 
   // Render bar chart for full layout
-  _renderBarChart(kHistory, volume) {
+  _renderBarChart(kHistory, volume, overrideColor = null) {
     if (!kHistory || kHistory.length === 0) return '';
 
     // Calculate scores (K/m³) for each day - this is what determines both color AND height
@@ -1016,7 +1077,8 @@ class HomePerformanceCard extends LitElement {
       const heightPx = range > 0.01
         ? minHeight + ((score - minScore) / range) * (maxHeight - minHeight)
         : (minHeight + maxHeight) / 2; // If all nearly same, show at middle height
-      const barColor = this._getColorFromScore(score);
+      // Use override color if provided, otherwise calculate from score
+      const barColor = overrideColor || this._getColorFromScore(score);
       const isEstimated = day.estimated === true;
       const opacity = isEstimated ? 0.5 : 1;
       const tooltip = isEstimated
@@ -1146,17 +1208,25 @@ class HomePerformanceCard extends LitElement {
     const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
     const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
 
+    // Get temperature variation for warning
+    const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
+    const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
+    const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+      (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
+
     const insulationData = this._getInsulationData(insulation, insulationAttrs);
     const scoreLetter = this._getScoreLetter(insulation);
     const hasHistory = kHistory && kHistory.length >= 2;
+    const isOptimal = insulation === "optimal";
 
     return html`
-      <ha-card class="badge-card" style="--accent: ${insulationData.color}">
+      <ha-card class="badge-card ${isOptimal ? 'badge-card-optimal' : ''}" style="--accent: ${insulationData.color}">
         <div class="badge-accent-bar"></div>
-        <div class="badge-score-circle">
+        <div class="badge-score-circle ${isOptimal ? 'badge-score-optimal' : ''}">
           <span class="badge-score-letter">${scoreLetter}</span>
         </div>
         <div class="badge-rating-label">${insulationData.label}</div>
+        ${isOptimal ? html`<div class="badge-rating-desc">${insulationData.desc}</div>` : ''}
         ${this.config.show_graph && hasHistory ? html`
           <div class="badge-sparkline-wrapper">
             ${this._renderSparkline(kHistory, 60, 20, insulationData.color)}
@@ -1176,6 +1246,12 @@ class HomePerformanceCard extends LitElement {
           ${this._isValidValue(kCoef) ? html`${kCoef}<span class="badge-k-unit">W/°C</span>` : "--"}
         </div>
         ${this._isValidValue(kPerM3) ? html`<div class="badge-k-normalized">${kPerM3} W/m³</div>` : ""}
+        ${hasTempWarning ? html`
+          <div class="badge-temp-warning">
+            <span class="badge-warning-title">⚠️ ${this._t('temp_variation')}</span>
+            <span class="badge-warning-value">±${Math.round(tempVariation)}°C</span>
+          </div>
+        ` : ''}
       </ha-card>
     `;
   }
@@ -1228,11 +1304,19 @@ class HomePerformanceCard extends LitElement {
     const deltaTUnit = this._getEntityUnit(deltaTEntityId);
     const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);
     const hasHistory = kHistory && kHistory.length >= 2;
+    const isOptimal = insulation === "optimal";
+
+    // Get temperature variation for warning
+    const kCoefEntityId = this._getEntityId("coefficient_k");
+    const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
+    const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
+    const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+      (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
 
     return html`
-      <ha-card class="pill-card" style="--accent: ${insulationData.color}">
+      <ha-card class="pill-card ${isOptimal ? 'pill-card-optimal' : ''}" style="--accent: ${insulationData.color}">
         <div class="pill-accent-bar"></div>
-        <div class="pill-score-badge">
+        <div class="pill-score-badge ${isOptimal ? 'pill-score-optimal' : ''}">
           <span class="pill-score-letter">${scoreLetter}</span>
         </div>
         <div class="pill-zone-section">
@@ -1255,6 +1339,7 @@ class HomePerformanceCard extends LitElement {
             <div class="pill-stat-label">ΔT</div>
           </div>
         </div>
+        ${hasTempWarning ? html`<div class="pill-temp-warning">⚠️</div>` : ''}
       </ha-card>
     `;
   }
@@ -1340,10 +1425,11 @@ class HomePerformanceCard extends LitElement {
       return { letter: '?', color: '#6b7280' };
     }
 
-    // Score mapping
-    const scoreMap = { excellent: 5, excellent_inferred: 5, good: 4, average: 3, poor: 2, very_poor: 1 };
+    // Score mapping (optimal = 6, highest)
+    const scoreMap = { optimal: 6, excellent: 5, excellent_inferred: 5, good: 4, average: 3, poor: 2, very_poor: 1 };
     const avgScore = validRatings.reduce((sum, r) => sum + (scoreMap[r] || 3), 0) / validRatings.length;
 
+    if (avgScore >= 5.5) return { letter: 'S', color: '#0ea5e9' };
     if (avgScore >= 4.5) return { letter: 'A+', color: '#10b981' };
     if (avgScore >= 3.5) return { letter: 'A', color: '#22c55e' };
     if (avgScore >= 2.5) return { letter: 'B', color: '#eab308' };
@@ -1364,18 +1450,23 @@ class HomePerformanceCard extends LitElement {
     const accentColor = zone.insulationData?.color || '#6b7280';
     const showSparklines = this.config.show_sparklines !== false; // default true
     const hasValidHistory = zone.kHistory && zone.kHistory.length >= 2;
+    const isOptimal = zone.isOptimal;
+    const hasTempWarning = zone.hasTempWarning;
 
     return html`
       <div
-        class="multi-zone-row ${isExpanded ? 'expanded' : ''}"
+        class="multi-zone-row ${isExpanded ? 'expanded' : ''} ${isOptimal ? 'multi-zone-row-optimal' : ''}"
         style="--accent-color: ${accentColor}"
         @click=${() => this._toggleZoneExpanded(zone.name)}
       >
         <div class="multi-zone-row-main">
-          <div class="multi-zone-score">${zone.scoreLetter || '?'}</div>
+          <div class="multi-zone-score ${isOptimal ? 'multi-zone-score-optimal' : ''}">${zone.scoreLetter || '?'}</div>
           <div class="multi-zone-info">
             <div class="multi-zone-name">${zone.name}</div>
-            <div class="multi-zone-rating">${zone.insulationData?.label || ''}</div>
+            <div class="multi-zone-rating-row">
+              <span class="multi-zone-rating">${zone.insulationData?.label || ''}</span>
+              ${hasTempWarning ? html`<span class="multi-zone-temp-warning">⚠️</span>` : ''}
+            </div>
           </div>
           <div class="multi-zone-stats">
             <div class="multi-zone-stat">
@@ -1465,6 +1556,15 @@ class HomePerformanceCard extends LitElement {
               ` : ''}
             </div>
           ` : ''}
+          ${zone.hasTempWarning ? html`
+            <div class="multi-zone-temp-warning-banner">
+              <span class="warning-icon">⚠️</span>
+              <div class="warning-content">
+                <div class="warning-title">${this._t('temp_variation_warning')} : ±${zone.tempVariation?.toFixed(0)}°C</div>
+                <div class="warning-desc">${this._t('temp_variation_desc')}</div>
+              </div>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1475,38 +1575,63 @@ class HomePerformanceCard extends LitElement {
       return html`<div class="multi-empty-compare">${this._t('multi_no_data')}</div>`;
     }
 
-    // Sort by K/m³ (best first = lowest)
+    // Rating priority order (best first)
+    const ratingPriority = {
+      optimal: 0,
+      excellent: 1,
+      excellent_inferred: 1,
+      good: 2,
+      average: 3,
+      poor: 4,
+      very_poor: 5,
+    };
+
+    // Sort by rating level first, then by K/m³ within same level
     const sorted = [...zonesData]
       .filter(z => z.kPerM3 !== null)
-      .sort((a, b) => parseFloat(a.kPerM3) - parseFloat(b.kPerM3));
+      .sort((a, b) => {
+        const priorityA = ratingPriority[a.insulation] ?? 99;
+        const priorityB = ratingPriority[b.insulation] ?? 99;
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        // Same rating level: sort by K/m³ (lower is better)
+        return parseFloat(a.kPerM3) - parseFloat(b.kPerM3);
+      });
 
     if (sorted.length === 0) {
       return html`<div class="multi-empty-compare">${this._t('multi_waiting_data')}</div>`;
     }
 
-    const bestValue = parseFloat(sorted[0].kPerM3);
+    // Reference is the first in ranking (best level), use its K/m³ for delta calculations
+    const refKPerM3 = parseFloat(sorted[0].kPerM3);
 
     return html`
       <div class="multi-zone-ranking">
-        ${sorted.map((zone, index) => this._renderMultiRankingItem(zone, index, bestValue))}
+        ${sorted.map((zone, index) => this._renderMultiRankingItem(zone, index, refKPerM3))}
       </div>
     `;
   }
 
-  _renderMultiRankingItem(zone, index, bestValue) {
+  _renderMultiRankingItem(zone, index, refKPerM3) {
     const accentColor = zone.insulationData?.color || '#6b7280';
     const kPerM3 = parseFloat(zone.kPerM3);
-    const barWidth = bestValue / kPerM3 * 100;
-    const deltaPercent = ((kPerM3 - bestValue) / bestValue * 100).toFixed(0);
+    const barWidth = refKPerM3 / kPerM3 * 100;
+    const deltaPercent = ((kPerM3 - refKPerM3) / refKPerM3 * 100).toFixed(0);
     const isRef = index === 0;
 
-    // Delta class based on percentage
+    // Delta class based on percentage difference from reference
     let deltaClass = 'ref';
     if (!isRef) {
-      if (deltaPercent < 50) deltaClass = 'warn';
-      else if (deltaPercent < 150) deltaClass = 'bad';
+      const absDelta = Math.abs(deltaPercent);
+      if (absDelta < 50) deltaClass = 'warn';
+      else if (absDelta < 150) deltaClass = 'bad';
       else deltaClass = 'worst';
     }
+
+    // Format delta with correct sign
+    const deltaSign = deltaPercent >= 0 ? '+' : '';
+    const deltaDisplay = isRef ? this._t('multi_ref') : `${deltaSign}${deltaPercent}%`;
 
     return html`
       <div class="multi-ranking-item" style="--accent-color: ${accentColor}">
@@ -1520,7 +1645,7 @@ class HomePerformanceCard extends LitElement {
         </div>
         <div class="multi-ranking-value">${zone.kPerM3} W/m³</div>
         <div class="multi-ranking-delta ${deltaClass}">
-          ${isRef ? this._t('multi_ref') : `+${deltaPercent}%`}
+          ${deltaDisplay}
         </div>
       </div>
     `;
@@ -1529,6 +1654,7 @@ class HomePerformanceCard extends LitElement {
   // Get score letter from insulation rating
   _getScoreLetter(rating) {
     const letters = {
+      optimal: "S",
       excellent: "A+",
       excellent_inferred: "A+",
       good: "A",
@@ -1609,6 +1735,7 @@ class HomePerformanceCard extends LitElement {
       k_value: this._getAttribute(insulationEntityId, "k_value"),
       k_source: this._getAttribute(insulationEntityId, "k_source"),
       temp_stable: this._getAttribute(insulationEntityId, "temp_stable"),
+      last_k_date: this._getAttribute(insulationEntityId, "last_k_date"),
     };
 
     // Priority: measured energy (if available) > estimated energy
@@ -1777,9 +1904,28 @@ class HomePerformanceCard extends LitElement {
       ${this.config.show_graph && kHistory && kHistory.length >= 2 ? html`
         <div class="history-section">
           <div class="section-title">${this._t('history_title')}</div>
-          ${this._renderBarChart(kHistory, volume)}
+          ${this._renderBarChart(kHistory, volume, insulationData.color)}
         </div>
       ` : ''}
+
+      <!-- Temperature Variation Warning -->
+      ${(() => {
+        const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
+        const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
+        const indoorTempMax = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_max");
+        const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+          (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
+        if (!hasTempWarning) return '';
+        return html`
+          <div class="temp-warning-banner">
+            <span class="warning-icon">⚠️</span>
+            <div class="warning-content">
+              <div class="warning-title">${this._t('temp_variation_warning')} : ±${Math.round(tempVariation)}°C</div>
+              <div class="warning-desc">${this._t('temp_variation_desc')}</div>
+            </div>
+          </div>
+        `;
+      })()}
     `;
   }
 
@@ -2205,6 +2351,38 @@ class HomePerformanceCard extends LitElement {
         margin-top: 8px;
       }
 
+      /* Temperature Variation Warning Banner */
+      .temp-warning-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 10px;
+        margin-top: 12px;
+      }
+
+      .temp-warning-banner .warning-icon {
+        font-size: 1.3em;
+      }
+
+      .temp-warning-banner .warning-content {
+        flex: 1;
+      }
+
+      .temp-warning-banner .warning-title {
+        font-size: 1em;
+        font-weight: 600;
+        color: #f59e0b;
+      }
+
+      .temp-warning-banner .warning-desc {
+        font-size: 0.85em;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+
       .k-chart {
         display: flex;
         align-items: flex-end;
@@ -2260,6 +2438,13 @@ class HomePerformanceCard extends LitElement {
         width: 100%;
         height: 100%;
       }
+
+      /* ========================================
+         LEVEL S - OPTIMAL STYLES
+         Displayed when 7 days of A+ with <30min heating
+         ======================================== */
+
+      /* Level S - Optimal: uses same styling as other levels via --accent color */
 
       /* Responsive */
       @media (max-width: 400px) {
@@ -2357,7 +2542,14 @@ class HomePerformanceCard extends LitElement {
         color: var(--accent);
         text-transform: uppercase;
         letter-spacing: 0.8px;
-        margin-bottom: 8px;
+        margin-bottom: 2px;
+      }
+
+      .badge-rating-desc {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+        opacity: 0.8;
       }
 
       .badge-separator {
@@ -2403,6 +2595,36 @@ class HomePerformanceCard extends LitElement {
         color: var(--text-secondary);
         margin-top: 2px;
         opacity: 0.8;
+      }
+
+      .badge-temp-warning {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        margin-top: 8px;
+        padding: 4px 8px;
+        background: rgba(245, 158, 11, 0.15);
+        border-radius: 6px;
+        max-width: 80px;
+        align-self: center;
+      }
+
+      .badge-warning-title {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 0.75em;
+        font-weight: 600;
+        color: #f59e0b;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+      }
+
+      .badge-warning-value {
+        font-size: 0.8em;
+        font-weight: 700;
+        color: #f59e0b;
       }
 
       .badge-wind {
@@ -2579,6 +2801,19 @@ class HomePerformanceCard extends LitElement {
         color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.3px;
+      }
+
+      .pill-temp-warning {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: rgba(245, 158, 11, 0.15);
+        border-radius: 6px;
+        font-size: 0.9em;
+        flex-shrink: 0;
+        margin-left: 8px;
       }
 
       /* Pill Analyzing State */
@@ -2778,6 +3013,46 @@ class HomePerformanceCard extends LitElement {
         background: color-mix(in srgb, var(--accent-color) 15%, transparent);
       }
 
+      .multi-zone-temp-warning {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        background: rgba(245, 158, 11, 0.2);
+        border-radius: 3px;
+        font-size: 0.55em;
+      }
+
+      .multi-zone-temp-warning-banner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        background: rgba(245, 158, 11, 0.15);
+        border-radius: 8px;
+        margin-top: 8px;
+      }
+
+      .multi-zone-temp-warning-banner .warning-icon {
+        font-size: 1em;
+      }
+
+      .multi-zone-temp-warning-banner .warning-content {
+        flex: 1;
+      }
+
+      .multi-zone-temp-warning-banner .warning-title {
+        font-size: 0.85em;
+        font-weight: 600;
+        color: #f59e0b;
+      }
+
+      .multi-zone-temp-warning-banner .warning-desc {
+        font-size: 0.75em;
+        color: var(--text-secondary);
+      }
+
       .multi-zone-info {
         min-width: 0;
       }
@@ -2786,6 +3061,12 @@ class HomePerformanceCard extends LitElement {
         font-size: 0.95em;
         font-weight: 600;
         color: var(--text-primary);
+      }
+
+      .multi-zone-rating-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
 
       .multi-zone-rating {
@@ -3107,7 +3388,7 @@ class HomePerformanceCardEditor extends LitElement {
 
     const zones = [];
     const seen = new Set();
-    
+
     // Method 1: Find zones from devices (most reliable)
     // Devices are named "Home Performance - {Zone Name}"
     if (this.hass.devices) {
@@ -3125,7 +3406,7 @@ class HomePerformanceCardEditor extends LitElement {
     // Method 2: Fallback - find from entities if devices not available
     if (zones.length === 0) {
       const knownSuffixes = ['k_coefficient', 'coefficient_k', 'k_per_m2', 'k_per_m3'];
-      
+
       Object.keys(this.hass.states).forEach((entityId) => {
         for (const suffix of knownSuffixes) {
           // Try standard pattern: sensor.home_performance_{zone}_{suffix}
@@ -3134,7 +3415,7 @@ class HomePerformanceCardEditor extends LitElement {
           if (!match) {
             match = entityId.match(new RegExp(`^sensor\\.(.+?)_${suffix}$`));
           }
-          
+
           if (match && !seen.has(match[1])) {
             const slug = match[1];
             const displayName = slug
@@ -3209,15 +3490,15 @@ class HomePerformanceCardEditor extends LitElement {
     return html`
       <div class="editor">
         ${!isMultiZone
-          ? html`
+        ? html`
               ${zones.length > 0
-                ? html`
+            ? html`
                     <div class="zone-selector">
                       <label>${this._t('editor_zone')}</label>
                       <select @change=${this._onZoneSelected}>
                         <option value="" ?selected=${!this.config.zone}>-- ${this._t('editor_select_zone')} --</option>
                         ${zones.map(
-                          (zone) => html`
+              (zone) => html`
                             <option
                               value=${zone.displayName}
                               ?selected=${this.config.zone === zone.displayName}
@@ -3225,11 +3506,11 @@ class HomePerformanceCardEditor extends LitElement {
                               ${zone.displayName}
                             </option>
                           `
-                        )}
+            )}
                       </select>
                     </div>
                   `
-                : html`
+            : html`
                     <ha-textfield
                       label="${this._t('editor_zone')}"
                       .value=${this.config.zone || ""}
@@ -3238,7 +3519,7 @@ class HomePerformanceCardEditor extends LitElement {
                     ></ha-textfield>
                   `}
             `
-          : ""}
+        : ""}
 
         <ha-textfield
           label="${this._t('editor_title')}"

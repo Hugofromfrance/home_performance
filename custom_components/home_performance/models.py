@@ -48,6 +48,7 @@ MAX_DATA_POINTS = 1440 * 2  # 48h at 1 sample per minute
 # Season/inference constants
 TEMP_STABILITY_THRESHOLD = 3.0  # °C - max variation for "stable" temperature (increased for fast-cycling systems)
 EXCELLENT_INFERENCE_MIN_HOURS = 24  # Hours needed to infer excellent isolation
+MIN_COMFORT_TEMP = 17.0  # °C - minimum indoor temp to consider a "perfect" day (room must be comfortable)
 
 # Season status codes
 SEASON_SUMMER = "summer"  # T° ext > T° int (ΔT negative)
@@ -230,6 +231,7 @@ class ThermalLossModel:
         self._k_coefficient: float | None = None  # W/°C - current K from rolling 24h
         self._k_coefficient_7d: float | None = None  # W/°C - stable K from 7-day history
         self._last_valid_k: float | None = None  # Last valid K (preserved during off-season)
+        self._last_k_date: str | None = None  # Date of last valid K calculation (ISO format)
         self._last_aggregation: AggregatedPeriod | None = None
 
         # Energy tracking (cumulative)
@@ -490,6 +492,9 @@ class ThermalLossModel:
 
         self._k_coefficient = k
         self._last_valid_k = k  # Preserve this valid K
+        # Update last K date to today (real-time calculation)
+        from datetime import datetime
+        self._last_k_date = datetime.now().strftime("%Y-%m-%d")
 
         _LOGGER.info(
             "K calculated for %s: %.1f W/°C " "(energy=%.0f Wh [%s], ΔT=%.1f°C, duration=%.1fh, heating=%.1fh)",
@@ -638,37 +643,89 @@ class ThermalLossModel:
             self._daily_history[-HISTORY_DAYS:] if len(self._daily_history) > HISTORY_DAYS else self._daily_history
         )
 
-        # Filter valid days for K calculation
-        # A day is valid if:
-        # 1. ΔT >= MIN_DELTA_T (sufficient temperature difference)
-        # 2. AND one of:
-        #    a) heating_hours >= MIN_HEATING_TIME_HOURS (normal case: enough heating data)
-        #    b) heating_hours >= 0.1h AND temp_stable (excellent isolation: little heating needed)
-        #
-        # This allows days with little heating but stable temperature to contribute
-        # to the K_7d calculation, rewarding excellent insulation.
-        valid_days = []
+        # Separate days into categories:
+        # 1. Days with enough heating data (can calculate K directly)
+        # 2. "Perfect" days: temp stable but very little heating (use K_min as estimate)
+        # 3. Invalid days: not enough ΔT or unstable temp
+        calculable_days = []
+        perfect_days = []
+
         for d in recent_history:
             if d.avg_delta_t < MIN_DELTA_T:
                 continue  # Not enough ΔT
 
-            # Check if day has enough heating data OR is "excellent isolation" case
-            has_enough_heating = d.heating_hours >= MIN_HEATING_TIME_HOURS
             temp_stable = d.temp_variation is not None and d.temp_variation < TEMP_STABILITY_THRESHOLD
+            has_enough_heating = d.heating_hours >= MIN_HEATING_TIME_HOURS
             has_minimal_heating = d.heating_hours >= 0.1  # At least 6 minutes
 
+            # Check if indoor temp is comfortable (>= 17°C)
+            temp_comfortable = d.avg_indoor_temp >= MIN_COMFORT_TEMP
+
             if has_enough_heating or (has_minimal_heating and temp_stable):
-                valid_days.append(d)
+                # Can calculate K for this day
+                calculable_days.append(d)
+            elif temp_stable and temp_comfortable and d.heating_hours < 0.1:
+                # "Perfect" day: stable AND comfortable temp with almost no heating
+                # This proves excellent insulation - will use K_min as conservative estimate
+                perfect_days.append(d)
             else:
                 _LOGGER.debug(
-                    "[%s] Day %s filtered: heating=%.2fh, temp_variation=%s",
+                    "[%s] Day %s filtered: heating=%.2fh, temp_var=%s, indoor=%.1f°C, stable=%s, comfortable=%s",
                     self.zone_name,
                     d.date,
                     d.heating_hours,
                     f"{d.temp_variation:.1f}°C" if d.temp_variation else "N/A",
+                    d.avg_indoor_temp,
+                    temp_stable,
+                    temp_comfortable,
                 )
 
-        if not valid_days:
+        # First pass: calculate K for days with enough heating data
+        day_k_values = []
+        for day in calculable_days:
+            if day.energy_kwh > 0:
+                energy_wh = day.energy_kwh * 1000 * self.efficiency_factor
+            elif self.heater_power is not None and self.heater_power > 0:
+                energy_wh = self.heater_power * day.heating_hours * self.efficiency_factor
+            else:
+                continue
+
+            k_day = energy_wh / (day.avg_delta_t * 24)
+            day_k_values.append((day, k_day))
+
+            _LOGGER.debug(
+                "[%s] Day %s: K=%.1f W/°C (heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh)",
+                self.zone_name,
+                day.date,
+                k_day,
+                day.heating_hours,
+                day.avg_delta_t,
+                day.energy_kwh,
+            )
+
+        # Find minimum K from calculable days (or use current K_24h as fallback)
+        k_min = None
+        if day_k_values:
+            k_min = min(k for _, k in day_k_values)
+        elif self._k_coefficient is not None:
+            k_min = self._k_coefficient
+
+        # Add "perfect" days using K_min as estimate
+        # Logic: if temp is stable with no heating, K must be <= K_min
+        if k_min is not None and perfect_days:
+            for day in perfect_days:
+                day_k_values.append((day, k_min))
+                _LOGGER.info(
+                    "[%s] Day %s: K=%.1f W/°C (PERFECT day - using K_min, heating=%.1fmin, indoor=%.1f°C, temp_var=%.1f°C)",
+                    self.zone_name,
+                    day.date,
+                    k_min,
+                    day.heating_hours * 60,
+                    day.avg_indoor_temp,
+                    day.temp_variation or 0,
+                )
+
+        if not day_k_values:
             _LOGGER.debug(
                 "[%s] No valid days in history for K calculation (%d days total)",
                 self.zone_name,
@@ -676,51 +733,30 @@ class ThermalLossModel:
             )
             return
 
-        # Calculate K for each valid day and weight by sample count
+        # Calculate weighted average
         total_weighted_k = 0.0
         total_weight = 0.0
 
-        for day in valid_days:
-            # energy_kwh in history is consumed energy (electric/gas)
-            # Apply efficiency_factor to convert to thermal energy
-            if day.energy_kwh > 0:
-                energy_wh = day.energy_kwh * 1000 * self.efficiency_factor  # Convert to Wh thermal
-            elif self.heater_power is not None and self.heater_power > 0:
-                # Fallback for old history entries without energy data
-                energy_wh = self.heater_power * day.heating_hours * self.efficiency_factor
-            else:
-                # Skip this day if no energy data available
-                _LOGGER.debug("[%s] Day %s: skipped (no energy data)", self.zone_name, day.date)
-                continue
-
-            # K = Thermal Energy / (ΔT × 24h)
-            k_day = energy_wh / (day.avg_delta_t * 24)  # Normalize to 24h period
-
+        for day, k_day in day_k_values:
             weight = day.sample_count
             total_weighted_k += k_day * weight
             total_weight += weight
 
-            _LOGGER.debug(
-                "[%s] Day %s: K=%.1f W/°C (heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh, weight=%d)",
-                self.zone_name,
-                day.date,
-                k_day,
-                day.heating_hours,
-                day.avg_delta_t,
-                day.energy_kwh,
-                weight,
-            )
-
         if total_weight > 0:
             self._k_coefficient_7d = total_weighted_k / total_weight
             self._last_valid_k = self._k_coefficient_7d  # Update last valid K
+            # Track the most recent day used in the calculation
+            all_days = [day for day, _ in day_k_values]
+            self._last_k_date = all_days[-1].date if all_days else None
 
             _LOGGER.info(
-                "[%s] 📊 7-day K coefficient: %.1f W/°C (from %d valid days, %d total)",
+                "[%s] 📊 7-day K coefficient: %.1f W/°C (from %d days: %d calculated + %d perfect, last: %s)",
                 self.zone_name,
                 self._k_coefficient_7d,
-                len(valid_days),
-                len(self._daily_history),
+                len(day_k_values),
+                len(calculable_days),
+                len(perfect_days),
+                self._last_k_date,
             )
 
     def clear_history(self) -> None:
@@ -767,6 +803,7 @@ class ThermalLossModel:
         self._k_coefficient = None
         self._k_coefficient_7d = None
         self._last_valid_k = None
+        self._last_k_date = None
         self._last_aggregation = None
         self._total_energy_kwh = 0.0
         self._last_point = None
@@ -817,6 +854,7 @@ class ThermalLossModel:
             # History status
             "history_days": len(self._daily_history),
             "history_has_valid_k": self._k_coefficient_7d is not None,
+            "last_k_date": self._last_k_date,
             # Configuration and derived values
             "heater_power": self.heater_power,
             "effective_power": self.effective_power,
@@ -1060,6 +1098,7 @@ class ThermalLossModel:
             "k_coefficient": self._k_coefficient,
             "k_coefficient_7d": self._k_coefficient_7d,
             "last_valid_k": self._last_valid_k,
+            "last_k_date": self._last_k_date,
             "total_energy_kwh": self._total_energy_kwh,
             "last_point": (
                 {
@@ -1112,6 +1151,9 @@ class ThermalLossModel:
         elif self._k_coefficient is not None:
             # Backward compatibility: use k_coefficient as last_valid_k
             self._last_valid_k = self._k_coefficient
+
+        if "last_k_date" in data:
+            self._last_k_date = data["last_k_date"]
 
         if "total_energy_kwh" in data:
             self._total_energy_kwh = data["total_energy_kwh"]

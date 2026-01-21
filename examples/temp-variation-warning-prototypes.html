@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype - Warning Variation Température</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e4e4e7;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #9ca3af;
+      margin-bottom: 30px;
+      font-size: 0.9em;
+    }
+    
+    .section {
+      margin-bottom: 40px;
+    }
+    
+    .section-title {
+      font-size: 1.1em;
+      color: #9ca3af;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .cards-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    
+    .card-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .card-label {
+      font-size: 0.75em;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Variables */
+    :root {
+      --bg-card: #16213e;
+      --bg-secondary: #1f2937;
+      --bg-tertiary: rgba(128,128,128,0.15);
+      --text-primary: #e4e4e7;
+      --text-secondary: #9ca3af;
+      --good-color: #22c55e;
+      --warning-color: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.15);
+    }
+    
+    /* ========================================
+       BADGE LAYOUT
+       ======================================== */
+    .badge-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 16px;
+      width: 140px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.05);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .badge-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--accent);
+    }
+    
+    .badge-score {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+      font-size: 1.5em;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    
+    .badge-rating {
+      font-size: 0.75em;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    
+    .badge-zone {
+      font-size: 0.85em;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    
+    .badge-k {
+      font-size: 0.9em;
+      color: var(--text-secondary);
+    }
+    
+    .badge-warning {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      margin-top: 8px;
+      padding: 6px 10px;
+      background: var(--warning-bg);
+      border-radius: 6px;
+      color: var(--warning-color);
+    }
+    
+    .badge-warning-title {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.6em;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    
+    .badge-warning-value {
+      font-size: 0.75em;
+      font-weight: 700;
+    }
+    
+    /* ========================================
+       PILL LAYOUT
+       ======================================== */
+    .pill-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 380px;
+      border: 1px solid rgba(255,255,255,0.05);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .pill-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--accent);
+    }
+    
+    .pill-score {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1em;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    
+    .pill-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .pill-zone {
+      font-size: 0.95em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .pill-rating {
+      font-size: 0.7em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    
+    .pill-stats {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    
+    .pill-stat {
+      text-align: center;
+    }
+    
+    .pill-stat-value {
+      font-size: 0.95em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .pill-stat-label {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+    }
+    
+    .pill-warning {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--warning-bg);
+      border-radius: 6px;
+      color: var(--warning-color);
+      font-size: 0.9em;
+      flex-shrink: 0;
+    }
+    
+    /* ========================================
+       MULTI-ZONE LAYOUT
+       ======================================== */
+    .multi-zone-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 16px;
+      width: 420px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .multi-zone-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .multi-zone-title {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .multi-zone-subtitle {
+      font-size: 0.75em;
+      color: var(--text-secondary);
+    }
+    
+    .multi-zone-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .multi-zone-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      border-left: 3px solid var(--accent);
+    }
+    
+    .multi-zone-score {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9em;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    
+    .multi-zone-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .multi-zone-name {
+      font-size: 0.9em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .multi-zone-rating {
+      font-size: 0.65em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    
+    .multi-zone-stats {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    
+    .multi-zone-stat {
+      text-align: right;
+    }
+    
+    .multi-zone-stat-value {
+      font-size: 0.85em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .multi-zone-stat-label {
+      font-size: 0.6em;
+      color: var(--text-secondary);
+    }
+    
+    .multi-zone-warning {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: var(--warning-bg);
+      border-radius: 6px;
+      color: var(--warning-color);
+      font-size: 0.8em;
+      flex-shrink: 0;
+    }
+    
+    /* Warning positionné à gauche, intégré au score */
+    .multi-zone-score-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .multi-zone-score-warning {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: var(--warning-bg);
+      border-radius: 4px;
+      color: var(--warning-color);
+      font-size: 0.7em;
+      flex-shrink: 0;
+    }
+    
+    /* ========================================
+       FULL LAYOUT
+       ======================================== */
+    .full-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 20px;
+      width: 380px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .full-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .full-score {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5em;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    
+    .full-info {
+      flex: 1;
+    }
+    
+    .full-zone {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .full-rating {
+      font-size: 0.8em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    
+    .full-k-section {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    
+    .full-k-value {
+      font-size: 1.4em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .full-k-unit {
+      font-size: 0.8em;
+      color: var(--text-secondary);
+    }
+    
+    .full-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    
+    .full-metric {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    
+    .full-metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0.65em;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    
+    .full-metric-value {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .full-metric-unit {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    
+    .full-warning-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--warning-bg);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 10px;
+      margin-top: 12px;
+    }
+    
+    .full-warning-icon {
+      font-size: 1.3em;
+      color: var(--warning-color);
+    }
+    
+    .full-warning-text {
+      flex: 1;
+    }
+    
+    .full-warning-title {
+      font-size: 0.8em;
+      font-weight: 600;
+      color: var(--warning-color);
+    }
+    
+    .full-warning-desc {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    
+    /* ========================================
+       ALTERNATIVES - OPTIONS DE DESIGN
+       ======================================== */
+    .alternatives-section {
+      margin-top: 50px;
+      padding-top: 30px;
+      border-top: 2px solid rgba(255,255,255,0.1);
+    }
+    
+    .alternatives-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    
+    .alt-option {
+      background: rgba(255,255,255,0.03);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    
+    .alt-title {
+      font-size: 0.9em;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+    
+    /* Option: Icône seule (discret) */
+    .warning-icon-only {
+      color: var(--warning-color);
+      font-size: 0.9em;
+    }
+    
+    /* Option: Badge coloré */
+    .warning-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      background: var(--warning-bg);
+      border-radius: 10px;
+      font-size: 0.7em;
+      color: var(--warning-color);
+      font-weight: 500;
+    }
+    
+    /* Option: K barré avec correction */
+    .k-corrected {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    
+    .k-original {
+      text-decoration: line-through;
+      color: var(--text-secondary);
+      font-size: 0.8em;
+    }
+    
+    .k-estimated {
+      color: var(--warning-color);
+      font-weight: 600;
+    }
+    
+    .k-estimated-label {
+      font-size: 0.6em;
+      color: var(--warning-color);
+    }
+    
+    /* Option: Bordure warning */
+    .warning-border {
+      border: 2px dashed var(--warning-color) !important;
+    }
+    
+    /* Option: Variation affichée */
+    .variation-display {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75em;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    
+    .variation-value {
+      color: var(--warning-color);
+      font-weight: 600;
+    }
+    
+    /* Comparaison côte à côte */
+    .comparison {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    
+    .comparison-label {
+      font-size: 0.7em;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+    
+    .vs-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 10px;
+      color: #6b7280;
+      font-size: 0.8em;
+    }
+  </style>
+</head>
+<body>
+  <h1>⚠️ Warning Variation Température</h1>
+  <p class="subtitle">Prototypes pour signaler quand le K est potentiellement sous-estimé (variation > 3°C)</p>
+  
+  <!-- BADGE LAYOUT -->
+  <div class="section">
+    <h2 class="section-title">Badge Layout</h2>
+    <div class="cards-row">
+      <div class="comparison">
+        <div class="card-container">
+          <span class="comparison-label">Sans warning (stable)</span>
+          <div class="badge-card" style="--accent: #0ea5e9">
+            <div class="badge-score">S</div>
+            <div class="badge-rating">Optimal</div>
+            <div class="badge-zone">Chambre Alina</div>
+            <div class="badge-k">4.1 W/°C</div>
+          </div>
+        </div>
+        
+        <div class="vs-label">vs</div>
+        
+        <div class="card-container">
+          <span class="comparison-label">Avec warning (variation 5°C)</span>
+          <div class="badge-card" style="--accent: #22c55e">
+            <div class="badge-score">A</div>
+            <div class="badge-rating">Bon</div>
+            <div class="badge-zone">Salle De Bain</div>
+            <div class="badge-k">11.4 W/°C</div>
+            <div class="badge-warning">
+              <span class="badge-warning-title">⚠️ VARIATION</span>
+              <span class="badge-warning-value">±5°C</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- PILL LAYOUT -->
+  <div class="section">
+    <h2 class="section-title">Pill Layout</h2>
+    <div class="cards-row">
+      <div class="card-container">
+        <span class="card-label">Sans warning</span>
+        <div class="pill-card" style="--accent: #0ea5e9">
+          <div class="pill-score">S</div>
+          <div class="pill-info">
+            <div class="pill-zone">Chambre Alina</div>
+            <div class="pill-rating">Optimal</div>
+          </div>
+          <div class="pill-stats">
+            <div class="pill-stat">
+              <div class="pill-stat-value">4.1</div>
+              <div class="pill-stat-label">W/°C</div>
+            </div>
+            <div class="pill-stat">
+              <div class="pill-stat-value">13.9°</div>
+              <div class="pill-stat-label">ΔT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-container">
+        <span class="card-label">Avec warning</span>
+        <div class="pill-card" style="--accent: #22c55e">
+          <div class="pill-score">A</div>
+          <div class="pill-info">
+            <div class="pill-zone">Salle De Bain</div>
+            <div class="pill-rating">Bon</div>
+          </div>
+          <div class="pill-stats">
+            <div class="pill-stat">
+              <div class="pill-stat-value">11.4</div>
+              <div class="pill-stat-label">W/°C</div>
+            </div>
+            <div class="pill-stat">
+              <div class="pill-stat-value">12.1°</div>
+              <div class="pill-stat-label">ΔT</div>
+            </div>
+          </div>
+          <div class="pill-warning">⚠️</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- MULTI-ZONE LAYOUT -->
+  <div class="section">
+    <h2 class="section-title">Multi-Zone Layout</h2>
+    <div class="multi-zone-card">
+      <div class="multi-zone-header">
+        <div>
+          <div class="multi-zone-title">Home Performance</div>
+          <div class="multi-zone-subtitle">3 zones surveillées</div>
+        </div>
+      </div>
+      <div class="multi-zone-list">
+        <!-- Zone sans warning -->
+        <div class="multi-zone-row" style="--accent: #0ea5e9">
+          <div class="multi-zone-score">S</div>
+          <div class="multi-zone-info">
+            <div class="multi-zone-name">Chambre Alina</div>
+            <div class="multi-zone-rating">Optimal</div>
+          </div>
+          <div class="multi-zone-stats">
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">4.1</div>
+              <div class="multi-zone-stat-label">W/°C</div>
+            </div>
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">0.000</div>
+              <div class="multi-zone-stat-label">KWH</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Zone sans warning -->
+        <div class="multi-zone-row" style="--accent: #10b981">
+          <div class="multi-zone-score">A+</div>
+          <div class="multi-zone-info">
+            <div class="multi-zone-name">Chambre Flavien</div>
+            <div class="multi-zone-rating">Excellent</div>
+          </div>
+          <div class="multi-zone-stats">
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">3.7</div>
+              <div class="multi-zone-stat-label">W/°C</div>
+            </div>
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">0.957</div>
+              <div class="multi-zone-stat-label">KWH</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Zone AVEC warning - icône à gauche près du score -->
+        <div class="multi-zone-row" style="--accent: #22c55e">
+          <div class="multi-zone-score-wrapper">
+            <div class="multi-zone-score">A</div>
+            <div class="multi-zone-score-warning">⚠️</div>
+          </div>
+          <div class="multi-zone-info">
+            <div class="multi-zone-name">Salle De Bain</div>
+            <div class="multi-zone-rating">Bon</div>
+          </div>
+          <div class="multi-zone-stats">
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">11.4</div>
+              <div class="multi-zone-stat-label">W/°C</div>
+            </div>
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">1.130</div>
+              <div class="multi-zone-stat-label">KWH</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- MULTI-ZONE EXPANDED -->
+  <div class="section">
+    <h2 class="section-title">Multi-Zone - Vue Étendue (au clic)</h2>
+    <p style="color: var(--text-secondary); font-size: 0.85em; margin-bottom: 15px;">
+      Quand l'utilisateur clique sur la zone, les détails s'affichent avec le warning complet
+    </p>
+    <div class="multi-zone-card" style="width: 420px;">
+      <div class="multi-zone-row" style="--accent: #22c55e; flex-direction: column; align-items: stretch; padding: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="multi-zone-score-wrapper">
+            <div class="multi-zone-score">A</div>
+            <div class="multi-zone-score-warning">⚠️</div>
+          </div>
+          <div class="multi-zone-info">
+            <div class="multi-zone-name">Salle De Bain</div>
+            <div class="multi-zone-rating">Bon</div>
+          </div>
+          <div class="multi-zone-stats">
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">11.4</div>
+              <div class="multi-zone-stat-label">W/°C</div>
+            </div>
+            <div class="multi-zone-stat">
+              <div class="multi-zone-stat-value">1.130</div>
+              <div class="multi-zone-stat-label">KWH</div>
+            </div>
+          </div>
+        </div>
+        <!-- Détails étendus avec warning -->
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;">
+            <div style="text-align: center;">
+              <div style="font-size: 0.6em; color: var(--text-secondary);">K INST.</div>
+              <div style="font-size: 0.9em; font-weight: 600;">14.2 W/°C</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6em; color: var(--text-secondary);">ÉNERGIE</div>
+              <div style="font-size: 0.9em; font-weight: 600;">1.130 kWh</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6em; color: var(--text-secondary);">CHAUFFE</div>
+              <div style="font-size: 0.9em; font-weight: 600;">28m</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6em; color: var(--text-secondary);">ΔT MOY</div>
+              <div style="font-size: 0.9em; font-weight: 600;">12.1°C</div>
+            </div>
+          </div>
+          <!-- Warning dans la vue étendue -->
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--warning-bg); border-radius: 8px;">
+            <span style="font-size: 1em;">⚠️</span>
+            <div>
+              <div style="font-size: 0.75em; font-weight: 600; color: var(--warning-color);">Variation : ±5°C (15° → 20°)</div>
+              <div style="font-size: 0.65em; color: var(--text-secondary);">Score potentiellement sous-estimé</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL LAYOUT -->
+  <div class="section">
+    <h2 class="section-title">Full Layout - Avec Banner Warning</h2>
+    <div class="full-card" style="--accent: #22c55e">
+      <div class="full-header">
+        <div class="full-score">A</div>
+        <div class="full-info">
+          <div class="full-zone">Salle De Bain</div>
+          <div class="full-rating">Bon</div>
+        </div>
+        <div class="full-k-section">
+          <span class="full-k-value">11.4</span>
+          <span class="full-k-unit">W/°C</span>
+        </div>
+      </div>
+      
+      <div class="full-metrics">
+        <div class="full-metric">
+          <div class="full-metric-header">🌡️ K INST.</div>
+          <div class="full-metric-value">14.2</div>
+          <div class="full-metric-unit">W/°C</div>
+        </div>
+        <div class="full-metric">
+          <div class="full-metric-header">⚡ ÉNERGIE</div>
+          <div class="full-metric-value">0.990</div>
+          <div class="full-metric-unit">kWh/jour</div>
+        </div>
+        <div class="full-metric">
+          <div class="full-metric-header">🔥 CHAUFFE</div>
+          <div class="full-metric-value">28m</div>
+          <div class="full-metric-unit">sur 24h</div>
+        </div>
+        <div class="full-metric">
+          <div class="full-metric-header">🌡️ ΔT MOY</div>
+          <div class="full-metric-value">12.1°C</div>
+          <div class="full-metric-unit">Int. - Ext.</div>
+        </div>
+      </div>
+      
+      <!-- Warning Banner -->
+      <div class="full-warning-banner">
+        <span class="full-warning-icon">⚠️</span>
+        <div class="full-warning-text">
+          <div class="full-warning-title">Variation température : ±5°C</div>
+          <div class="full-warning-desc">Score potentiellement sous-estimé (chauffage intermittent détecté)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ALTERNATIVES -->
+  <div class="section alternatives-section">
+    <h2 class="section-title">🎨 Alternatives de Design</h2>
+    <div class="alternatives-grid">
+      
+      <!-- Option 1: Icône seule -->
+      <div class="alt-option">
+        <div class="alt-title">Option 1 : Icône seule (discret)</div>
+        <div class="cards-row">
+          <div class="badge-card" style="--accent: #22c55e">
+            <div class="badge-score">A</div>
+            <div class="badge-rating">Bon</div>
+            <div class="badge-zone">Salle De Bain</div>
+            <div class="badge-k">11.4 W/°C <span class="warning-icon-only">⚠️</span></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Option 2: Badge avec valeur -->
+      <div class="alt-option">
+        <div class="alt-title">Option 2 : Badge variation</div>
+        <div class="cards-row">
+          <div class="badge-card" style="--accent: #22c55e">
+            <div class="badge-score">A</div>
+            <div class="badge-rating">Bon</div>
+            <div class="badge-zone">Salle De Bain</div>
+            <div class="badge-k">11.4 W/°C</div>
+            <div style="margin-top: 8px;">
+              <span class="warning-badge">⚠️ var. 5°C</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Option 3: K avec estimation corrigée -->
+      <div class="alt-option">
+        <div class="alt-title">Option 3 : K estimé corrigé</div>
+        <div class="cards-row">
+          <div class="badge-card" style="--accent: #22c55e">
+            <div class="badge-score">A</div>
+            <div class="badge-rating">Bon</div>
+            <div class="badge-zone">Salle De Bain</div>
+            <div class="k-corrected">
+              <span class="k-original">11.4 W/°C</span>
+              <span class="k-estimated">~14 W/°C</span>
+              <span class="k-estimated-label">estimé</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Option 4: Bordure warning -->
+      <div class="alt-option">
+        <div class="alt-title">Option 4 : Bordure pointillée</div>
+        <div class="cards-row">
+          <div class="badge-card warning-border" style="--accent: #22c55e">
+            <div class="badge-score">A</div>
+            <div class="badge-rating">Bon</div>
+            <div class="badge-zone">Salle De Bain</div>
+            <div class="badge-k">11.4 W/°C</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Option 5: Afficher min/max -->
+      <div class="alt-option">
+        <div class="alt-title">Option 5 : Afficher min/max température</div>
+        <div class="cards-row">
+          <div class="badge-card" style="--accent: #22c55e">
+            <div class="badge-score">A</div>
+            <div class="badge-rating">Bon</div>
+            <div class="badge-zone">Salle De Bain</div>
+            <div class="badge-k">11.4 W/°C</div>
+            <div class="variation-display">
+              🌡️ <span class="variation-value">15°C</span> → <span class="variation-value">20°C</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Option 6: Combinée pour full -->
+      <div class="alt-option">
+        <div class="alt-title">Option 6 : Métrique dédiée (Full layout)</div>
+        <div class="full-metrics" style="grid-template-columns: repeat(2, 1fr); max-width: 200px;">
+          <div class="full-metric" style="background: var(--warning-bg); border: 1px solid rgba(245,158,11,0.3);">
+            <div class="full-metric-header" style="color: var(--warning-color);">⚠️ VARIATION</div>
+            <div class="full-metric-value" style="color: var(--warning-color);">±5°C</div>
+            <div class="full-metric-unit">15° → 20°</div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="section" style="margin-top: 40px; padding: 20px; background: rgba(255,255,255,0.03); border-radius: 12px;">
+    <h2 class="section-title">📋 Récapitulatif Final</h2>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <th style="text-align: left; padding: 10px; color: var(--text-secondary);">Layout</th>
+          <th style="text-align: left; padding: 10px; color: var(--text-secondary);">Affichage Warning</th>
+          <th style="text-align: left; padding: 10px; color: var(--text-secondary);">Mobile-friendly</th>
+        </tr>
+      </thead>
+      <tbody style="color: var(--text-primary);">
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <td style="padding: 10px;"><strong>Badge</strong></td>
+          <td style="padding: 10px;">2 lignes : "⚠️ VARIATION" + "±5°C"</td>
+          <td style="padding: 10px;">✅ OK (assez d'espace)</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <td style="padding: 10px;"><strong>Pill</strong></td>
+          <td style="padding: 10px;">Icône seule ⚠️ (fond orange)</td>
+          <td style="padding: 10px;">✅ Compact</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <td style="padding: 10px;"><strong>Multi-zone (compact)</strong></td>
+          <td style="padding: 10px;">Icône ⚠️ à gauche du score</td>
+          <td style="padding: 10px;">✅ Compact</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <td style="padding: 10px;"><strong>Multi-zone (étendu)</strong></td>
+          <td style="padding: 10px;">Warning complet dans les détails</td>
+          <td style="padding: 10px;">✅ Au clic</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px;"><strong>Full</strong></td>
+          <td style="padding: 10px;">Banner complet en bas</td>
+          <td style="padding: 10px;">✅ Responsive</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="color: #10b981; font-weight: 500;">
+      💡 Avantage : Pas besoin de tooltip ! L'info complète est accessible au clic (mobile) ou visible directement (desktop).
+    </p>
+  </div>
+  
+</body>
+</html>
