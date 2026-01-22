@@ -1083,6 +1083,11 @@ class ThermalLossModel:
         """Get last valid K coefficient (preserved during off-season)."""
         return self._last_valid_k
 
+    @property
+    def last_k_date(self) -> str | None:
+        """Get date of last valid K calculation (ISO format YYYY-MM-DD)."""
+        return self._last_k_date
+
     def to_dict(self) -> dict[str, Any]:
         """Export model state to dictionary for persistence."""
         return {
