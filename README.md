@@ -97,8 +97,10 @@ You have a heating system and wonder:
 
 | Sensor | Examples | Benefit |
 |--------|----------|---------|
-| Instant power | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | Precise heating time |
-| Energy counter | HA Utility Meter, native counter | Measured vs estimated energy |
+| Instant power | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | **Energy integration** + precise heating detection |
+| Energy counter | HA Utility Meter, native counter | Most accurate energy measurement |
+
+> **💡 Important for Heat Pumps**: If your heat pump has **variable/modulating power**, configure a `power_sensor` (real-time power in Watts). The integration will **integrate the actual power over time** instead of using a fixed `heater_power` value. This is much more accurate for systems where power output varies.
 
 ### Supported Heat Source Types
 
@@ -107,9 +109,16 @@ The integration supports **4 heat source types**:
 | Heat Source | `heater_power` | `energy_sensor` | Best for |
 |-------------|----------------|-----------------|----------|
 | **Electric** (default) | Required | Optional | Radiators, convectors, underfloor heating |
-| **Heat pump** | Optional | Optional | PAC, air-to-air, air-to-water |
-| **Gas Boiler** | Optional | Optional | European-style gas boilers (water heating), central heating |
-| **Gas Furnace** | Optional | Optional | US-style gas furnaces (forced air heating) |
+| **Heat pump** | Optional* | Optional | PAC, air-to-air, air-to-water |
+| **Gas Boiler** | Optional* | Optional | European-style gas boilers (water heating), central heating |
+| **Gas Furnace** | Optional* | Optional | US-style gas furnaces (forced air heating) |
+
+*\* For non-electric sources, you can set `heater_power` to **0** to remove it and rely entirely on `energy_sensor` or `power_sensor` for energy calculation.*
+
+#### Where to Select Heat Source Type
+
+- **New zone**: The heat source type selector appears on the **first configuration screen**
+- **Existing zone**: Go to **Settings → Integrations → Home Performance** → click **Configure (⚙️)** on your zone → the heat source type is the **first field** in the options form
 
 ### ⚡ Energy Source Priority
 
@@ -639,13 +648,18 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 |-----------|-------------|
 | Surface | m² (for K/m²) |
 | Volume | m³ (for K/m³ and insulation rating) |
-| Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
+| Power sensor | sensor.xxx_power in Watts - **see note below** |
 | Power threshold | Detection threshold in Watts (default: 50W) |
 | Energy sensor | sensor.xxx_energy (optional - most accurate for K calculation) |
 | Efficiency factor | Converts consumed energy to thermal output (see below) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
 | Weather entity | weather.xxx (for wind data display - shared between zones) |
 | Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
+
+> **📊 Power Sensor - Dual Purpose**:
+> The `power_sensor` serves **two purposes**:
+> 1. **Precise heating detection**: Detects when heating is active (power > threshold) - ideal for thermostatic heaters
+> 2. **Energy integration**: When no `energy_sensor` is configured, the integration **integrates the real-time power over time** to calculate energy consumption. This is especially useful for **modulating systems** (heat pumps, inverter AC) where power output varies.
 
 ### Efficiency Factor
 
