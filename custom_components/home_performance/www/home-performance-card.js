@@ -3,13 +3,35 @@
  * Modern dashboard card for Home Performance integration
  */
 
-const CARD_VERSION = "1.3.0";
+// Wrap everything in an IIFE to handle async loading
+((async () => {
+  const CARD_VERSION = "1.3.0";
 
-const LitElement = customElements.get("hui-masonry-view")
-  ? Object.getPrototypeOf(customElements.get("hui-masonry-view"))
-  : Object.getPrototypeOf(customElements.get("hui-view"));
-const html = LitElement.prototype.html;
-const css = LitElement.prototype.css;
+  // Wait for Home Assistant custom elements to be available
+  // This is necessary because Lovelace may load this script before HA is fully initialized
+  const waitForElement = async (selector, maxWait = 10000) => {
+    const start = Date.now();
+    while (!customElements.get(selector)) {
+      if (Date.now() - start > maxWait) return null;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return customElements.get(selector);
+  };
+
+  // Try hui-masonry-view first, then hui-view
+  let baseElement = await waitForElement("hui-masonry-view", 5000);
+  if (!baseElement) {
+    baseElement = await waitForElement("hui-view", 5000);
+  }
+  
+  if (!baseElement) {
+    console.error("Home Performance Card: Could not find Home Assistant base elements. Card will not load.");
+    return;
+  }
+
+  const LitElement = Object.getPrototypeOf(baseElement);
+  const html = LitElement.prototype.html;
+  const css = LitElement.prototype.css;
 
 class HomePerformanceCard extends LitElement {
   static get properties() {
@@ -3799,3 +3821,5 @@ console.info(
   "color: white; background: #6366f1; font-weight: bold; border-radius: 4px 0 0 4px; padding: 2px 6px;",
   "color: #6366f1; background: #1a1a2e; font-weight: bold; border-radius: 0 4px 4px 0; padding: 2px 6px;"
 );
+
+}))();
