@@ -8,8 +8,18 @@ from unittest.mock import mock_open, patch
 from custom_components.home_performance.const import (
     AGGREGATION_PERIOD_HOURS,
     BINARY_SENSOR_ENTITY_SUFFIXES,
+    DEFAULT_EFFICIENCY_FACTORS,
+    DEFAULT_HEAT_SOURCE_TYPE,
     DEFAULT_POWER_THRESHOLD,
     DOMAIN,
+    HEAT_SOURCE_ELECTRIC,
+    HEAT_SOURCE_GAS,
+    HEAT_SOURCE_GAS_BOILER,
+    HEAT_SOURCE_GAS_FURNACE,
+    HEAT_SOURCE_HEATPUMP,
+    HEAT_SOURCE_MIGRATION,
+    HEAT_SOURCE_TYPES,
+    HEAT_SOURCES_REQUIRING_ENERGY,
     HISTORY_DAYS,
     JSMODULES,
     MIN_DATA_HOURS,
@@ -155,6 +165,24 @@ class TestOrientations:
         expected = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
         assert set(ORIENTATIONS) == set(expected)
 
+    def test_orientations_are_lowercase(self):
+        """Test ORIENTATIONS are all lowercase for case-insensitive matching.
+
+        This is important for backward compatibility with legacy data
+        that may have been stored in uppercase (e.g., "N" instead of "n").
+        The config_flow and coordinator normalize values to lowercase.
+        """
+        for orientation in ORIENTATIONS:
+            assert orientation == orientation.lower()
+            assert orientation.isalpha() or orientation.isalnum()
+
+    def test_legacy_uppercase_can_be_normalized(self):
+        """Test that uppercase legacy values can be normalized to match ORIENTATIONS."""
+        legacy_values = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        for legacy in legacy_values:
+            normalized = legacy.lower()
+            assert normalized in ORIENTATIONS, f"{legacy} should normalize to a valid orientation"
+
 
 class TestGetVersion:
     """Test get_version function."""
@@ -249,3 +277,117 @@ class TestFrontendConstants:
         """Test that JSMODULES contains the main card."""
         filenames = [m["filename"] for m in JSMODULES]
         assert "home-performance-card.js" in filenames
+
+
+class TestHeatSourceTypes:
+    """Test heat source type constants."""
+
+    def test_heat_source_electric_value(self):
+        """Test HEAT_SOURCE_ELECTRIC constant value."""
+        assert HEAT_SOURCE_ELECTRIC == "electric"
+
+    def test_heat_source_heatpump_value(self):
+        """Test HEAT_SOURCE_HEATPUMP constant value."""
+        assert HEAT_SOURCE_HEATPUMP == "heatpump"
+
+    def test_heat_source_gas_boiler_value(self):
+        """Test HEAT_SOURCE_GAS_BOILER constant value."""
+        assert HEAT_SOURCE_GAS_BOILER == "gas_boiler"
+
+    def test_heat_source_gas_furnace_value(self):
+        """Test HEAT_SOURCE_GAS_FURNACE constant value."""
+        assert HEAT_SOURCE_GAS_FURNACE == "gas_furnace"
+
+    def test_heat_source_gas_legacy_value(self):
+        """Test HEAT_SOURCE_GAS legacy constant value."""
+        assert HEAT_SOURCE_GAS == "gas"
+
+    def test_heat_source_types_list(self):
+        """Test HEAT_SOURCE_TYPES contains all current types."""
+        assert HEAT_SOURCE_ELECTRIC in HEAT_SOURCE_TYPES
+        assert HEAT_SOURCE_HEATPUMP in HEAT_SOURCE_TYPES
+        assert HEAT_SOURCE_GAS_BOILER in HEAT_SOURCE_TYPES
+        assert HEAT_SOURCE_GAS_FURNACE in HEAT_SOURCE_TYPES
+        # Legacy type should NOT be in current types
+        assert HEAT_SOURCE_GAS not in HEAT_SOURCE_TYPES
+
+    def test_heat_sources_requiring_energy(self):
+        """Test HEAT_SOURCES_REQUIRING_ENERGY list."""
+        # Electric should NOT require energy sensor (uses heater_power)
+        assert HEAT_SOURCE_ELECTRIC not in HEAT_SOURCES_REQUIRING_ENERGY
+        # Non-electric sources benefit from energy sensor
+        assert HEAT_SOURCE_HEATPUMP in HEAT_SOURCES_REQUIRING_ENERGY
+        assert HEAT_SOURCE_GAS_BOILER in HEAT_SOURCES_REQUIRING_ENERGY
+        assert HEAT_SOURCE_GAS_FURNACE in HEAT_SOURCES_REQUIRING_ENERGY
+
+    def test_default_heat_source_type(self):
+        """Test default heat source is electric."""
+        assert DEFAULT_HEAT_SOURCE_TYPE == HEAT_SOURCE_ELECTRIC
+
+
+class TestHeatSourceMigration:
+    """Test heat source migration constants."""
+
+    def test_migration_mapping_exists(self):
+        """Test HEAT_SOURCE_MIGRATION is a dict."""
+        assert isinstance(HEAT_SOURCE_MIGRATION, dict)
+
+    def test_legacy_gas_maps_to_gas_boiler(self):
+        """Test legacy 'gas' type maps to 'gas_boiler'."""
+        assert HEAT_SOURCE_GAS in HEAT_SOURCE_MIGRATION
+        assert HEAT_SOURCE_MIGRATION[HEAT_SOURCE_GAS] == HEAT_SOURCE_GAS_BOILER
+
+    def test_migration_only_contains_legacy_types(self):
+        """Test migration dict only contains legacy types."""
+        for legacy_type in HEAT_SOURCE_MIGRATION.keys():
+            # Legacy types should NOT be in current HEAT_SOURCE_TYPES
+            assert legacy_type not in HEAT_SOURCE_TYPES
+
+
+class TestEfficiencyFactors:
+    """Test efficiency factor constants."""
+
+    def test_default_efficiency_factors_is_dict(self):
+        """Test DEFAULT_EFFICIENCY_FACTORS is a dictionary."""
+        assert isinstance(DEFAULT_EFFICIENCY_FACTORS, dict)
+
+    def test_electric_efficiency_is_1(self):
+        """Test electric efficiency factor is 1.0 (100% efficient)."""
+        assert DEFAULT_EFFICIENCY_FACTORS[HEAT_SOURCE_ELECTRIC] == 1.0
+
+    def test_heatpump_efficiency_is_cop(self):
+        """Test heat pump efficiency factor represents typical COP."""
+        # Heat pump COP typically 2.5-4.0
+        cop = DEFAULT_EFFICIENCY_FACTORS[HEAT_SOURCE_HEATPUMP]
+        assert 2.0 <= cop <= 5.0
+        assert cop == 3.0  # Expected default
+
+    def test_gas_boiler_efficiency_less_than_1(self):
+        """Test gas boiler efficiency is less than 1.0 (combustion losses)."""
+        efficiency = DEFAULT_EFFICIENCY_FACTORS[HEAT_SOURCE_GAS_BOILER]
+        assert 0.8 <= efficiency <= 1.0
+        assert efficiency == 0.90  # Expected for condensing boilers
+
+    def test_gas_furnace_efficiency_lower_than_boiler(self):
+        """Test gas furnace efficiency is lower than boiler (distribution losses)."""
+        furnace_eff = DEFAULT_EFFICIENCY_FACTORS[HEAT_SOURCE_GAS_FURNACE]
+        boiler_eff = DEFAULT_EFFICIENCY_FACTORS[HEAT_SOURCE_GAS_BOILER]
+        assert furnace_eff < boiler_eff
+        assert furnace_eff == 0.85  # Expected for US furnaces
+
+    def test_legacy_gas_has_efficiency(self):
+        """Test legacy gas type has efficiency factor for backward compat."""
+        assert HEAT_SOURCE_GAS in DEFAULT_EFFICIENCY_FACTORS
+        # Should match gas_boiler
+        assert DEFAULT_EFFICIENCY_FACTORS[HEAT_SOURCE_GAS] == DEFAULT_EFFICIENCY_FACTORS[HEAT_SOURCE_GAS_BOILER]
+
+    def test_all_heat_source_types_have_efficiency(self):
+        """Test all heat source types have an efficiency factor."""
+        for heat_source in HEAT_SOURCE_TYPES:
+            assert heat_source in DEFAULT_EFFICIENCY_FACTORS, f"Missing efficiency for {heat_source}"
+
+    def test_efficiency_factors_are_positive(self):
+        """Test all efficiency factors are positive numbers."""
+        for heat_source, efficiency in DEFAULT_EFFICIENCY_FACTORS.items():
+            assert isinstance(efficiency, (int, float)), f"Efficiency for {heat_source} is not a number"
+            assert efficiency > 0, f"Efficiency for {heat_source} must be positive"

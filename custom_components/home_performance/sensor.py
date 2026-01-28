@@ -37,16 +37,28 @@ def format_duration(hours: float | None) -> str | None:
     return f"{h}h {m}min"
 
 
-def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> dict[str, Any]:
+def get_energy_performance(
+    daily_kwh: float | None,
+    heater_power_w: float | None,
+    derived_power_w: float | None = None,
+) -> dict[str, Any]:
     """
     Evaluate energy performance based on French national statistics.
 
-    Thresholds based on heater power:
+    Thresholds based on heater power (or derived power for energy-based sources):
     - Excellent: < (power/1000) * 4 kWh/day (-40% vs national average)
     - Standard: between excellent and (power/1000) * 6 kWh/day
     - To optimize: > (power/1000) * 6 kWh/day
+
+    Args:
+        daily_kwh: Daily energy consumption in kWh
+        heater_power_w: Declared heater power in Watts (may be None for energy-based sources)
+        derived_power_w: Calculated average power from energy/time (fallback for energy-based sources)
     """
-    if daily_kwh is None or heater_power_w <= 0:
+    # Use heater_power if available, otherwise use derived_power
+    effective_power = heater_power_w if heater_power_w and heater_power_w > 0 else derived_power_w
+
+    if daily_kwh is None or effective_power is None or effective_power <= 0:
         return {
             "level": None,
             "icon": "mdi:help-circle",
@@ -56,9 +68,9 @@ def get_energy_performance(daily_kwh: float | None, heater_power_w: float) -> di
             "standard_threshold": None,
         }
 
-    # Thresholds based on heater power
-    excellent_threshold = (heater_power_w / 1000) * 4
-    standard_threshold = (heater_power_w / 1000) * 6
+    # Thresholds based on effective power
+    excellent_threshold = (effective_power / 1000) * 4
+    standard_threshold = (effective_power / 1000) * 6
 
     if daily_kwh < excellent_threshold:
         saving = round((1 - daily_kwh / standard_threshold) * 100)
@@ -125,6 +137,11 @@ async def async_setup_entry(
     # Add measured daily energy sensor if power sensor or energy sensor is configured
     if coordinator.power_sensor or coordinator.energy_sensor:
         entities.append(MeasuredEnergyDailySensor(coordinator, zone_name))
+
+    # Add measured COP sensors if dynamic COP is enabled (heat pumps only)
+    if coordinator.enable_dynamic_cop:
+        entities.append(MeasuredCOPSensor(coordinator, zone_name))
+        entities.append(COP7dSensor(coordinator, zone_name))
 
     async_add_entities(entities)
 
@@ -235,13 +252,30 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
                     k_value = entry.k_7d
                 elif entry.avg_delta_t >= 5 and entry.heating_hours >= 0.5:
                     # Fallback for old data without k_7d: calculate daily K
-                    energy_wh = heater_power * entry.heating_hours
-                    k_value = energy_wh / (entry.avg_delta_t * 24)
+                    # Use stored energy if available, otherwise estimate from power
+                    if entry.energy_kwh > 0:
+                        energy_wh = entry.energy_kwh * 1000
+                    elif heater_power is not None and heater_power > 0:
+                        energy_wh = heater_power * entry.heating_hours
+                    else:
+                        energy_wh = None
+
+                    if energy_wh is not None:
+                        k_value = energy_wh / (entry.avg_delta_t * 24)
+
+            # Get heating_hours for excellence badge calculation
+            heating_hours = None
+            if is_today:
+                # Today: use current heating_hours from coordinator data
+                heating_hours = data.get("heating_hours")
+            elif entry:
+                heating_hours = entry.heating_hours
 
             days_data.append(
                 {
                     "date": date_str,
                     "k": k_value,  # None if no valid data
+                    "heating_hours": heating_hours,
                 }
             )
 
@@ -272,13 +306,19 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
         k_history = []
         for day_data in days_data:
             if day_data["k"] is not None:
-                k_history.append(
-                    {
-                        "date": day_data["date"],
-                        "k": round(day_data["k"], 1),
-                        "estimated": day_data.get("estimated", False),
-                    }
-                )
+                entry_data = {
+                    "date": day_data["date"],
+                    "k": round(day_data["k"], 1),
+                    "estimated": day_data.get("estimated", False),
+                }
+                # Include heating_hours if available
+                if day_data.get("heating_hours") is not None:
+                    entry_data["heating_hours"] = round(day_data["heating_hours"], 2)
+                k_history.append(entry_data)
+
+        # Check if we're at optimal level (Level S)
+        insulation_status = data.get("insulation_status", {})
+        is_optimal = insulation_status.get("rating") == "optimal"
 
         # Wind data (if weather entity configured)
         wind_speed = data.get("wind_speed")
@@ -293,6 +333,17 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
             "k_7d": round(k_7d, 1) if k_7d is not None else None,
             "k_per_m3_24h": k_per_m3_24h,
             "k_history_7d": k_history,
+            "is_optimal": is_optimal,
+            # Temperature variation (for warning display)
+            "temp_variation": (
+                round(data.get("temp_variation"), 1) if data.get("temp_variation") is not None else None
+            ),
+            "indoor_temp_min": (
+                round(data.get("indoor_temp_min"), 1) if data.get("indoor_temp_min") is not None else None
+            ),
+            "indoor_temp_max": (
+                round(data.get("indoor_temp_max"), 1) if data.get("indoor_temp_max") is not None else None
+            ),
             "interpretation": (
                 "Lower K = better insulation. "
                 "Typical values: 10-20 (well insulated), 20-40 (average), 40+ (poorly insulated)"
@@ -370,11 +421,15 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
 
 
 class DailyEnergySensor(HomePerformanceBaseSensor):
-    """Sensor for daily energy consumption (rolling 24h window, estimated)."""
+    """Sensor for daily energy consumption (rolling 24h window, estimated).
+
+    Uses state_class TOTAL (not TOTAL_INCREASING) because this is a daily
+    counter that resets at midnight, similar to a Utility Meter.
+    """
 
     _attr_native_unit_of_measurement = "kWh"
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:lightning-bolt-outline"
     _attr_name = "Daily estimated energy"
 
@@ -495,8 +550,9 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         """Return energy performance level."""
         if self.coordinator.data:
             daily_kwh = self.coordinator.data.get("daily_energy_kwh")
-            heater_power = self.coordinator.data.get("heater_power", 0)
-            perf = get_energy_performance(daily_kwh, heater_power)
+            heater_power = self.coordinator.data.get("heater_power")
+            derived_power = self.coordinator.data.get("derived_power")
+            perf = get_energy_performance(daily_kwh, heater_power, derived_power)
             return perf.get("level")
         return None
 
@@ -505,8 +561,9 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         """Return dynamic icon based on performance level."""
         if self.coordinator.data:
             daily_kwh = self.coordinator.data.get("daily_energy_kwh")
-            heater_power = self.coordinator.data.get("heater_power", 0)
-            perf = get_energy_performance(daily_kwh, heater_power)
+            heater_power = self.coordinator.data.get("heater_power")
+            derived_power = self.coordinator.data.get("derived_power")
+            perf = get_energy_performance(daily_kwh, heater_power, derived_power)
             return perf.get("icon", "mdi:help-circle")
         return "mdi:help-circle"
 
@@ -515,8 +572,9 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         """Return extra state attributes."""
         data = self.coordinator.data or {}
         daily_kwh = data.get("daily_energy_kwh")
-        heater_power = data.get("heater_power", 0)
-        perf = get_energy_performance(daily_kwh, heater_power)
+        heater_power = data.get("heater_power")
+        derived_power = data.get("derived_power")
+        perf = get_energy_performance(daily_kwh, heater_power, derived_power)
 
         level_descriptions = {
             "excellent": "🟢 Excellent",
@@ -536,7 +594,12 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
             ),
             "daily_energy_kwh": round(daily_kwh, 2) if daily_kwh is not None else None,
             "heater_power_w": heater_power,
-            "description": ("Evaluation based on national statistics. " "Thresholds calculated based on heater power."),
+            "derived_power_w": round(derived_power, 0) if derived_power else None,
+            "effective_power_w": heater_power if heater_power else (round(derived_power, 0) if derived_power else None),
+            "description": (
+                "Evaluation based on national statistics. "
+                "Thresholds calculated based on heater power (or derived power for energy-based sources)."
+            ),
         }
 
 
@@ -799,8 +862,9 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
         k_value = insulation_status.get("k_value")
 
         rating_descriptions = {
+            "optimal": "Level S - Optimal performance",
             "excellent": "Very well insulated",
-            "excellent_inferred": "🏆 Excellent (inferred)",
+            "excellent_inferred": "Excellent (inferred)",
             "good": "Well insulated",
             "average": "Average insulation",
             "poor": "Poorly insulated",
@@ -821,6 +885,7 @@ class InsulationRatingSensor(HomePerformanceBaseSensor):
             "k_value": round(k_value, 1) if k_value is not None else None,
             "k_source": k_source,
             "k_per_m3": (round(data.get("k_per_m3"), 2) if data.get("k_per_m3") is not None else None),
+            "last_k_date": data.get("last_k_date"),
             "temp_stable": insulation_status.get("temp_stable"),
             "message": message,
             "note": "Based on K/m³ or inferred if minimal heating needed",
@@ -893,3 +958,133 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
             "power_sensor": self.coordinator.power_sensor if not uses_external else None,
             "current_power_w": data.get("measured_power_w") if not uses_external else None,
         }
+
+
+class MeasuredCOPSensor(HomePerformanceBaseSensor):
+    """Sensor for measured COP (Coefficient of Performance) for heat pumps.
+
+    Calculates real-world COP based on:
+    - K coefficient (thermal loss)
+    - Temperature difference (ΔT)
+    - Heating time
+    - Actual energy consumption (from energy sensor)
+
+    Formula: COP = Thermal_energy_output / Electrical_energy_input
+    Where: Thermal_energy = K × ΔT × hours
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:heat-pump"
+    _attr_name = "Measured COP"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "measured_cop")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the measured COP value."""
+        if self.coordinator.data:
+            cop = self.coordinator.data.get("measured_cop")
+            if cop is not None:
+                return round(cop, 2)
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        cop_status = data.get("cop_status")
+
+        # Map status to user-friendly messages
+        status_messages = {
+            "ok": "COP calculated successfully",
+            "waiting_calibration": "Waiting for K coefficient calibration",
+            "insufficient_delta_t": "Temperature difference too low (need ΔT ≥ 5°C)",
+            "insufficient_heating_time": "Not enough heating time (need ≥ 30 min)",
+            "no_energy_data": "No energy consumption data",
+            "low_cop_warning": "COP unusually low - check sensor configuration",
+            "high_cop_warning": "COP unusually high - check sensor configuration",
+            "waiting_data": "Waiting for measurement data",
+        }
+
+        return {
+            "description": "Real-time COP calculated from actual measurements",
+            "status": cop_status,
+            "status_message": status_messages.get(cop_status, "Unknown status"),
+            "static_efficiency_factor": self.coordinator.efficiency_factor,
+            "k_coefficient": data.get("k_coefficient"),
+            "avg_delta_t": data.get("avg_delta_t"),
+            "heating_hours": data.get("heating_hours"),
+            "energy_consumed_kwh": data.get("external_energy_daily_kwh"),
+            "note": "COP = Thermal output / Electrical input. Typical values: 2.5-4.5",
+        }
+
+
+class COP7dSensor(HomePerformanceBaseSensor):
+    """Sensor for 7-day average COP (used for auto-calibration).
+
+    This sensor shows the rolling 7-day average of measured COP values.
+    When dynamic COP is enabled, this value is used as the effective
+    efficiency factor for K coefficient calculations instead of the
+    static factor configured in settings.
+
+    This provides automatic adaptation to:
+    - Seasonal variations (COP changes with outdoor temperature)
+    - Heat pump performance changes over time
+    - Different operating conditions
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:chart-line"
+    _attr_name = "COP 7d Average"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "cop_7d")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the 7-day average COP value."""
+        if self.coordinator.data:
+            cop_7d = self.coordinator.data.get("cop_7d")
+            if cop_7d is not None:
+                return round(cop_7d, 2)
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+
+        # Determine status
+        cop_7d = data.get("cop_7d")
+        measured_cop = data.get("measured_cop")
+        static_factor = self.coordinator.efficiency_factor
+
+        if cop_7d is not None:
+            status = "active"
+            status_message = "Using COP 7d for K calculations"
+        elif measured_cop is not None:
+            status = "collecting"
+            status_message = "Collecting data (need 3+ days with valid COP)"
+        else:
+            status = "waiting"
+            status_message = "Waiting for first COP measurement"
+
+        return {
+            "description": "7-day rolling average COP used for K calculations",
+            "status": status,
+            "status_message": status_message,
+            "static_efficiency_factor": static_factor,
+            "effective_efficiency": data.get("effective_efficiency"),
+            "measured_cop_24h": measured_cop,
+            "days_with_cop_data": self._count_days_with_cop(),
+            "is_active": cop_7d is not None,
+            "note": "After 3+ days of valid COP data, this value replaces the static factor",
+        }
+
+    def _count_days_with_cop(self) -> int:
+        """Count days in history with valid COP measurements."""
+        history = self.coordinator.thermal_model.daily_history
+        return sum(1 for entry in history if entry.measured_cop is not None and entry.measured_cop > 0)

@@ -47,13 +47,13 @@
       },
       "dimensions": {
         "title": "Dimensions and optional sensors",
-        "description": "These parameters are optional but allow for more precise analysis.",
+        "description": "These parameters are optional but improve accuracy. Energy source priority: energy_sensor > power_sensor > heater_power.",
         "data": {
           "surface": "Floor Area",
           "volume": "Room volume",
           "power_sensor": "Power sensor (optional)",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "External energy meter (optional)",
+          "energy_sensor": "Energy meter (optional)",
           "window_sensor": "Window/Door sensor (optional)",
           "weather_entity": "Weather entity (optional)",
           "room_orientation": "Room orientation (optional)"
@@ -61,9 +61,9 @@
         "data_description": {
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
-          "power_sensor": "Instantaneous power sensor to measure actual heating time and consumption",
+          "power_sensor": "Real-time power sensor (W) for precise heating detection and energy integration",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority over integrated calculation)",
+          "energy_sensor": "Daily energy counter (kWh) that resets at midnight (e.g., Utility Meter). Most accurate for K calculation. Required for heat pump/gas, falls back to power_sensor or heater_power if not set",
           "window_sensor": "Physical window/door contact sensor for accurate open detection (instead of temperature-based)",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
@@ -87,6 +87,7 @@
     "error": {
       "entity_not_found": "Entity not found",
       "invalid_power": "Invalid power",
+      "energy_sensor_required": "Energy sensor is required for this heat source type",
       "unknown": "Unexpected error"
     },
     "abort": {
@@ -106,7 +107,7 @@
           "volume": "Room volume",
           "power_sensor": "Power sensor",
           "power_threshold": "Heating detection threshold",
-          "energy_sensor": "External energy meter",
+          "energy_sensor": "Energy meter",
           "window_sensor": "Window/Door sensor",
           "window_notification_enabled": "Enable window open alerts",
           "notify_device": "Mobile device for notifications",
@@ -120,15 +121,25 @@
           "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90",
           "surface": "Floor area to calculate K coefficient per m²",
           "volume": "Volume to calculate K coefficient per m³",
-          "power_sensor": "Instantaneous power sensor (power > threshold = heating)",
+          "power_sensor": "Real-time power sensor (W) for precise heating detection",
           "power_threshold": "Power in Watts above which heating is considered active (default: 50W)",
-          "energy_sensor": "Existing Home Assistant energy meter (takes priority)",
+          "energy_sensor": "Daily energy counter (kWh) that resets at midnight (e.g., Utility Meter). Most accurate for K calculation. Required for heat pump/gas, takes priority",
           "window_sensor": "Physical window/door contact sensor for accurate open detection",
           "window_notification_enabled": "Send push notification when window is open and heating is active",
           "notify_device": "Select the mobile device to receive notifications",
           "notification_delay": "Wait this many minutes before alerting (avoids alerts for quick openings)",
           "weather_entity": "Weather entity for wind data (shared between zones)",
           "room_orientation": "Main facade orientation to determine wind exposure"
+        }
+      },
+      "heatpump_options": {
+        "title": "Heat Pump Options",
+        "description": "Configure heat pump specific settings.",
+        "data": {
+          "enable_dynamic_cop": "Enable dynamic COP calculation"
+        },
+        "data_description": {
+          "enable_dynamic_cop": "Calculate real COP from measured energy data instead of using static efficiency factor. Requires an energy sensor."
         }
       },
       "notifications": {
@@ -191,6 +202,12 @@
       },
       "insulation_rating": {
         "name": "Insulation Rating"
+      },
+      "measured_cop": {
+        "name": "Measured COP"
+      },
+      "cop_7d": {
+        "name": "COP 7d Average"
       }
     },
     "binary_sensor": {

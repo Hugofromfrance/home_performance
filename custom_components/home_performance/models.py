@@ -6,12 +6,17 @@ the thermal loss coefficient K (W/°C) of a room.
 Formula: K = Energy / (ΔT × duration)
 
 Where:
-- Energy = heater_power × heating_time (in Wh)
+- Energy = measured or estimated heating energy consumption (in Wh)
 - ΔT = average temperature difference (indoor - outdoor)
 - duration = observation period (in hours)
 
-Example: 1000W heater running 6h/24h to maintain 19°C when it's 5°C outside:
-- Energy = 1000W × 6h = 6000 Wh
+Energy sources (in order of accuracy):
+1. energy_sensor: External energy meter reading (most accurate)
+2. power_sensor: Integrated power over time (accurate)
+3. heater_power × heating_time: Estimated from declared power (fallback)
+
+Example: Heater consuming 6kWh over 24h to maintain 19°C when it's 5°C outside:
+- Energy = 6000 Wh (measured or estimated)
 - ΔT = 14°C
 - K = 6000 / (14 × 24) ≈ 18 W/°C
 
@@ -43,6 +48,7 @@ MAX_DATA_POINTS = 1440 * 2  # 48h at 1 sample per minute
 # Season/inference constants
 TEMP_STABILITY_THRESHOLD = 3.0  # °C - max variation for "stable" temperature (increased for fast-cycling systems)
 EXCELLENT_INFERENCE_MIN_HOURS = 24  # Hours needed to infer excellent isolation
+MIN_COMFORT_TEMP = 17.0  # °C - minimum indoor temp to consider a "perfect" day (room must be comfortable)
 
 # Season status codes
 SEASON_SUMMER = "summer"  # T° ext > T° int (ΔT negative)
@@ -116,9 +122,13 @@ class DailyHistoryEntry:
     avg_outdoor_temp: float  # Average outdoor temperature
     sample_count: int  # Number of samples (data points)
     k_7d: float | None = None  # K_7j at the time of archival (for historical graph)
+    # Temperature stability (for "excellent isolation" inference)
+    temp_variation: float | None = None  # Indoor temp variation (max - min) in °C
     # Weather data (for future analysis)
     avg_wind_speed: float | None = None  # Average wind speed that day (km/h)
     dominant_wind_direction: str | None = None  # Most frequent wind direction
+    # Dynamic COP for heat pumps (measured that day)
+    measured_cop: float | None = None  # COP calculated from actual measurements
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for persistence."""
@@ -133,10 +143,14 @@ class DailyHistoryEntry:
         }
         if self.k_7d is not None:
             result["k_7d"] = self.k_7d
+        if self.temp_variation is not None:
+            result["temp_variation"] = self.temp_variation
         if self.avg_wind_speed is not None:
             result["avg_wind_speed"] = self.avg_wind_speed
         if self.dominant_wind_direction is not None:
             result["dominant_wind_direction"] = self.dominant_wind_direction
+        if self.measured_cop is not None:
+            result["measured_cop"] = self.measured_cop
         return result
 
     @classmethod
@@ -151,8 +165,10 @@ class DailyHistoryEntry:
             avg_outdoor_temp=data.get("avg_outdoor_temp", 0.0),
             sample_count=data.get("sample_count", 0),
             k_7d=data.get("k_7d"),
+            temp_variation=data.get("temp_variation"),
             avg_wind_speed=data.get("avg_wind_speed"),
             dominant_wind_direction=data.get("dominant_wind_direction"),
+            measured_cop=data.get("measured_cop"),
         )
 
 
@@ -169,27 +185,41 @@ class ThermalLossModel:
     - Well insulated room: 10-20 W/°C
     - Average room: 20-40 W/°C
     - Poorly insulated room: 40-80 W/°C
+
+    Energy source hierarchy (most accurate first):
+    1. energy_sensor: External energy meter (kWh) - direct measurement, most accurate
+    2. power_sensor: Real-time power (W) integrated over time - calculated, accurate
+    3. heater_power: Declared power (W) × heating time - estimation, least accurate
+
+    Using measured energy (from energy_sensor or power_sensor) instead of declared
+    heater_power provides more accurate K calculations because:
+    - Actual efficiency losses are accounted for
+    - Variable output (thermostatic radiators, modulating systems) is captured
+    - Real consumption is measured, not estimated
     """
 
     def __init__(
         self,
         zone_name: str,
-        heater_power: float,
+        heater_power: float | None = None,
         surface: float | None = None,
         volume: float | None = None,
+        efficiency_factor: float = 1.0,
     ) -> None:
         """Initialize the thermal loss model.
 
         Args:
             zone_name: Name of the zone/room
-            heater_power: Declared power of the heater in Watts
+            heater_power: Declared power of the heater in Watts (optional for energy-based sources)
             surface: Room surface in m² (optional, for K/m²)
             volume: Room volume in m³ (optional, for K/m³)
+            efficiency_factor: Multiplier for energy conversion (1.0 for electric, ~3.0 for heat pump, ~0.85 for gas)
         """
         self.zone_name = zone_name
-        self.heater_power = heater_power  # W
+        self.heater_power = heater_power  # W - can be None for energy-based sources
         self.surface = surface  # m²
         self.volume = volume  # m³
+        self.efficiency_factor = efficiency_factor  # Multiplier: consumed energy → heat output
 
         # Data storage
         self.data_points: deque[ThermalDataPoint] = deque(maxlen=MAX_DATA_POINTS)
@@ -201,13 +231,38 @@ class ThermalLossModel:
         self._k_coefficient: float | None = None  # W/°C - current K from rolling 24h
         self._k_coefficient_7d: float | None = None  # W/°C - stable K from 7-day history
         self._last_valid_k: float | None = None  # Last valid K (preserved during off-season)
+        self._last_k_date: str | None = None  # Date of last valid K calculation (ISO format)
         self._last_aggregation: AggregatedPeriod | None = None
 
         # Energy tracking (cumulative)
         self._total_energy_kwh: float = 0.0  # Cumulative energy in kWh
+        self._measured_energy_kwh: float = 0.0  # Energy from external sensor (for energy-based sources)
+        self._total_heating_hours: float = 0.0  # Total heating hours (for derived power calculation)
 
         # Tracking
         self._last_point: ThermalDataPoint | None = None
+
+    @property
+    def derived_power(self) -> float | None:
+        """Calculate average power from measured energy and heating time.
+
+        Used for performance thresholds when heater_power is not available.
+        Returns power in Watts.
+        """
+        if self._total_heating_hours > 0 and self._measured_energy_kwh > 0:
+            # Power (W) = Energy (kWh) / Time (h) * 1000
+            return (self._measured_energy_kwh / self._total_heating_hours) * 1000
+        return None
+
+    @property
+    def effective_power(self) -> float | None:
+        """Get the power to use for calculations.
+
+        Returns heater_power if available, otherwise derived_power.
+        """
+        if self.heater_power is not None and self.heater_power > 0:
+            return self.heater_power
+        return self.derived_power
 
     @property
     def samples_count(self) -> int:
@@ -274,19 +329,76 @@ class ThermalLossModel:
         return self.k_coefficient / self.volume
 
     @property
+    def cop_7d(self) -> float | None:
+        """Get the 7-day average COP for heat pumps.
+
+        Calculates the average of measured_cop values from the last 7 days
+        of daily history. Only includes days where COP was successfully measured.
+
+        Returns:
+            Average COP over 7 days, or None if not enough data.
+        """
+        if not self._daily_history:
+            return None
+
+        # Get COP values from last 7 days (most recent entries)
+        recent_entries = self._daily_history[-HISTORY_DAYS:]
+        cop_values = [
+            entry.measured_cop for entry in recent_entries if entry.measured_cop is not None and entry.measured_cop > 0
+        ]
+
+        if not cop_values:
+            return None
+
+        # Need at least 3 days of data for a meaningful average
+        if len(cop_values) < 3:
+            return None
+
+        return sum(cop_values) / len(cop_values)
+
+    def update_efficiency_factor(self, new_factor: float) -> None:
+        """Update the efficiency factor dynamically.
+
+        Used for heat pumps with dynamic COP calculation where the
+        effective COP changes based on measured data.
+
+        Args:
+            new_factor: The new efficiency factor (COP for heat pumps)
+        """
+        if new_factor > 0:
+            self.efficiency_factor = new_factor
+
+    @property
     def total_energy_kwh(self) -> float:
         """Get total cumulative energy in kWh."""
         return self._total_energy_kwh
 
-    def add_data_point(self, point: ThermalDataPoint) -> None:
-        """Add a new data point and update calculations."""
-        # Calculate energy consumed since last point
+    def add_data_point(
+        self,
+        point: ThermalDataPoint,
+        measured_energy_kwh: float | None = None,
+    ) -> None:
+        """Add a new data point and update calculations.
+
+        Args:
+            point: The thermal data point
+            measured_energy_kwh: Energy measured from external sensor (for energy-based sources)
+        """
+        # Track heating time
         if self._last_point is not None and self._last_point.heating_on:
             time_delta_hours = (point.timestamp - self._last_point.timestamp) / SECONDS_PER_HOUR
             if time_delta_hours > 0:
-                # Energy = Power × time (convert W to kW)
-                energy_kwh = (self.heater_power / 1000) * time_delta_hours
-                self._total_energy_kwh += energy_kwh
+                self._total_heating_hours += time_delta_hours
+
+                # Calculate energy: use measured if available, otherwise estimate from power
+                if measured_energy_kwh is not None:
+                    # Energy-based source: use provided energy increment
+                    self._measured_energy_kwh += measured_energy_kwh
+                    self._total_energy_kwh += measured_energy_kwh
+                elif self.heater_power is not None and self.heater_power > 0:
+                    # Power-based source: estimate energy = Power × time
+                    energy_kwh = (self.heater_power / 1000) * time_delta_hours
+                    self._total_energy_kwh += energy_kwh
 
         self.data_points.append(point)
         self._last_point = point
@@ -295,8 +407,18 @@ class ThermalLossModel:
         if self.data_hours >= MIN_DATA_HOURS:
             self._calculate_k()
 
-    def _calculate_k(self) -> None:
-        """Calculate K from aggregated data over the last AGGREGATION_PERIOD_HOURS."""
+    def _calculate_k(self, period_energy_kwh: float | None = None) -> None:
+        """Calculate K from aggregated data over the last AGGREGATION_PERIOD_HOURS.
+
+        Args:
+            period_energy_kwh: Measured energy for the period (from energy_sensor or power_sensor).
+                               If None, will estimate from heater_power.
+
+        Energy source priority (most accurate first):
+        1. period_energy_kwh (external energy sensor - most accurate)
+        2. _measured_energy_kwh (integrated from power sensor - accurate)
+        3. heater_power × heating_hours (declared power - estimation)
+        """
         if len(self.data_points) < 2:
             return
 
@@ -332,21 +454,54 @@ class ThermalLossModel:
             )
             return
 
-        # Calculate K
-        # Energy = Power × heating_time (Wh)
-        energy_wh = self.heater_power * aggregation.heating_hours
+        # Calculate energy for K calculation
+        # Priority: measured energy (external) > measured energy (integrated) > estimated from power
+        #
+        # IMPORTANT: efficiency_factor converts consumed energy to thermal output:
+        # - Electric (1.0): 1 kWh consumed = 1 kWh heat
+        # - Heat pump (3.0): 1 kWh consumed = 3 kWh heat (COP)
+        # - Gas boiler (0.9): 1 kWh gas = 0.9 kWh heat (combustion efficiency)
+        # - Gas furnace (0.85): 1 kWh gas = 0.85 kWh heat (combustion + distribution losses)
+        if period_energy_kwh is not None and period_energy_kwh > 0:
+            # 1. External energy sensor (most accurate - actual consumption)
+            # Apply efficiency_factor to convert to thermal energy
+            energy_wh = period_energy_kwh * 1000 * self.efficiency_factor  # Convert kWh to Wh thermal
+            energy_source = "energy_sensor"
+        elif self._measured_energy_kwh > 0 and aggregation.heating_hours > 0:
+            # 2. Integrated from power sensor (accurate - real power readings)
+            # Scale measured energy to the aggregation period based on heating ratio
+            # Apply efficiency_factor to convert to thermal energy
+            energy_wh = self._measured_energy_kwh * 1000 * self.efficiency_factor  # Convert kWh to Wh thermal
+            energy_source = "power_sensor"
+        elif self.heater_power is not None and self.heater_power > 0:
+            # 3. Estimated from declared power (least accurate)
+            # Apply efficiency_factor to convert to thermal energy
+            energy_wh = self.heater_power * aggregation.heating_hours * self.efficiency_factor
+            energy_source = "heater_power"
+        else:
+            # Cannot calculate K without energy data
+            _LOGGER.debug(
+                "[%s] Cannot calculate K: no power or energy data available",
+                self.zone_name,
+            )
+            return
 
-        # K = Energy / (ΔT × duration)
+        # K = Thermal Energy / (ΔT × duration)
+        # K represents heat loss in W/°C (thermal watts, not electric watts)
         k = energy_wh / (aggregation.delta_t * aggregation.duration_hours)
 
         self._k_coefficient = k
         self._last_valid_k = k  # Preserve this valid K
+        # Update last K date to today (real-time calculation)
+        from datetime import datetime
+        self._last_k_date = datetime.now().strftime("%Y-%m-%d")
 
         _LOGGER.info(
-            "K calculated for %s: %.1f W/°C " "(energy=%.0f Wh, ΔT=%.1f°C, duration=%.1fh, heating=%.1fh)",
+            "K calculated for %s: %.1f W/°C " "(energy=%.0f Wh [%s], ΔT=%.1f°C, duration=%.1fh, heating=%.1fh)",
             self.zone_name,
             k,
             energy_wh,
+            energy_source,
             aggregation.delta_t,
             aggregation.duration_hours,
             aggregation.heating_hours,
@@ -393,8 +548,10 @@ class ThermalLossModel:
         avg_outdoor_temp: float,
         sample_count: int,
         k_7d: float | None = None,
+        temp_variation: float | None = None,
         avg_wind_speed: float | None = None,
         dominant_wind_direction: str | None = None,
+        measured_cop: float | None = None,
     ) -> None:
         """Archive a day's data into the rolling 7-day history.
 
@@ -410,8 +567,10 @@ class ThermalLossModel:
             avg_outdoor_temp: Average outdoor temperature
             sample_count: Number of data samples
             k_7d: The K_7j score at time of archival (for historical graph)
+            temp_variation: Indoor temperature variation (max - min) in °C
             avg_wind_speed: Average wind speed that day (km/h)
             dominant_wind_direction: Most frequent wind direction (N, NE, E, SE, S, SW, W, NW)
+            measured_cop: Measured COP for heat pumps (for dynamic efficiency)
         """
         # Don't add if we don't have meaningful data
         if sample_count < 10:
@@ -436,8 +595,10 @@ class ThermalLossModel:
             avg_outdoor_temp=avg_outdoor_temp,
             sample_count=sample_count,
             k_7d=k_7d,
+            temp_variation=temp_variation,
             avg_wind_speed=avg_wind_speed,
             dominant_wind_direction=dominant_wind_direction,
+            measured_cop=measured_cop,
         )
         self._daily_history.append(entry)
 
@@ -466,6 +627,13 @@ class ThermalLossModel:
         This provides a stable K that doesn't reset at midnight.
         Uses weighted average based on sample count per day.
         Only uses the last HISTORY_DAYS (7) days for calculation.
+
+        Energy source hierarchy (stored in daily history):
+        1. energy_kwh from energy_sensor (measured - most accurate)
+        2. energy_kwh from power_sensor integration (measured - accurate)
+        3. energy_kwh estimated from heater_power × heating_hours (fallback)
+
+        The coordinator stores the best available energy source in energy_kwh.
         """
         if not self._daily_history:
             return
@@ -475,12 +643,89 @@ class ThermalLossModel:
             self._daily_history[-HISTORY_DAYS:] if len(self._daily_history) > HISTORY_DAYS else self._daily_history
         )
 
-        # Filter valid days (sufficient ΔT and heating time)
-        valid_days = [
-            d for d in recent_history if d.avg_delta_t >= MIN_DELTA_T and d.heating_hours >= MIN_HEATING_TIME_HOURS
-        ]
+        # Separate days into categories:
+        # 1. Days with enough heating data (can calculate K directly)
+        # 2. "Perfect" days: temp stable but very little heating (use K_min as estimate)
+        # 3. Invalid days: not enough ΔT or unstable temp
+        calculable_days = []
+        perfect_days = []
 
-        if not valid_days:
+        for d in recent_history:
+            if d.avg_delta_t < MIN_DELTA_T:
+                continue  # Not enough ΔT
+
+            temp_stable = d.temp_variation is not None and d.temp_variation < TEMP_STABILITY_THRESHOLD
+            has_enough_heating = d.heating_hours >= MIN_HEATING_TIME_HOURS
+            has_minimal_heating = d.heating_hours >= 0.1  # At least 6 minutes
+
+            # Check if indoor temp is comfortable (>= 17°C)
+            temp_comfortable = d.avg_indoor_temp >= MIN_COMFORT_TEMP
+
+            if has_enough_heating or (has_minimal_heating and temp_stable):
+                # Can calculate K for this day
+                calculable_days.append(d)
+            elif temp_stable and temp_comfortable and d.heating_hours < 0.1:
+                # "Perfect" day: stable AND comfortable temp with almost no heating
+                # This proves excellent insulation - will use K_min as conservative estimate
+                perfect_days.append(d)
+            else:
+                _LOGGER.debug(
+                    "[%s] Day %s filtered: heating=%.2fh, temp_var=%s, indoor=%.1f°C, stable=%s, comfortable=%s",
+                    self.zone_name,
+                    d.date,
+                    d.heating_hours,
+                    f"{d.temp_variation:.1f}°C" if d.temp_variation else "N/A",
+                    d.avg_indoor_temp,
+                    temp_stable,
+                    temp_comfortable,
+                )
+
+        # First pass: calculate K for days with enough heating data
+        day_k_values = []
+        for day in calculable_days:
+            if day.energy_kwh > 0:
+                energy_wh = day.energy_kwh * 1000 * self.efficiency_factor
+            elif self.heater_power is not None and self.heater_power > 0:
+                energy_wh = self.heater_power * day.heating_hours * self.efficiency_factor
+            else:
+                continue
+
+            k_day = energy_wh / (day.avg_delta_t * 24)
+            day_k_values.append((day, k_day))
+
+            _LOGGER.debug(
+                "[%s] Day %s: K=%.1f W/°C (heating=%.1fh, ΔT=%.1f°C, energy=%.2f kWh)",
+                self.zone_name,
+                day.date,
+                k_day,
+                day.heating_hours,
+                day.avg_delta_t,
+                day.energy_kwh,
+            )
+
+        # Find minimum K from calculable days (or use current K_24h as fallback)
+        k_min = None
+        if day_k_values:
+            k_min = min(k for _, k in day_k_values)
+        elif self._k_coefficient is not None:
+            k_min = self._k_coefficient
+
+        # Add "perfect" days using K_min as estimate
+        # Logic: if temp is stable with no heating, K must be <= K_min
+        if k_min is not None and perfect_days:
+            for day in perfect_days:
+                day_k_values.append((day, k_min))
+                _LOGGER.info(
+                    "[%s] Day %s: K=%.1f W/°C (PERFECT day - using K_min, heating=%.1fmin, indoor=%.1f°C, temp_var=%.1f°C)",
+                    self.zone_name,
+                    day.date,
+                    k_min,
+                    day.heating_hours * 60,
+                    day.avg_indoor_temp,
+                    day.temp_variation or 0,
+                )
+
+        if not day_k_values:
             _LOGGER.debug(
                 "[%s] No valid days in history for K calculation (%d days total)",
                 self.zone_name,
@@ -488,40 +733,30 @@ class ThermalLossModel:
             )
             return
 
-        # Calculate K for each valid day and weight by sample count
+        # Calculate weighted average
         total_weighted_k = 0.0
         total_weight = 0.0
 
-        for day in valid_days:
-            # K = Energy / (ΔT × 24h)
-            # Energy = Power × heating_hours (Wh)
-            energy_wh = self.heater_power * day.heating_hours
-            k_day = energy_wh / (day.avg_delta_t * 24)  # Normalize to 24h period
-
+        for day, k_day in day_k_values:
             weight = day.sample_count
             total_weighted_k += k_day * weight
             total_weight += weight
 
-            _LOGGER.debug(
-                "[%s] Day %s: K=%.1f W/°C (heating=%.1fh, ΔT=%.1f°C, weight=%d)",
-                self.zone_name,
-                day.date,
-                k_day,
-                day.heating_hours,
-                day.avg_delta_t,
-                weight,
-            )
-
         if total_weight > 0:
             self._k_coefficient_7d = total_weighted_k / total_weight
             self._last_valid_k = self._k_coefficient_7d  # Update last valid K
+            # Track the most recent day used in the calculation
+            all_days = [day for day, _ in day_k_values]
+            self._last_k_date = all_days[-1].date if all_days else None
 
             _LOGGER.info(
-                "[%s] 📊 7-day K coefficient: %.1f W/°C (from %d valid days, %d total)",
+                "[%s] 📊 7-day K coefficient: %.1f W/°C (from %d days: %d calculated + %d perfect, last: %s)",
                 self.zone_name,
                 self._k_coefficient_7d,
-                len(valid_days),
-                len(self._daily_history),
+                len(day_k_values),
+                len(calculable_days),
+                len(perfect_days),
+                self._last_k_date,
             )
 
     def clear_history(self) -> None:
@@ -568,6 +803,7 @@ class ThermalLossModel:
         self._k_coefficient = None
         self._k_coefficient_7d = None
         self._last_valid_k = None
+        self._last_k_date = None
         self._last_aggregation = None
         self._total_energy_kwh = 0.0
         self._last_point = None
@@ -583,6 +819,19 @@ class ThermalLossModel:
         """Get current analysis results."""
         agg = self._last_aggregation
 
+        # Calculate daily energy
+        daily_energy_kwh = None
+        if agg:
+            if self.heater_power is not None and self.heater_power > 0:
+                daily_energy_kwh = self.heater_power * agg.heating_hours / 1000
+            elif self._measured_energy_kwh > 0 and self._total_heating_hours > 0:
+                # Estimate from measured energy ratio
+                daily_energy_kwh = (
+                    self._measured_energy_kwh * (agg.heating_hours / self._total_heating_hours)
+                    if self._total_heating_hours > 0
+                    else None
+                )
+
         return {
             # Main coefficient (prefers 7-day stable K)
             "k_coefficient": self.k_coefficient,  # Uses property that prefers 7d
@@ -594,9 +843,10 @@ class ThermalLossModel:
             "heating_hours": agg.heating_hours if agg else None,
             "heating_ratio": agg.heating_ratio if agg else None,
             "avg_delta_t": agg.delta_t if agg else None,
-            "daily_energy_kwh": ((self.heater_power * agg.heating_hours / 1000) if agg else None),
+            "daily_energy_kwh": daily_energy_kwh,
             # Cumulative energy (for Energy Dashboard)
             "total_energy_kwh": self._total_energy_kwh,
+            "measured_energy_kwh": self._measured_energy_kwh,
             # Status
             "data_hours": self.data_hours,
             "samples_count": self.samples_count,
@@ -604,8 +854,12 @@ class ThermalLossModel:
             # History status
             "history_days": len(self._daily_history),
             "history_has_valid_k": self._k_coefficient_7d is not None,
-            # Configuration
+            "last_k_date": self._last_k_date,
+            # Configuration and derived values
             "heater_power": self.heater_power,
+            "effective_power": self.effective_power,
+            "derived_power": self.derived_power,
+            "efficiency_factor": self.efficiency_factor,
             "surface": self.surface,
             "volume": self.volume,
         }
@@ -829,6 +1083,11 @@ class ThermalLossModel:
         """Get last valid K coefficient (preserved during off-season)."""
         return self._last_valid_k
 
+    @property
+    def last_k_date(self) -> str | None:
+        """Get date of last valid K calculation (ISO format YYYY-MM-DD)."""
+        return self._last_k_date
+
     def to_dict(self) -> dict[str, Any]:
         """Export model state to dictionary for persistence."""
         return {
@@ -844,6 +1103,7 @@ class ThermalLossModel:
             "k_coefficient": self._k_coefficient,
             "k_coefficient_7d": self._k_coefficient_7d,
             "last_valid_k": self._last_valid_k,
+            "last_k_date": self._last_k_date,
             "total_energy_kwh": self._total_energy_kwh,
             "last_point": (
                 {
@@ -896,6 +1156,9 @@ class ThermalLossModel:
         elif self._k_coefficient is not None:
             # Backward compatibility: use k_coefficient as last_valid_k
             self._last_valid_k = self._k_coefficient
+
+        if "last_k_date" in data:
+            self._last_k_date = data["last_k_date"]
 
         if "total_energy_kwh" in data:
             self._total_energy_kwh = data["total_energy_kwh"]

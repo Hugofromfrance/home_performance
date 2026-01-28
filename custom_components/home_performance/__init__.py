@@ -12,9 +12,10 @@ from typing import TYPE_CHECKING
 import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
-from homeassistant.core import CoreState, HomeAssistant, ServiceCall, callback
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.start import async_at_started
 
 from .const import DOMAIN, VERSION
 from .coordinator import HomePerformanceCoordinator
@@ -53,18 +54,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     websocket_api.async_register_command(hass, websocket_get_version)
 
     # Setup frontend registration
-    async def _async_setup_frontend() -> None:
+    async def _async_setup_frontend(_hass: HomeAssistant) -> None:
         """Register frontend resources after Home Assistant is started."""
         module_register = JSModuleRegistration(hass)
         await module_register.async_register()
 
-    if hass.state == CoreState.running:
-        await _async_setup_frontend()
-    else:
-        hass.bus.async_listen_once(
-            EVENT_HOMEASSISTANT_STARTED,
-            lambda _: hass.async_create_task(_async_setup_frontend()),
-        )
+    # async_at_started handles both cases:
+    # - If HA is already running: executes immediately
+    # - If HA is starting: waits for EVENT_HOMEASSISTANT_STARTED
+    async_at_started(hass, _async_setup_frontend)
 
     return True
 
