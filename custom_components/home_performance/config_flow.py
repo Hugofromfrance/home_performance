@@ -125,9 +125,11 @@ def get_schema_step_zone(
             )
         )
     else:
+        # For non-electric sources, heater_power is optional
+        # min=0 allows users to clear the value (0 = no declared power)
         schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=100,
+                min=0,
                 max=100000,
                 step=50,
                 unit_of_measurement="W",
@@ -279,13 +281,17 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             heat_source_type = user_input.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
 
             # Validate heater power - required only for electric
+            # For non-electric sources, 0 means "no declared power" (use energy sensor)
             heater_power = user_input.get(CONF_HEATER_POWER)
             if heat_source_type == HEAT_SOURCE_ELECTRIC:
                 if not heater_power or heater_power <= 0:
                     errors[CONF_HEATER_POWER] = "invalid_power"
-            elif heater_power is not None and heater_power <= 0:
-                # Optional but if provided must be valid
+            elif heater_power is not None and heater_power < 0:
+                # Optional, 0 is allowed (means "clear"), but negative is invalid
                 errors[CONF_HEATER_POWER] = "invalid_power"
+            # Convert 0 to None for non-electric (means "no declared power")
+            if heat_source_type != HEAT_SOURCE_ELECTRIC and heater_power == 0:
+                user_input[CONF_HEATER_POWER] = None
 
             # Check if zone name is already used (use slugify for consistent comparison)
             zone_name = user_input.get(CONF_ZONE_NAME, "").strip()
@@ -458,13 +464,15 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 )
             )
         else:
-            if heater_power_value is not None:
+            # For non-electric sources, heater_power is optional
+            # min=0 allows users to clear the value (0 = no declared power, use energy sensor instead)
+            if heater_power_value is not None and heater_power_value > 0:
                 schema_dict[vol.Optional(CONF_HEATER_POWER, default=heater_power_value)] = selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=100, max=100000, step=50, unit_of_measurement="W", mode="box")
+                    selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
                 )
             else:
                 schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=100, max=100000, step=50, unit_of_measurement="W", mode="box")
+                    selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
                 )
 
         # Surface - only set default if value exists (NumberSelector doesn't support None)
@@ -693,6 +701,9 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         # But remove keys that are None AND not in current config (truly optional)
         cleaned_input = {}
         for k, v in self._data.items():
+            # Treat 0 as None for heater_power (allows clearing the value)
+            if k == CONF_HEATER_POWER and v == 0:
+                v = None
             if v is not None:
                 cleaned_input[k] = v
             elif k in current and current[k] is not None:
