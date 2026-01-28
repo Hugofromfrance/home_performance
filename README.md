@@ -638,9 +638,49 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Zone name | Room name (e.g.: Living Room) |
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
-| Heating entity | climate.xxx or switch.xxx |
+| Heating entity | climate.xxx or switch.xxx (see below) |
 | Heat source type | Electric, Heat pump, Gas Boiler, or Gas Furnace |
 | Heater power | Declared power in Watts (required for Electric, optional for others) |
+
+#### Supported Heating Entity Types
+
+| Domain | Detection Logic | Example |
+|--------|-----------------|---------|
+| `climate.*` | `hvac_action` = "heating" or `hvac_mode` = "heat" | `climate.living_room` |
+| `switch.*` | State = "on" | `switch.heater` |
+| `input_boolean.*` | State = "on" | `input_boolean.heating_active` |
+| `binary_sensor.*` | State = "on" | `binary_sensor.heater_running` |
+
+#### Using select.* Entities (Modbus, NodOn fil pilote, etc.)
+
+If your heating system uses a `select.*` or `input_select.*` entity (common with Modbus heat pumps, NodOn fil pilote modules, etc.), create a **template binary sensor** to bridge it:
+
+```yaml
+# In configuration.yaml
+template:
+  - binary_sensor:
+      # Example 1: NodOn fil pilote (French modes)
+      - name: "Radiateur Salon Actif"
+        unique_id: radiateur_salon_actif
+        state: "{{ states('select.nodon_fil_pilote_mode') in ['Confort', 'Eco'] }}"
+        device_class: running
+
+      # Example 2: Modbus heat pump
+      - name: "Heat Pump Heating Active"
+        unique_id: heatpump_heating_active
+        state: "{{ states('select.heatpump_mode') == 'Heating' }}"
+        device_class: running
+
+      # Example 3: Multiple active states
+      - name: "HVAC Heating Active"
+        unique_id: hvac_heating_active
+        state: "{{ states('select.hvac_mode') in ['Heat', 'Auto Heat', 'Emergency Heat'] }}"
+        device_class: running
+```
+
+Then use the binary sensor (e.g., `binary_sensor.radiateur_salon_actif`) as your heating entity in Home Performance.
+
+> **💡 Why a template?** Each heating system has different state names ("Confort", "Heating", "Heat", "On"...). A template lets you define exactly which states mean "heating is active" for YOUR specific setup.
 
 ### Optional Parameters
 
