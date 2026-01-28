@@ -97,8 +97,10 @@ You have a heating system and wonder:
 
 | Sensor | Examples | Benefit |
 |--------|----------|---------|
-| Instant power | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | Precise heating time |
-| Energy counter | HA Utility Meter, native counter | Measured vs estimated energy |
+| Instant power | Shelly Plug S, TP-Link, Tuya, Sonoff POW, NodOn | **Energy integration** + precise heating detection |
+| Energy counter | HA Utility Meter, native counter | Most accurate energy measurement |
+
+> **💡 Important for Heat Pumps**: If your heat pump has **variable/modulating power**, configure a `power_sensor` (real-time power in Watts). The integration will **integrate the actual power over time** instead of using a fixed `heater_power` value. This is much more accurate for systems where power output varies.
 
 ### Supported Heat Source Types
 
@@ -107,9 +109,16 @@ The integration supports **4 heat source types**:
 | Heat Source | `heater_power` | `energy_sensor` | Best for |
 |-------------|----------------|-----------------|----------|
 | **Electric** (default) | Required | Optional | Radiators, convectors, underfloor heating |
-| **Heat pump** | Optional | Optional | PAC, air-to-air, air-to-water |
-| **Gas Boiler** | Optional | Optional | European-style gas boilers (water heating), central heating |
-| **Gas Furnace** | Optional | Optional | US-style gas furnaces (forced air heating) |
+| **Heat pump** | Optional* | Optional | PAC, air-to-air, air-to-water |
+| **Gas Boiler** | Optional* | Optional | European-style gas boilers (water heating), central heating |
+| **Gas Furnace** | Optional* | Optional | US-style gas furnaces (forced air heating) |
+
+*\* For non-electric sources, you can set `heater_power` to **0** to remove it and rely entirely on `energy_sensor` or `power_sensor` for energy calculation.*
+
+#### Where to Select Heat Source Type
+
+- **New zone**: The heat source type selector appears on the **first configuration screen**
+- **Existing zone**: Go to **Settings → Integrations → Home Performance** → click **Configure (⚙️)** on your zone → the heat source type is the **first field** in the options form
 
 ### ⚡ Energy Source Priority
 
@@ -629,9 +638,49 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Zone name | Room name (e.g.: Living Room) |
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
-| Heating entity | climate.xxx or switch.xxx |
+| Heating entity | climate.xxx or switch.xxx (see below) |
 | Heat source type | Electric, Heat pump, Gas Boiler, or Gas Furnace |
 | Heater power | Declared power in Watts (required for Electric, optional for others) |
+
+#### Supported Heating Entity Types
+
+| Domain | Detection Logic | Example |
+|--------|-----------------|---------|
+| `climate.*` | `hvac_action` = "heating" or `hvac_mode` = "heat" | `climate.living_room` |
+| `switch.*` | State = "on" | `switch.heater` |
+| `input_boolean.*` | State = "on" | `input_boolean.heating_active` |
+| `binary_sensor.*` | State = "on" | `binary_sensor.heater_running` |
+
+#### Using select.* Entities (Modbus, NodOn fil pilote, etc.)
+
+If your heating system uses a `select.*` or `input_select.*` entity (common with Modbus heat pumps, NodOn fil pilote modules, etc.), create a **template binary sensor** to bridge it:
+
+```yaml
+# In configuration.yaml
+template:
+  - binary_sensor:
+      # Example 1: NodOn fil pilote (French modes)
+      - name: "Radiateur Salon Actif"
+        unique_id: radiateur_salon_actif
+        state: "{{ states('select.nodon_fil_pilote_mode') in ['Confort', 'Eco'] }}"
+        device_class: running
+
+      # Example 2: Modbus heat pump
+      - name: "Heat Pump Heating Active"
+        unique_id: heatpump_heating_active
+        state: "{{ states('select.heatpump_mode') == 'Heating' }}"
+        device_class: running
+
+      # Example 3: Multiple active states
+      - name: "HVAC Heating Active"
+        unique_id: hvac_heating_active
+        state: "{{ states('select.hvac_mode') in ['Heat', 'Auto Heat', 'Emergency Heat'] }}"
+        device_class: running
+```
+
+Then use the binary sensor (e.g., `binary_sensor.radiateur_salon_actif`) as your heating entity in Home Performance.
+
+> **💡 Why a template?** Each heating system has different state names ("Confort", "Heating", "Heat", "On"...). A template lets you define exactly which states mean "heating is active" for YOUR specific setup.
 
 ### Optional Parameters
 
@@ -639,13 +688,18 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 |-----------|-------------|
 | Surface | m² (for K/m²) |
 | Volume | m³ (for K/m³ and insulation rating) |
-| Power sensor | sensor.xxx_power in Watts (for energy + precise heat detection) |
+| Power sensor | sensor.xxx_power in Watts - **see note below** |
 | Power threshold | Detection threshold in Watts (default: 50W) |
 | Energy sensor | sensor.xxx_energy (optional - most accurate for K calculation) |
 | Efficiency factor | Converts consumed energy to thermal output (see below) |
 | Window/Door sensor | binary_sensor.xxx (physical contact sensor for open detection) |
 | Weather entity | weather.xxx (for wind data display - shared between zones) |
 | Room orientation | N, NE, E, SE, S, SW, W, NW (for wind exposure calculation) |
+
+> **📊 Power Sensor - Dual Purpose**:
+> The `power_sensor` serves **two purposes**:
+> 1. **Precise heating detection**: Detects when heating is active (power > threshold) - ideal for thermostatic heaters
+> 2. **Energy integration**: When no `energy_sensor` is configured, the integration **integrates the real-time power over time** to calculate energy consumption. This is especially useful for **modulating systems** (heat pumps, inverter AC) where power output varies.
 
 ### Efficiency Factor
 
