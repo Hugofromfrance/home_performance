@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.4.0](https://github.com/Hugofromfrance/home_performance/compare/v1.3.0...v1.4.0) (2026-02-13)
+
+
+### ✨ Nouvelles fonctionnalités
+
+* Add dynamic cop 7d ([edb7ebe](https://github.com/Hugofromfrance/home_performance/commit/edb7ebe24f3a63f2af84300a4cb8bf896ca7c18e))
+* Add new S rank and a variation temperature warning ([71b1ee0](https://github.com/Hugofromfrance/home_performance/commit/71b1ee04ba12f6783cad9938a35e84ba03113a1b))
+* Add selector to editor zone ([9465840](https://github.com/Hugofromfrance/home_performance/commit/94658407adc0b877f9f8edf0eef564178ce7f166))
+* Explain in documentation how to use select entity ([a48bc4a](https://github.com/Hugofromfrance/home_performance/commit/a48bc4a4709963b366c868fdb88e6366fdc1f2e8))
+* Heat source improvements ([da35314](https://github.com/Hugofromfrance/home_performance/commit/da3531457b9ebf5e9d202c609e68b28ced3ab6a3))
+* Improve config flow heat soruce configuration ([2d4430e](https://github.com/Hugofromfrance/home_performance/commit/2d4430e3a8c05babcebc88cc62d9f9a368ec574e))
+* Improve heating sources and add efficiency factor ([9362e00](https://github.com/Hugofromfrance/home_performance/commit/9362e0070ea769154f034fbbca7315473fed8f5a))
+* Improve k calculation ([cca0a52](https://github.com/Hugofromfrance/home_performance/commit/cca0a52ae22e96cd3a2beadbcca6bddf26e77af5))
+* Improve placeholder for energy sensor selector ([71728b6](https://github.com/Hugofromfrance/home_performance/commit/71728b6fa7af2ceb0c9a4146f2428f418a66f983))
+* refactor entity id standardiation ([1080022](https://github.com/Hugofromfrance/home_performance/commit/1080022992197c6eced32edaaf20156c4c242916))
+* Register lovelace card itself ([fb8f27a](https://github.com/Hugofromfrance/home_performance/commit/fb8f27a504165aa0ae5a1eaf5e7274110251168e))
+
+
+### 🐛 Corrections de bugs
+
+* display room orientation in uppercase on Lovelace card ([0159f6f](https://github.com/Hugofromfrance/home_performance/commit/0159f6f05af306c557cf3bbdf0663fb238f26a2d))
+* Fix a bug with room orientation normalization ([add97e0](https://github.com/Hugofromfrance/home_performance/commit/add97e01035cbb8d8a05a7a7d869c0ff598cd0c0))
+* Fix k7 calculation and improve energy sensor placeholder ([b291749](https://github.com/Hugofromfrance/home_performance/commit/b291749cdaf1e570d871fad2313ac9b6ad3ce121))
+* Format heating duration from float to hours ([91073df](https://github.com/Hugofromfrance/home_performance/commit/91073dfe55168d834210355cf5ca9b081377bdbe))
+* heater power optional for non electric ([bcd5e86](https://github.com/Hugofromfrance/home_performance/commit/bcd5e865dc82244032a2e46a60852f5903e3b74b))
+* Improve lovelace card loading ([b5324d2](https://github.com/Hugofromfrance/home_performance/commit/b5324d21f7bb58a17895497a7593cc5e8f85cfa3))
+* Update entity naming english translation ([ad3bbd3](https://github.com/Hugofromfrance/home_performance/commit/ad3bbd344ea292c72364f14315ef193ede28b66d))
+* use lowercase orientation keys for hassfest validation ([b7f9633](https://github.com/Hugofromfrance/home_performance/commit/b7f9633b9602f840d6bc9e582e4c11dc3f0b30cf))
+
+
+### 📚 Documentation
+
+* add tests badge to README ([e0af67f](https://github.com/Hugofromfrance/home_performance/commit/e0af67fa08118ef34daeab44a923d7f29ef42434))
+
 ## [1.3.0](https://github.com/Hugofromfrance/home_performance/compare/v1.2.2...v1.3.0) (2026-01-07)
 
 
