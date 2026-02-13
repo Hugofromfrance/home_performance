@@ -113,29 +113,19 @@ def get_schema_step_zone(
         ),
     }
 
-    # Heater power: required for electric, optional for others
-    if heat_source_type == HEAT_SOURCE_ELECTRIC:
-        schema_dict[vol.Required(CONF_HEATER_POWER)] = selector.NumberSelector(
-            selector.NumberSelectorConfig(
-                min=100,
-                max=100000,
-                step=50,
-                unit_of_measurement="W",
-                mode="box",
-            )
+    # Heater power: always Optional in the schema because HA config flows
+    # cannot dynamically update the schema when the user changes the heat
+    # source dropdown. Backend validation (in async_step_user) enforces
+    # that the value is provided for electric heat sources.
+    schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=0,
+            max=100000,
+            step=50,
+            unit_of_measurement="W",
+            mode="box",
         )
-    else:
-        # For non-electric sources, heater_power is optional
-        # min=0 allows users to clear the value (0 = no declared power)
-        schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
-            selector.NumberSelectorConfig(
-                min=0,
-                max=100000,
-                step=50,
-                unit_of_measurement="W",
-                mode="box",
-            )
-        )
+    )
 
     # Efficiency factor with default based on heat source type
     schema_dict[vol.Optional(CONF_EFFICIENCY_FACTOR, default=default_efficiency)] = selector.NumberSelector(
@@ -309,8 +299,12 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Get outdoor temp sensor from existing zones (for pre-filling)
         default_outdoor = get_last_outdoor_temp_sensor(self.hass)
 
-        # Get heat source type from current data (for re-display after error)
-        current_heat_source = self._data.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
+        # Get heat source type for re-display after error:
+        # prefer user_input (what the user just selected) over stored data
+        if user_input is not None:
+            current_heat_source = user_input.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
+        else:
+            current_heat_source = self._data.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
 
         return self.async_show_form(
             step_id="user",
@@ -446,34 +440,16 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             ),
         }
 
-        # Heater power - required for electric, optional for others
+        # Heater power - always Optional in schema (backend validates for electric)
         heater_power_value = current.get(CONF_HEATER_POWER)
-        if display_heat_source == HEAT_SOURCE_ELECTRIC:
-            schema_dict[
-                vol.Required(
-                    CONF_HEATER_POWER,
-                    default=heater_power_value or 1000,
-                )
-            ] = selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=100,
-                    max=100000,
-                    step=50,
-                    unit_of_measurement="W",
-                    mode="box",
-                )
+        if heater_power_value is not None and heater_power_value > 0:
+            schema_dict[vol.Optional(CONF_HEATER_POWER, default=heater_power_value)] = selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
             )
         else:
-            # For non-electric sources, heater_power is optional
-            # min=0 allows users to clear the value (0 = no declared power, use energy sensor instead)
-            if heater_power_value is not None and heater_power_value > 0:
-                schema_dict[vol.Optional(CONF_HEATER_POWER, default=heater_power_value)] = selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
-                )
-            else:
-                schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
-                )
+            schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
+            )
 
         # Surface - only set default if value exists (NumberSelector doesn't support None)
         surface_value = current.get(CONF_SURFACE)
