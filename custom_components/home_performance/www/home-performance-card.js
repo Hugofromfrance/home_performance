@@ -5,7 +5,7 @@
 
 // Wrap everything in an IIFE to handle async loading
 ((async () => {
-  const CARD_VERSION = "1.3.0";
+  const CARD_VERSION = "1.4.0";
 
   // Wait for Home Assistant custom elements to be available
   // This is necessary because Lovelace may load this script before HA is fully initialized
@@ -23,7 +23,7 @@
   if (!baseElement) {
     baseElement = await waitForElement("hui-view", 5000);
   }
-  
+
   if (!baseElement) {
     console.error("Home Performance Card: Could not find Home Assistant base elements. Card will not load.");
     return;
@@ -33,987 +33,987 @@
   const html = LitElement.prototype.html;
   const css = LitElement.prototype.css;
 
-class HomePerformanceCard extends LitElement {
-  static get properties() {
-    return {
-      hass: { type: Object },
-      config: { type: Object },
-    };
-  }
-
-  // Translations for i18n support
-  static _translations = {
-    en: {
-      // Config & titles
-      default_title: "Thermal Performance",
-      error_no_zone: "Please specify a zone",
-      loading: "Loading...",
-      loading_integration: "Loading integration...",
-
-      // Section headers
-      isolation: "INSULATION",
-      performance: "PERFORMANCE",
-      temperatures: "TEMPERATURES",
-      technical_details: "TECHNICAL DETAILS",
-      history_title: "K HISTORY (7 DAYS)",
-      excellence_title: "7-DAY PERFORMANCE",
-
-      // Insulation ratings
-      optimal: "Optimal",
-      optimal_desc: "Level S - 7 days perfect",
-      excellent: "Excellent",
-      excellent_desc: "Very well insulated",
-      good: "Good",
-      good_desc: "Well insulated",
-      average: "Average",
-      average_desc: "Standard insulation",
-      poor: "Poor",
-      poor_desc: "Needs improvement",
-      very_poor: "Critical",
-      very_poor_desc: "Insufficient insulation",
-      excellent_inferred: "Excellent",
-      excellent_inferred_desc: "Minimal heating needed",
-      summer_mode: "☀️ Summer mode",
-      summer_mode_desc: "Measurement not possible",
-      off_season: "🌤️ Shoulder season",
-      off_season_desc: "ΔT insufficient",
-      waiting: "Waiting",
-      waiting_desc: "Heating required",
-      last_measurement: "Last measurement",
-      last_k: "Last K",
-
-      // Performance ratings
-      perf_excellent: "Excellent",
-      perf_standard: "Standard",
-      perf_optimize: "Needs optimization",
-      vs_average: "vs average",
-
-      // Metrics
-      k_instant: "K instant",
-      energy_day: "Energy/day",
-      heating_time: "Heating time",
-      avg_delta: "Avg delta",
-      measured: "measured",
-      estimated: "estimated",
-      on_24h: "over 24h",
-      rolling_24h: "rolling 24h",
-      of_time: "of time",
-      indoor_outdoor: "In. - Out.",
-
-      // Tooltips
-      tooltip_estimated: "estimated",
-
-      // Days
-      days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-
-      // Loading & analyzing
-      integration_starting: "Home Performance is starting. Data will be available in a few seconds.",
-      zone_check_hint: "If this message persists, check that the zone",
-      exists_in_integration: "exists in the Home Performance integration.",
-      expected_entity: "Expected entity",
-      analyzing: "Analyzing",
-      analysis_in_progress: "Collecting thermal data to calculate room performance. Results available after 12h of analysis.",
-      remaining_time: "remaining",
-      completed: "Completed",
-      ready: "Ready",
-
-      // Editor
-      editor_zone: "Zone",
-      editor_select_zone: "Select a zone",
-      editor_title: "Title",
-      editor_card_style: "Card style",
-      editor_full: "Full",
-      editor_badge: "Badge",
-      editor_pill: "Pill",
-      editor_multi: "Multi-zone",
-      editor_demo: "Demo mode (preview)",
-      editor_show_graph: "Show history graph",
-
-      // Multi-zone
-      multi_title: "Home Performance",
-      multi_zones_monitored: "zones monitored",
-      multi_avg: "avg",
-      multi_list: "List",
-      multi_compare: "Compare",
-      multi_ref: "REF",
-      multi_k_inst: "K INST.",
-      multi_energy: "ENERGY",
-      multi_heating: "HEATING",
-      multi_delta: "ΔT AVG",
-      multi_no_zones: "No zones found",
-      multi_no_data: "No data available",
-      multi_waiting_data: "Waiting for K/m³ data...",
-      multi_kwh_day: "kWh/day",
-
-      // Wind
-      wind_exposure_exposed: "Exposed",
-      wind_exposure_partial: "Partial",
-      wind_exposure_sheltered: "Sheltered",
-
-      // Temperature variation warning
-      temp_variation: "VARIATION",
-      temp_variation_warning: "Temperature variation",
-      temp_variation_desc: "Score potentially underestimated",
-      wind_exposure_unknown: "",
-    },
-    fr: {
-      // Config & titles
-      default_title: "Performance Thermique",
-      error_no_zone: "Veuillez spécifier une zone",
-      loading: "Chargement...",
-      loading_integration: "Chargement de l'intégration...",
-
-      // Section headers
-      isolation: "ISOLATION",
-      performance: "PERFORMANCE",
-      temperatures: "TEMPÉRATURES",
-      technical_details: "DÉTAILS TECHNIQUES",
-      history_title: "HISTORIQUE K (7 JOURS)",
-      excellence_title: "PERFORMANCE 7 JOURS",
-
-      // Insulation ratings
-      optimal: "Optimal",
-      optimal_desc: "Niveau S - 7 jours parfaits",
-      excellent: "Excellent",
-      excellent_desc: "Très bien isolé",
-      good: "Bon",
-      good_desc: "Bien isolé",
-      average: "Moyen",
-      average_desc: "Isolation standard",
-      poor: "Faible",
-      poor_desc: "À améliorer",
-      very_poor: "Critique",
-      very_poor_desc: "Isolation insuffisante",
-      excellent_inferred: "Excellente",
-      excellent_inferred_desc: "Chauffe minimale nécessaire",
-      summer_mode: "☀️ Mode été",
-      summer_mode_desc: "Mesure impossible",
-      off_season: "🌤️ Hors saison",
-      off_season_desc: "ΔT insuffisant",
-      waiting: "En attente",
-      waiting_desc: "Chauffe nécessaire",
-      last_measurement: "Dernière mesure",
-      last_k: "Dernier K",
-
-      // Performance ratings
-      perf_excellent: "Excellente",
-      perf_standard: "Standard",
-      perf_optimize: "À optimiser",
-      vs_average: "vs moyenne",
-
-      // Metrics
-      k_instant: "K instantané",
-      energy_day: "Énergie/jour",
-      heating_time: "Temps chauffe",
-      avg_delta: "Écart moyen",
-      measured: "mesurée",
-      estimated: "estimée",
-      on_24h: "sur 24h",
-      rolling_24h: "sur 24h glissant",
-      of_time: "du temps",
-      indoor_outdoor: "Int. - Ext.",
-
-      // Tooltips
-      tooltip_estimated: "estimé",
-
-      // Days
-      days: ["Di", "Lu", "Ma", "Me", "Je", "Ve", "Sa"],
-
-      // Loading & analyzing
-      integration_starting: "Home Performance démarre. Les données seront disponibles dans quelques secondes.",
-      zone_check_hint: "Si ce message persiste, vérifiez que la zone",
-      exists_in_integration: "existe dans l'intégration Home Performance.",
-      expected_entity: "Entité attendue",
-      analyzing: "Analyse en cours",
-      analysis_in_progress: "Collecte des données thermiques pour calculer les performances de la pièce. Résultats disponibles après 12h d'analyse.",
-      remaining_time: "restantes",
-      completed: "Terminé",
-      ready: "Prêt",
-
-      // Editor
-      editor_zone: "Zone",
-      editor_select_zone: "Sélectionner une zone",
-      editor_title: "Titre",
-      editor_card_style: "Style de carte",
-      editor_full: "Complète",
-      editor_badge: "Badge",
-      editor_pill: "Pilule",
-      editor_multi: "Multi-zone",
-      editor_demo: "Mode démo (prévisualisation)",
-      editor_show_graph: "Afficher le graphique historique",
-
-      // Multi-zone
-      multi_title: "Home Performance",
-      multi_zones_monitored: "zones surveillées",
-      multi_avg: "moy",
-      multi_list: "Liste",
-      multi_compare: "Comparer",
-      multi_ref: "RÉF",
-      multi_k_inst: "K INST.",
-      multi_energy: "ÉNERGIE",
-      multi_heating: "CHAUFFE",
-      multi_delta: "ΔT MOY",
-      multi_no_zones: "Aucune zone trouvée",
-      multi_no_data: "Aucune donnée disponible",
-      multi_waiting_data: "En attente des données K/m³...",
-      multi_kwh_day: "kWh/jour",
-
-      // Wind
-      wind_exposure_exposed: "Exposée",
-      wind_exposure_partial: "Partielle",
-      wind_exposure_sheltered: "Abritée",
-
-      // Temperature variation warning
-      temp_variation: "VARIATION",
-      temp_variation_warning: "Variation température",
-      temp_variation_desc: "Score potentiellement sous-estimé",
-      wind_exposure_unknown: "",
-    },
-    it: {
-      // Config & titles
-      default_title: "Performance Termica",
-      error_no_zone: "Specificare una zona",
-      loading: "Caricamento...",
-      loading_integration: "Caricamento integrazione...",
-
-      // Section headers
-      isolation: "ISOLAMENTO",
-      performance: "PRESTAZIONI",
-      temperatures: "TEMPERATURE",
-      technical_details: "DETTAGLI TECNICI",
-      history_title: "STORICO K (7 GIORNI)",
-      excellence_title: "PRESTAZIONI 7 GIORNI",
-
-      // Insulation ratings
-      optimal: "Ottimale",
-      optimal_desc: "Livello S - 7 giorni perfetti",
-      excellent: "Eccellente",
-      excellent_desc: "Molto ben isolato",
-      good: "Buono",
-      good_desc: "Ben isolato",
-      average: "Medio",
-      average_desc: "Isolamento standard",
-      poor: "Scarso",
-      poor_desc: "Da migliorare",
-      very_poor: "Critico",
-      very_poor_desc: "Isolamento insufficiente",
-      excellent_inferred: "Eccellente",
-      excellent_inferred_desc: "Riscaldamento minimo necessario",
-      summer_mode: "☀️ Modalità estiva",
-      summer_mode_desc: "Misurazione impossibile",
-      off_season: "🌤️ Fuori stagione",
-      off_season_desc: "ΔT insufficiente",
-      waiting: "In attesa",
-      waiting_desc: "Riscaldamento necessario",
-      last_measurement: "Ultima misurazione",
-      last_k: "Ultimo K",
-
-      // Performance ratings
-      perf_excellent: "Eccellente",
-      perf_standard: "Standard",
-      perf_optimize: "Da ottimizzare",
-      vs_average: "vs media",
-
-      // Metrics
-      k_instant: "K istantaneo",
-      energy_day: "Energia/giorno",
-      heating_time: "Tempo risc.",
-      avg_delta: "Delta medio",
-      measured: "misurata",
-      estimated: "stimata",
-      on_24h: "su 24h",
-      rolling_24h: "su 24h mobili",
-      of_time: "del tempo",
-      indoor_outdoor: "Int. - Est.",
-
-      // Tooltips
-      tooltip_estimated: "stimato",
-
-      // Days
-      days: ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"],
-
-      // Loading & analyzing
-      integration_starting: "Home Performance si sta avviando. I dati saranno disponibili tra pochi secondi.",
-      zone_check_hint: "Se questo messaggio persiste, verificare che la zona",
-      exists_in_integration: "esista nell'integrazione Home Performance.",
-      expected_entity: "Entità prevista",
-      analyzing: "Analisi in corso",
-      analysis_in_progress: "Raccolta dati termici per calcolare le prestazioni della stanza. Risultati disponibili dopo 12h di analisi.",
-      remaining_time: "rimanenti",
-      completed: "Completato",
-      ready: "Pronto",
-
-      // Editor
-      editor_zone: "Zona",
-      editor_select_zone: "Seleziona una zona",
-      editor_title: "Titolo",
-      editor_card_style: "Stile scheda",
-      editor_full: "Completa",
-      editor_badge: "Badge",
-      editor_pill: "Pillola",
-      editor_multi: "Multi-zona",
-      editor_demo: "Modalità demo (anteprima)",
-      editor_show_graph: "Mostra grafico storico",
-
-      // Multi-zone
-      multi_title: "Home Performance",
-      multi_zones_monitored: "zone monitorate",
-      multi_avg: "media",
-      multi_list: "Lista",
-      multi_compare: "Confronta",
-      multi_ref: "RIF",
-      multi_k_inst: "K IST.",
-      multi_energy: "ENERGIA",
-      multi_heating: "RISC.",
-      multi_delta: "ΔT MEDIO",
-      multi_no_zones: "Nessuna zona trovata",
-      multi_no_data: "Nessun dato disponibile",
-      multi_waiting_data: "In attesa dei dati K/m³...",
-      multi_kwh_day: "kWh/giorno",
-
-      // Wind
-      wind_exposure_exposed: "Esposta",
-      wind_exposure_partial: "Parziale",
-      wind_exposure_sheltered: "Riparata",
-
-      // Temperature variation warning
-      temp_variation: "VARIAZIONE",
-      temp_variation_warning: "Variazione temperatura",
-      temp_variation_desc: "Punteggio potenzialmente sottostimato",
-      wind_exposure_unknown: "",
+  class HomePerformanceCard extends LitElement {
+    static get properties() {
+      return {
+        hass: { type: Object },
+        config: { type: Object },
+      };
     }
-  };
 
-  // Get translation for key
-  _t(key) {
-    const lang = this.hass?.language?.substring(0, 2) || 'en';
-    const translations = HomePerformanceCard._translations[lang] || HomePerformanceCard._translations['en'];
-    return translations[key] !== undefined ? translations[key] : key;
-  }
+    // Translations for i18n support
+    static _translations = {
+      en: {
+        // Config & titles
+        default_title: "Thermal Performance",
+        error_no_zone: "Please specify a zone",
+        loading: "Loading...",
+        loading_integration: "Loading integration...",
 
-  static getConfigElement() {
-    return document.createElement("home-performance-card-editor");
-  }
+        // Section headers
+        isolation: "INSULATION",
+        performance: "PERFORMANCE",
+        temperatures: "TEMPERATURES",
+        technical_details: "TECHNICAL DETAILS",
+        history_title: "K HISTORY (7 DAYS)",
+        excellence_title: "7-DAY PERFORMANCE",
 
-  static getStubConfig() {
-    return {
-      zone: "",
-      title: "",
-      layout: "full",  // "full", "badge", "pill"
-      demo: false,
+        // Insulation ratings
+        optimal: "Optimal",
+        optimal_desc: "Level S - 7 days perfect",
+        excellent: "Excellent",
+        excellent_desc: "Very well insulated",
+        good: "Good",
+        good_desc: "Well insulated",
+        average: "Average",
+        average_desc: "Standard insulation",
+        poor: "Poor",
+        poor_desc: "Needs improvement",
+        very_poor: "Critical",
+        very_poor_desc: "Insufficient insulation",
+        excellent_inferred: "Excellent",
+        excellent_inferred_desc: "Minimal heating needed",
+        summer_mode: "☀️ Summer mode",
+        summer_mode_desc: "Measurement not possible",
+        off_season: "🌤️ Shoulder season",
+        off_season_desc: "ΔT insufficient",
+        waiting: "Waiting",
+        waiting_desc: "Heating required",
+        last_measurement: "Last measurement",
+        last_k: "Last K",
+
+        // Performance ratings
+        perf_excellent: "Excellent",
+        perf_standard: "Standard",
+        perf_optimize: "Needs optimization",
+        vs_average: "vs average",
+
+        // Metrics
+        k_instant: "K instant",
+        energy_day: "Energy/day",
+        heating_time: "Heating time",
+        avg_delta: "Avg delta",
+        measured: "measured",
+        estimated: "estimated",
+        on_24h: "over 24h",
+        rolling_24h: "rolling 24h",
+        of_time: "of time",
+        indoor_outdoor: "In. - Out.",
+
+        // Tooltips
+        tooltip_estimated: "estimated",
+
+        // Days
+        days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+
+        // Loading & analyzing
+        integration_starting: "Home Performance is starting. Data will be available in a few seconds.",
+        zone_check_hint: "If this message persists, check that the zone",
+        exists_in_integration: "exists in the Home Performance integration.",
+        expected_entity: "Expected entity",
+        analyzing: "Analyzing",
+        analysis_in_progress: "Collecting thermal data to calculate room performance. Results available after 12h of analysis.",
+        remaining_time: "remaining",
+        completed: "Completed",
+        ready: "Ready",
+
+        // Editor
+        editor_zone: "Zone",
+        editor_select_zone: "Select a zone",
+        editor_title: "Title",
+        editor_card_style: "Card style",
+        editor_full: "Full",
+        editor_badge: "Badge",
+        editor_pill: "Pill",
+        editor_multi: "Multi-zone",
+        editor_demo: "Demo mode (preview)",
+        editor_show_graph: "Show history graph",
+
+        // Multi-zone
+        multi_title: "Home Performance",
+        multi_zones_monitored: "zones monitored",
+        multi_avg: "avg",
+        multi_list: "List",
+        multi_compare: "Compare",
+        multi_ref: "REF",
+        multi_k_inst: "K INST.",
+        multi_energy: "ENERGY",
+        multi_heating: "HEATING",
+        multi_delta: "ΔT AVG",
+        multi_no_zones: "No zones found",
+        multi_no_data: "No data available",
+        multi_waiting_data: "Waiting for K/m³ data...",
+        multi_kwh_day: "kWh/day",
+
+        // Wind
+        wind_exposure_exposed: "Exposed",
+        wind_exposure_partial: "Partial",
+        wind_exposure_sheltered: "Sheltered",
+
+        // Temperature variation warning
+        temp_variation: "VARIATION",
+        temp_variation_warning: "Temperature variation",
+        temp_variation_desc: "Score potentially underestimated",
+        wind_exposure_unknown: "",
+      },
+      fr: {
+        // Config & titles
+        default_title: "Performance Thermique",
+        error_no_zone: "Veuillez spécifier une zone",
+        loading: "Chargement...",
+        loading_integration: "Chargement de l'intégration...",
+
+        // Section headers
+        isolation: "ISOLATION",
+        performance: "PERFORMANCE",
+        temperatures: "TEMPÉRATURES",
+        technical_details: "DÉTAILS TECHNIQUES",
+        history_title: "HISTORIQUE K (7 JOURS)",
+        excellence_title: "PERFORMANCE 7 JOURS",
+
+        // Insulation ratings
+        optimal: "Optimal",
+        optimal_desc: "Niveau S - 7 jours parfaits",
+        excellent: "Excellent",
+        excellent_desc: "Très bien isolé",
+        good: "Bon",
+        good_desc: "Bien isolé",
+        average: "Moyen",
+        average_desc: "Isolation standard",
+        poor: "Faible",
+        poor_desc: "À améliorer",
+        very_poor: "Critique",
+        very_poor_desc: "Isolation insuffisante",
+        excellent_inferred: "Excellente",
+        excellent_inferred_desc: "Chauffe minimale nécessaire",
+        summer_mode: "☀️ Mode été",
+        summer_mode_desc: "Mesure impossible",
+        off_season: "🌤️ Hors saison",
+        off_season_desc: "ΔT insuffisant",
+        waiting: "En attente",
+        waiting_desc: "Chauffe nécessaire",
+        last_measurement: "Dernière mesure",
+        last_k: "Dernier K",
+
+        // Performance ratings
+        perf_excellent: "Excellente",
+        perf_standard: "Standard",
+        perf_optimize: "À optimiser",
+        vs_average: "vs moyenne",
+
+        // Metrics
+        k_instant: "K instantané",
+        energy_day: "Énergie/jour",
+        heating_time: "Temps chauffe",
+        avg_delta: "Écart moyen",
+        measured: "mesurée",
+        estimated: "estimée",
+        on_24h: "sur 24h",
+        rolling_24h: "sur 24h glissant",
+        of_time: "du temps",
+        indoor_outdoor: "Int. - Ext.",
+
+        // Tooltips
+        tooltip_estimated: "estimé",
+
+        // Days
+        days: ["Di", "Lu", "Ma", "Me", "Je", "Ve", "Sa"],
+
+        // Loading & analyzing
+        integration_starting: "Home Performance démarre. Les données seront disponibles dans quelques secondes.",
+        zone_check_hint: "Si ce message persiste, vérifiez que la zone",
+        exists_in_integration: "existe dans l'intégration Home Performance.",
+        expected_entity: "Entité attendue",
+        analyzing: "Analyse en cours",
+        analysis_in_progress: "Collecte des données thermiques pour calculer les performances de la pièce. Résultats disponibles après 12h d'analyse.",
+        remaining_time: "restantes",
+        completed: "Terminé",
+        ready: "Prêt",
+
+        // Editor
+        editor_zone: "Zone",
+        editor_select_zone: "Sélectionner une zone",
+        editor_title: "Titre",
+        editor_card_style: "Style de carte",
+        editor_full: "Complète",
+        editor_badge: "Badge",
+        editor_pill: "Pilule",
+        editor_multi: "Multi-zone",
+        editor_demo: "Mode démo (prévisualisation)",
+        editor_show_graph: "Afficher le graphique historique",
+
+        // Multi-zone
+        multi_title: "Home Performance",
+        multi_zones_monitored: "zones surveillées",
+        multi_avg: "moy",
+        multi_list: "Liste",
+        multi_compare: "Comparer",
+        multi_ref: "RÉF",
+        multi_k_inst: "K INST.",
+        multi_energy: "ÉNERGIE",
+        multi_heating: "CHAUFFE",
+        multi_delta: "ΔT MOY",
+        multi_no_zones: "Aucune zone trouvée",
+        multi_no_data: "Aucune donnée disponible",
+        multi_waiting_data: "En attente des données K/m³...",
+        multi_kwh_day: "kWh/jour",
+
+        // Wind
+        wind_exposure_exposed: "Exposée",
+        wind_exposure_partial: "Partielle",
+        wind_exposure_sheltered: "Abritée",
+
+        // Temperature variation warning
+        temp_variation: "VARIATION",
+        temp_variation_warning: "Variation température",
+        temp_variation_desc: "Score potentiellement sous-estimé",
+        wind_exposure_unknown: "",
+      },
+      it: {
+        // Config & titles
+        default_title: "Performance Termica",
+        error_no_zone: "Specificare una zona",
+        loading: "Caricamento...",
+        loading_integration: "Caricamento integrazione...",
+
+        // Section headers
+        isolation: "ISOLAMENTO",
+        performance: "PRESTAZIONI",
+        temperatures: "TEMPERATURE",
+        technical_details: "DETTAGLI TECNICI",
+        history_title: "STORICO K (7 GIORNI)",
+        excellence_title: "PRESTAZIONI 7 GIORNI",
+
+        // Insulation ratings
+        optimal: "Ottimale",
+        optimal_desc: "Livello S - 7 giorni perfetti",
+        excellent: "Eccellente",
+        excellent_desc: "Molto ben isolato",
+        good: "Buono",
+        good_desc: "Ben isolato",
+        average: "Medio",
+        average_desc: "Isolamento standard",
+        poor: "Scarso",
+        poor_desc: "Da migliorare",
+        very_poor: "Critico",
+        very_poor_desc: "Isolamento insufficiente",
+        excellent_inferred: "Eccellente",
+        excellent_inferred_desc: "Riscaldamento minimo necessario",
+        summer_mode: "☀️ Modalità estiva",
+        summer_mode_desc: "Misurazione impossibile",
+        off_season: "🌤️ Fuori stagione",
+        off_season_desc: "ΔT insufficiente",
+        waiting: "In attesa",
+        waiting_desc: "Riscaldamento necessario",
+        last_measurement: "Ultima misurazione",
+        last_k: "Ultimo K",
+
+        // Performance ratings
+        perf_excellent: "Eccellente",
+        perf_standard: "Standard",
+        perf_optimize: "Da ottimizzare",
+        vs_average: "vs media",
+
+        // Metrics
+        k_instant: "K istantaneo",
+        energy_day: "Energia/giorno",
+        heating_time: "Tempo risc.",
+        avg_delta: "Delta medio",
+        measured: "misurata",
+        estimated: "stimata",
+        on_24h: "su 24h",
+        rolling_24h: "su 24h mobili",
+        of_time: "del tempo",
+        indoor_outdoor: "Int. - Est.",
+
+        // Tooltips
+        tooltip_estimated: "stimato",
+
+        // Days
+        days: ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"],
+
+        // Loading & analyzing
+        integration_starting: "Home Performance si sta avviando. I dati saranno disponibili tra pochi secondi.",
+        zone_check_hint: "Se questo messaggio persiste, verificare che la zona",
+        exists_in_integration: "esista nell'integrazione Home Performance.",
+        expected_entity: "Entità prevista",
+        analyzing: "Analisi in corso",
+        analysis_in_progress: "Raccolta dati termici per calcolare le prestazioni della stanza. Risultati disponibili dopo 12h di analisi.",
+        remaining_time: "rimanenti",
+        completed: "Completato",
+        ready: "Pronto",
+
+        // Editor
+        editor_zone: "Zona",
+        editor_select_zone: "Seleziona una zona",
+        editor_title: "Titolo",
+        editor_card_style: "Stile scheda",
+        editor_full: "Completa",
+        editor_badge: "Badge",
+        editor_pill: "Pillola",
+        editor_multi: "Multi-zona",
+        editor_demo: "Modalità demo (anteprima)",
+        editor_show_graph: "Mostra grafico storico",
+
+        // Multi-zone
+        multi_title: "Home Performance",
+        multi_zones_monitored: "zone monitorate",
+        multi_avg: "media",
+        multi_list: "Lista",
+        multi_compare: "Confronta",
+        multi_ref: "RIF",
+        multi_k_inst: "K IST.",
+        multi_energy: "ENERGIA",
+        multi_heating: "RISC.",
+        multi_delta: "ΔT MEDIO",
+        multi_no_zones: "Nessuna zona trovata",
+        multi_no_data: "Nessun dato disponibile",
+        multi_waiting_data: "In attesa dei dati K/m³...",
+        multi_kwh_day: "kWh/giorno",
+
+        // Wind
+        wind_exposure_exposed: "Esposta",
+        wind_exposure_partial: "Parziale",
+        wind_exposure_sheltered: "Riparata",
+
+        // Temperature variation warning
+        temp_variation: "VARIAZIONE",
+        temp_variation_warning: "Variazione temperatura",
+        temp_variation_desc: "Punteggio potenzialmente sottostimato",
+        wind_exposure_unknown: "",
+      }
     };
-  }
 
-  setConfig(config) {
-    // Multi layout doesn't require a zone (auto-detects all zones)
-    if (config.layout !== "multi" && !config.zone) {
-      throw new Error(HomePerformanceCard._translations.en.error_no_zone);
+    // Get translation for key
+    _t(key) {
+      const lang = this.hass?.language?.substring(0, 2) || 'en';
+      const translations = HomePerformanceCard._translations[lang] || HomePerformanceCard._translations['en'];
+      return translations[key] !== undefined ? translations[key] : key;
     }
-    this.config = {
-      title: "",  // Will use _t('default_title') if empty
-      layout: "full",
-      show_graph: true,
-      demo: false,
-      // Multi-zone specific options
-      default_view: "list",      // "list" or "compare"
-      show_sparklines: true,
-      ...config,
-    };
-    // Initialize multi-zone view state
-    if (this.config.layout === "multi") {
-      this._multiView = this.config.default_view || "list";
-      this._expandedZone = null;
+
+    static getConfigElement() {
+      return document.createElement("home-performance-card-editor");
     }
-  }
 
-  connectedCallback() {
-    super.connectedCallback();
-    this._checkVersion();
-  }
+    static getStubConfig() {
+      return {
+        zone: "",
+        title: "",
+        layout: "full",  // "full", "badge", "pill"
+        demo: false,
+      };
+    }
 
-  updated(changedProps) {
-    super.updated?.(changedProps);
-    // Check version when hass becomes available
-    if (changedProps.has("hass") && this.hass && !this._versionChecked) {
+    setConfig(config) {
+      // Multi layout doesn't require a zone (auto-detects all zones)
+      if (config.layout !== "multi" && !config.zone) {
+        throw new Error(HomePerformanceCard._translations.en.error_no_zone);
+      }
+      this.config = {
+        title: "",  // Will use _t('default_title') if empty
+        layout: "full",
+        show_graph: true,
+        demo: false,
+        // Multi-zone specific options
+        default_view: "list",      // "list" or "compare"
+        show_sparklines: true,
+        ...config,
+      };
+      // Initialize multi-zone view state
+      if (this.config.layout === "multi") {
+        this._multiView = this.config.default_view || "list";
+        this._expandedZone = null;
+      }
+    }
+
+    connectedCallback() {
+      super.connectedCallback();
       this._checkVersion();
     }
-  }
 
-  async _checkVersion() {
-    if (!this.hass || this._versionChecked) return;
-    this._versionChecked = true;
-
-    try {
-      const result = await this.hass.callWS({
-        type: "home_performance/version",
-      });
-
-      if (result && result.version && result.version !== CARD_VERSION) {
-        console.warn(
-          `[Home Performance] Version mismatch: Card v${CARD_VERSION}, Backend v${result.version}`
-        );
-        this._showVersionMismatchNotification(result.version);
+    updated(changedProps) {
+      super.updated?.(changedProps);
+      // Check version when hass becomes available
+      if (changedProps.has("hass") && this.hass && !this._versionChecked) {
+        this._checkVersion();
       }
-    } catch (err) {
-      // WebSocket command not available (older backend version)
-      console.debug("[Home Performance] Version check not available:", err);
     }
-  }
 
-  _showVersionMismatchNotification(backendVersion) {
-    const event = new CustomEvent("hass-notification", {
-      bubbles: true,
-      composed: true,
-      detail: {
-        message: `Home Performance: Version mismatch detected!\nCard: v${CARD_VERSION} | Backend: v${backendVersion}\nPlease clear your cache and reload.`,
-        duration: 0, // Persistent notification
-        dismissable: true,
-        action: {
-          text: "Reload",
-          action: async () => {
-            // Clear caches if available
-            if ("caches" in window) {
-              try {
-                const cacheNames = await caches.keys();
-                await Promise.all(
-                  cacheNames.map((name) => caches.delete(name))
-                );
-              } catch (e) {
-                console.warn("[Home Performance] Could not clear caches:", e);
+    async _checkVersion() {
+      if (!this.hass || this._versionChecked) return;
+      this._versionChecked = true;
+
+      try {
+        const result = await this.hass.callWS({
+          type: "home_performance/version",
+        });
+
+        if (result && result.version && result.version !== CARD_VERSION) {
+          console.warn(
+            `[Home Performance] Version mismatch: Card v${CARD_VERSION}, Backend v${result.version}`
+          );
+          this._showVersionMismatchNotification(result.version);
+        }
+      } catch (err) {
+        // WebSocket command not available (older backend version)
+        console.debug("[Home Performance] Version check not available:", err);
+      }
+    }
+
+    _showVersionMismatchNotification(backendVersion) {
+      const event = new CustomEvent("hass-notification", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          message: `Home Performance: Version mismatch detected!\nCard: v${CARD_VERSION} | Backend: v${backendVersion}\nPlease clear your cache and reload.`,
+          duration: 0, // Persistent notification
+          dismissable: true,
+          action: {
+            text: "Reload",
+            action: async () => {
+              // Clear caches if available
+              if ("caches" in window) {
+                try {
+                  const cacheNames = await caches.keys();
+                  await Promise.all(
+                    cacheNames.map((name) => caches.delete(name))
+                  );
+                } catch (e) {
+                  console.warn("[Home Performance] Could not clear caches:", e);
+                }
               }
-            }
-            // Reload the page
-            window.location.reload(true);
+              // Reload the page
+              window.location.reload(true);
+            },
           },
         },
-      },
-    });
-    this.dispatchEvent(event);
-  }
-
-  getCardSize() {
-    // Different sizes for different layouts
-    switch (this.config?.layout) {
-      case "badge": return 2;
-      case "pill": return 1;
-      case "multi": return 4;
-      default: return 5;
+      });
+      this.dispatchEvent(event);
     }
-  }
 
-  // Slugify zone name to match Home Assistant entity_id format
-  // Handles special characters like ü, é, ç, etc.
-  _slugifyZone(zone) {
-    return zone
-      .toLowerCase()
-      // Normalize Unicode characters (é → e, ü → u, ç → c, etc.)
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      // Replace spaces and special chars with underscores
-      .replace(/[^a-z0-9]+/g, '_')
-      // Remove leading/trailing underscores
-      .replace(/^_+|_+$/g, '');
-  }
-
-  // Entity name mappings: NEW standardized name first, then legacy variants for backward compatibility
-  // New installations use first entry (English), existing users match via fallbacks (French/legacy)
-  _entityMappings = {
-    // Binary sensors - standardized first, then legacy
-    "donnees_pretes": ["data_ready", "donnees_pretes"],
-    "fenetre_ouverte": ["window_open", "fenetre_ouverte"],
-    "chauffage_actif": ["heating_active", "chauffage_actif"],
-    // Sensors - standardized first, then legacy variants
-    "coefficient_k": ["k_coefficient", "coefficient_k"],
-    "k_par_m2": ["k_per_m2", "k_par_m2"],
-    "k_par_m3": ["k_per_m3", "k_par_m3"],
-    "note_d_isolation": ["insulation_rating", "note_d_isolation", "note_isolation"],
-    "performance_energetique": ["energy_performance", "performance_energetique"],
-    "energie_mesuree_jour": ["measured_energy_daily", "energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
-    "energie_24h_estimee": ["daily_estimated_energy", "energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy"],
-    "temps_de_chauffe_24h": ["heating_time_24h", "temps_de_chauffe_24h", "daily_heating_time"],
-    "ratio_de_chauffe": ["heating_ratio_24h", "ratio_de_chauffe", "taux_de_chauffe_24h", "heating_ratio"],
-    "dt_moyen_24h": ["avg_delta_t_24h", "dt_moyen_24h", "average_delta_t", "average_dt_24h"],
-    "progression_analyse": ["analysis_progress", "progression_analyse"],
-    "temps_restant_analyse": ["analysis_remaining", "temps_restant_analyse", "analysis_time_remaining"],
-    "heures_de_donnees": ["data_hours", "heures_de_donnees"],
-  };
-
-  _getEntityId(suffix) {
-    const zone = this._slugifyZone(this.config.zone);
-    const variants = this._entityMappings[suffix] || [suffix];
-
-    // Try each variant and return the first one that exists
-    for (const variant of variants) {
-      const entityId = `sensor.home_performance_${zone}_${variant}`;
-      if (this.hass?.states[entityId] !== undefined) {
-        return entityId;
+    getCardSize() {
+      // Different sizes for different layouts
+      switch (this.config?.layout) {
+        case "badge": return 2;
+        case "pill": return 1;
+        case "multi": return 4;
+        default: return 5;
       }
     }
-    // Fallback to primary (first) variant
-    return `sensor.home_performance_${zone}_${variants[0]}`;
-  }
 
-  _getBinaryEntityId(suffix) {
-    const zone = this._slugifyZone(this.config.zone);
-    const variants = this._entityMappings[suffix] || [suffix];
+    // Slugify zone name to match Home Assistant entity_id format
+    // Handles special characters like ü, é, ç, etc.
+    _slugifyZone(zone) {
+      return zone
+        .toLowerCase()
+        // Normalize Unicode characters (é → e, ü → u, ç → c, etc.)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        // Replace spaces and special chars with underscores
+        .replace(/[^a-z0-9]+/g, '_')
+        // Remove leading/trailing underscores
+        .replace(/^_+|_+$/g, '');
+    }
 
-    // Try each variant and return the first one that exists
-    for (const variant of variants) {
-      const entityId = `binary_sensor.home_performance_${zone}_${variant}`;
-      if (this.hass?.states[entityId] !== undefined) {
-        return entityId;
+    // Entity name mappings: NEW standardized name first, then legacy variants for backward compatibility
+    // New installations use first entry (English), existing users match via fallbacks (French/legacy)
+    _entityMappings = {
+      // Binary sensors - standardized first, then legacy
+      "donnees_pretes": ["data_ready", "donnees_pretes"],
+      "fenetre_ouverte": ["window_open", "fenetre_ouverte"],
+      "chauffage_actif": ["heating_active", "chauffage_actif"],
+      // Sensors - standardized first, then legacy variants
+      "coefficient_k": ["k_coefficient", "coefficient_k"],
+      "k_par_m2": ["k_per_m2", "k_par_m2"],
+      "k_par_m3": ["k_per_m3", "k_par_m3"],
+      "note_d_isolation": ["insulation_rating", "note_d_isolation", "note_isolation"],
+      "performance_energetique": ["energy_performance", "performance_energetique"],
+      "energie_mesuree_jour": ["measured_energy_daily", "energie_mesuree_jour", "energie_jour_mesuree", "energie_mesuree_journaliere", "daily_measured_energy"],
+      "energie_24h_estimee": ["daily_estimated_energy", "energie_24h_estimee", "energie_estimee_journaliere", "estimated_daily_energy"],
+      "temps_de_chauffe_24h": ["heating_time_24h", "temps_de_chauffe_24h", "daily_heating_time"],
+      "ratio_de_chauffe": ["heating_ratio_24h", "ratio_de_chauffe", "taux_de_chauffe_24h", "heating_ratio"],
+      "dt_moyen_24h": ["avg_delta_t_24h", "dt_moyen_24h", "average_delta_t", "average_dt_24h"],
+      "progression_analyse": ["analysis_progress", "progression_analyse"],
+      "temps_restant_analyse": ["analysis_remaining", "temps_restant_analyse", "analysis_time_remaining"],
+      "heures_de_donnees": ["data_hours", "heures_de_donnees"],
+    };
+
+    _getEntityId(suffix) {
+      const zone = this._slugifyZone(this.config.zone);
+      const variants = this._entityMappings[suffix] || [suffix];
+
+      // Try each variant and return the first one that exists
+      for (const variant of variants) {
+        const entityId = `sensor.home_performance_${zone}_${variant}`;
+        if (this.hass?.states[entityId] !== undefined) {
+          return entityId;
+        }
       }
+      // Fallback to primary (first) variant
+      return `sensor.home_performance_${zone}_${variants[0]}`;
     }
-    // Fallback to primary (first) variant
-    return `binary_sensor.home_performance_${zone}_${variants[0]}`;
-  }
 
-  _getState(entityId) {
-    const state = this.hass?.states[entityId];
-    return state ? state.state : "unavailable";
-  }
+    _getBinaryEntityId(suffix) {
+      const zone = this._slugifyZone(this.config.zone);
+      const variants = this._entityMappings[suffix] || [suffix];
 
-  _getAttribute(entityId, attr) {
-    const state = this.hass?.states[entityId];
-    return state?.attributes?.[attr];
-  }
-
-  // Get unit of measurement for a specific entity
-  _getEntityUnit(entityId) {
-    const state = this.hass?.states[entityId];
-    return state?.attributes?.unit_of_measurement;
-  }
-
-  // Get user's temperature unit from HA config
-  _getTempUnit() {
-    return this.hass?.config?.unit_system?.temperature || "°C";
-  }
-
-  // Check if user uses Fahrenheit
-  _usesFahrenheit() {
-    const unit = this._getTempUnit();
-    return unit === "°F" || unit === "F";
-  }
-
-  // Convert Celsius to Fahrenheit (absolute temperature)
-  _celsiusToFahrenheit(celsius) {
-    if (celsius === null || celsius === undefined || isNaN(parseFloat(celsius))) {
-      return celsius;
+      // Try each variant and return the first one that exists
+      for (const variant of variants) {
+        const entityId = `binary_sensor.home_performance_${zone}_${variant}`;
+        if (this.hass?.states[entityId] !== undefined) {
+          return entityId;
+        }
+      }
+      // Fallback to primary (first) variant
+      return `binary_sensor.home_performance_${zone}_${variants[0]}`;
     }
-    return ((parseFloat(celsius) * 9 / 5) + 32).toFixed(1);
-  }
 
-  // Convert temperature DIFFERENCE (delta) to Fahrenheit - NO +32 offset!
-  _celsiusDeltaToFahrenheit(celsiusDelta) {
-    if (celsiusDelta === null || celsiusDelta === undefined || isNaN(parseFloat(celsiusDelta))) {
-      return celsiusDelta;
+    _getState(entityId) {
+      const state = this.hass?.states[entityId];
+      return state ? state.state : "unavailable";
     }
-    return (parseFloat(celsiusDelta) * 9 / 5).toFixed(1);
-  }
 
-  // Convert absolute temperature based on user's unit system
-  // Our backend always stores in Celsius, this converts for display
-  _convertTemp(tempCelsius) {
-    if (this._usesFahrenheit()) {
-      return this._celsiusToFahrenheit(tempCelsius);
+    _getAttribute(entityId, attr) {
+      const state = this.hass?.states[entityId];
+      return state?.attributes?.[attr];
     }
-    return tempCelsius;
-  }
 
-  // Convert temperature difference (delta) based on user's unit system
-  // If sensorUnit is provided and already matches user's unit, skip conversion
-  _convertTempDelta(deltaValue, sensorUnit = null) {
-    if (deltaValue === null || deltaValue === undefined || isNaN(parseFloat(deltaValue))) {
-      return deltaValue;
+    // Get unit of measurement for a specific entity
+    _getEntityUnit(entityId) {
+      const state = this.hass?.states[entityId];
+      return state?.attributes?.unit_of_measurement;
     }
-    const userUnit = this._getTempUnit();
-    // If sensor already provides value in user's unit, no conversion needed
-    if (sensorUnit && sensorUnit === userUnit) {
+
+    // Get user's temperature unit from HA config
+    _getTempUnit() {
+      return this.hass?.config?.unit_system?.temperature || "°C";
+    }
+
+    // Check if user uses Fahrenheit
+    _usesFahrenheit() {
+      const unit = this._getTempUnit();
+      return unit === "°F" || unit === "F";
+    }
+
+    // Convert Celsius to Fahrenheit (absolute temperature)
+    _celsiusToFahrenheit(celsius) {
+      if (celsius === null || celsius === undefined || isNaN(parseFloat(celsius))) {
+        return celsius;
+      }
+      return ((parseFloat(celsius) * 9 / 5) + 32).toFixed(1);
+    }
+
+    // Convert temperature DIFFERENCE (delta) to Fahrenheit - NO +32 offset!
+    _celsiusDeltaToFahrenheit(celsiusDelta) {
+      if (celsiusDelta === null || celsiusDelta === undefined || isNaN(parseFloat(celsiusDelta))) {
+        return celsiusDelta;
+      }
+      return (parseFloat(celsiusDelta) * 9 / 5).toFixed(1);
+    }
+
+    // Convert absolute temperature based on user's unit system
+    // Our backend always stores in Celsius, this converts for display
+    _convertTemp(tempCelsius) {
+      if (this._usesFahrenheit()) {
+        return this._celsiusToFahrenheit(tempCelsius);
+      }
+      return tempCelsius;
+    }
+
+    // Convert temperature difference (delta) based on user's unit system
+    // If sensorUnit is provided and already matches user's unit, skip conversion
+    _convertTempDelta(deltaValue, sensorUnit = null) {
+      if (deltaValue === null || deltaValue === undefined || isNaN(parseFloat(deltaValue))) {
+        return deltaValue;
+      }
+      const userUnit = this._getTempUnit();
+      // If sensor already provides value in user's unit, no conversion needed
+      if (sensorUnit && sensorUnit === userUnit) {
+        return parseFloat(deltaValue).toFixed(1);
+      }
+      // Otherwise convert from Celsius
+      if (this._usesFahrenheit()) {
+        return this._celsiusDeltaToFahrenheit(deltaValue);
+      }
       return parseFloat(deltaValue).toFixed(1);
     }
-    // Otherwise convert from Celsius
-    if (this._usesFahrenheit()) {
-      return this._celsiusDeltaToFahrenheit(deltaValue);
+
+    _entityExists(entityId) {
+      return this.hass?.states[entityId] !== undefined;
     }
-    return parseFloat(deltaValue).toFixed(1);
-  }
 
-  _entityExists(entityId) {
-    return this.hass?.states[entityId] !== undefined;
-  }
+    // Check if any of the zone's entities exist (integration is loaded)
+    _isIntegrationReady() {
+      if (this.config.demo) return true;
 
-  // Check if any of the zone's entities exist (integration is loaded)
-  _isIntegrationReady() {
-    if (this.config.demo) return true;
+      // Try to find any entity for this zone to confirm integration is loaded
+      const zone = this._slugifyZone(this.config.zone);
+      const possibleEntities = [
+        `binary_sensor.home_performance_${zone}_donnees_pretes`,
+        `binary_sensor.home_performance_${zone}_data_ready`,
+        `sensor.home_performance_${zone}_coefficient_k`,
+        `sensor.home_performance_${zone}_k_coefficient`,
+        `sensor.home_performance_${zone}_progression_analyse`,
+        `sensor.home_performance_${zone}_analysis_progress`,
+      ];
 
-    // Try to find any entity for this zone to confirm integration is loaded
-    const zone = this._slugifyZone(this.config.zone);
-    const possibleEntities = [
-      `binary_sensor.home_performance_${zone}_donnees_pretes`,
-      `binary_sensor.home_performance_${zone}_data_ready`,
-      `sensor.home_performance_${zone}_coefficient_k`,
-      `sensor.home_performance_${zone}_k_coefficient`,
-      `sensor.home_performance_${zone}_progression_analyse`,
-      `sensor.home_performance_${zone}_analysis_progress`,
-    ];
+      return possibleEntities.some(entityId => this.hass?.states[entityId] !== undefined);
+    }
 
-    return possibleEntities.some(entityId => this.hass?.states[entityId] !== undefined);
-  }
+    _isDataReady() {
+      if (this.config.demo) return true;
+      const entityId = this._getBinaryEntityId("donnees_pretes");
+      return this._getState(entityId) === "on";
+    }
 
-  _isDataReady() {
-    if (this.config.demo) return true;
-    const entityId = this._getBinaryEntityId("donnees_pretes");
-    return this._getState(entityId) === "on";
-  }
+    _isStorageLoaded() {
+      if (this.config.demo) return true;
+      const entityId = this._getBinaryEntityId("donnees_pretes");
+      const storageLoaded = this._getAttribute(entityId, "storage_loaded");
+      return storageLoaded === true;
+    }
 
-  _isStorageLoaded() {
-    if (this.config.demo) return true;
-    const entityId = this._getBinaryEntityId("donnees_pretes");
-    const storageLoaded = this._getAttribute(entityId, "storage_loaded");
-    return storageLoaded === true;
-  }
+    // Get data hours from the data_ready sensor
+    _getDataHours() {
+      if (this.config.demo) return 25;
+      const entityId = this._getBinaryEntityId("donnees_pretes");
+      return this._getAttribute(entityId, "data_hours") || 0;
+    }
 
-  // Get data hours from the data_ready sensor
-  _getDataHours() {
-    if (this.config.demo) return 25;
-    const entityId = this._getBinaryEntityId("donnees_pretes");
-    return this._getAttribute(entityId, "data_hours") || 0;
-  }
+    _getProgress() {
+      if (this.config.demo) return 100;
+      const entityId = this._getEntityId("progression_analyse");
+      const value = parseFloat(this._getState(entityId));
+      return isNaN(value) ? 0 : Math.min(100, Math.max(0, value));
+    }
 
-  _getProgress() {
-    if (this.config.demo) return 100;
-    const entityId = this._getEntityId("progression_analyse");
-    const value = parseFloat(this._getState(entityId));
-    return isNaN(value) ? 0 : Math.min(100, Math.max(0, value));
-  }
+    _getTimeRemaining() {
+      if (this.config.demo) return this._t('ready');
+      const entityId = this._getEntityId("temps_restant_analyse");
+      return this._getState(entityId);
+    }
 
-  _getTimeRemaining() {
-    if (this.config.demo) return this._t('ready');
-    const entityId = this._getEntityId("temps_restant_analyse");
-    return this._getState(entityId);
-  }
+    _getInsulationData(rating, insulationAttrs = {}) {
+      const data = {
+        // Level S - Optimal (7 days of excellence with minimal heating)
+        optimal: { label: this._t('optimal'), color: "#0ea5e9", icon: "mdi:shield-star", desc: this._t('optimal_desc') },
+        // Calculated ratings
+        excellent: { label: this._t('excellent'), color: "#10b981", icon: "mdi:shield-check", desc: this._t('excellent_desc') },
+        good: { label: this._t('good'), color: "#22c55e", icon: "mdi:shield-half-full", desc: this._t('good_desc') },
+        average: { label: this._t('average'), color: "#eab308", icon: "mdi:shield-outline", desc: this._t('average_desc') },
+        poor: { label: this._t('poor'), color: "#f97316", icon: "mdi:shield-alert", desc: this._t('poor_desc') },
+        very_poor: { label: this._t('very_poor'), color: "#ef4444", icon: "mdi:shield-off", desc: this._t('very_poor_desc') },
+        // Inferred excellent
+        excellent_inferred: { label: this._t('excellent_inferred'), color: "#059669", icon: "mdi:shield-check", desc: this._t('excellent_inferred_desc') },
+      };
 
-  _getInsulationData(rating, insulationAttrs = {}) {
-    const data = {
-      // Level S - Optimal (7 days of excellence with minimal heating)
-      optimal: { label: this._t('optimal'), color: "#0ea5e9", icon: "mdi:shield-star", desc: this._t('optimal_desc') },
-      // Calculated ratings
-      excellent: { label: this._t('excellent'), color: "#10b981", icon: "mdi:shield-check", desc: this._t('excellent_desc') },
-      good: { label: this._t('good'), color: "#22c55e", icon: "mdi:shield-half-full", desc: this._t('good_desc') },
-      average: { label: this._t('average'), color: "#eab308", icon: "mdi:shield-outline", desc: this._t('average_desc') },
-      poor: { label: this._t('poor'), color: "#f97316", icon: "mdi:shield-alert", desc: this._t('poor_desc') },
-      very_poor: { label: this._t('very_poor'), color: "#ef4444", icon: "mdi:shield-off", desc: this._t('very_poor_desc') },
-      // Inferred excellent
-      excellent_inferred: { label: this._t('excellent_inferred'), color: "#059669", icon: "mdi:shield-check", desc: this._t('excellent_inferred_desc') },
-    };
+      // Get season and status from attributes
+      const season = insulationAttrs.season;
+      const status = insulationAttrs.status;
+      const message = insulationAttrs.message;
+      const kValue = insulationAttrs.k_value;
+      const kSource = insulationAttrs.k_source;
+      const lastKDate = insulationAttrs.last_k_date;
 
-    // Get season and status from attributes
-    const season = insulationAttrs.season;
-    const status = insulationAttrs.status;
-    const message = insulationAttrs.message;
-    const kValue = insulationAttrs.k_value;
-    const kSource = insulationAttrs.k_source;
-    const lastKDate = insulationAttrs.last_k_date;
+      // Handle season-specific messages
+      if (season === "summer") {
+        const lastK = kValue ? `(K=${kValue} W/°C)` : "";
+        return {
+          label: this._t('summer_mode'),
+          color: "#f59e0b",
+          icon: "mdi:weather-sunny",
+          desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('summer_mode_desc')
+        };
+      }
 
-    // Handle season-specific messages
-    if (season === "summer") {
-      const lastK = kValue ? `(K=${kValue} W/°C)` : "";
+      if (season === "off_season") {
+        const lastK = kValue ? `(K=${kValue} W/°C)` : "";
+        return {
+          label: this._t('off_season'),
+          color: "#8b5cf6",
+          icon: "mdi:weather-partly-cloudy",
+          desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('off_season_desc')
+        };
+      }
+
+      // Handle excellent inferred
+      if (rating === "excellent_inferred" || status === "excellent_inferred") {
+        return data.excellent_inferred;
+      }
+
+      // Handle waiting states
+      if (!rating || rating === "unknown" || rating === "unavailable") {
+        // Check if we have a last valid K to show
+        if (kValue && kSource === "last_valid") {
+          return {
+            label: this._t('waiting'),
+            color: "#6b7280",
+            icon: "mdi:shield-outline",
+            desc: `${this._t('last_k')}: ${kValue} W/°C`
+          };
+        }
+        // Show specific message from status
+        if (message) {
+          return { label: this._t('waiting'), color: "#6b7280", icon: "mdi:shield-outline", desc: message };
+        }
+        return { label: this._t('waiting'), color: "#6b7280", icon: "mdi:shield-outline", desc: this._t('waiting_desc') };
+      }
+
+      // Get base rating data
+      const baseData = data[rating] || { label: rating, color: "#6b7280", icon: "mdi:shield-outline", desc: "" };
+
+      // Add date info if K is from a previous day
+      if (lastKDate && kValue) {
+        const today = new Date().toISOString().split('T')[0];
+        if (lastKDate !== today) {
+          // Format date as DD/MM
+          const dateParts = lastKDate.split('-');
+          const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
+          return {
+            ...baseData,
+            desc: `${baseData.desc} (K du ${formattedDate})`,
+            lastKDate: lastKDate,
+          };
+        }
+      }
+
+      return baseData;
+    }
+
+    _getPerformanceData(level) {
+      const data = {
+        excellent: { label: this._t('perf_excellent'), color: "#10b981", icon: "mdi:leaf", badge: "−40%" },
+        standard: { label: this._t('perf_standard'), color: "#eab308", icon: "mdi:minus", badge: "~" },
+        to_optimize: { label: this._t('perf_optimize'), color: "#f97316", icon: "mdi:trending-up", badge: "+20%" },
+      };
+      return data[level] || { label: level, color: "#6b7280", icon: "mdi:help", badge: "?" };
+    }
+
+    // Check if value is valid (not null, undefined, unavailable, unknown)
+    _isValidValue(value) {
+      return value !== null && value !== undefined && value !== "unavailable" && value !== "unknown";
+    }
+
+    // Format energy values to 3 decimals
+    _formatEnergy(value) {
+      if (value === "unavailable" || value === "unknown" || value === null) {
+        return value;
+      }
+      const num = parseFloat(value);
+      return isNaN(num) ? value : num.toFixed(3);
+    }
+
+    // Format heating time from decimal hours to "Xh Ymin" format
+    _formatHeatingTime(decimalHours) {
+      if (decimalHours === null || decimalHours === undefined || decimalHours === "unavailable" || decimalHours === "unknown" || isNaN(parseFloat(decimalHours))) {
+        return "0min";
+      }
+      const totalMinutes = Math.round(parseFloat(decimalHours) * 60);
+      if (totalMinutes === 0) return "0min";
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours > 0 && minutes > 0) {
+        return `${hours}h ${minutes}m`;
+      } else if (hours > 0) {
+        return `${hours}h`;
+      }
+      return `${minutes}m`;
+    }
+
+    // Demo data
+    _getDemoData() {
       return {
-        label: this._t('summer_mode'),
-        color: "#f59e0b",
-        icon: "mdi:weather-sunny",
-        desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('summer_mode_desc')
+        k_coefficient: "45.2",
+        k_per_m3: "1.28",
+        daily_energy: "3.421",
+        heating_time: "6.38",  // Decimal hours (6h 23min)
+        heating_ratio: "27",
+        delta_t: "12.5",
+        indoor_temp: "21.3",
+        outdoor_temp: "8.8",
+        insulation: "good",
+        performance: "excellent",
+        k_history_7d: [
+          { date: "2024-12-18", k: 12.5, estimated: false },  // excellent
+          { date: "2024-12-19", k: 18.0, estimated: false },  // good
+          { date: "2024-12-20", k: 18.0, estimated: true },   // carry-forward
+          { date: "2024-12-21", k: 28.5, estimated: false },  // average
+          { date: "2024-12-22", k: 35.0, estimated: false },  // poor
+          { date: "2024-12-23", k: 35.0, estimated: true },   // carry-forward
+          { date: "2024-12-24", k: 22.0, estimated: false },  // good
+        ],
       };
     }
 
-    if (season === "off_season") {
-      const lastK = kValue ? `(K=${kValue} W/°C)` : "";
-      return {
-        label: this._t('off_season'),
-        color: "#8b5cf6",
-        icon: "mdi:weather-partly-cloudy",
-        desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('off_season_desc')
+    // Get K history from sensor attributes
+    _getKHistory() {
+      if (this.config.demo) {
+        return this._getDemoData().k_history_7d;
+      }
+      const kCoefEntityId = this._getEntityId("coefficient_k");
+      return this._getAttribute(kCoefEntityId, "k_history_7d") || [];
+    }
+
+    // ==========================================
+    // MULTI-ZONE METHODS
+    // ==========================================
+
+    // Detect all Home Performance zones from entity IDs
+    _getAllZones() {
+      if (!this.hass?.states) return [];
+
+      const zones = new Set();
+      const pattern = /^sensor\.home_performance_(.+?)_(coefficient_k|k_coefficient)$/;
+
+      Object.keys(this.hass.states).forEach(entityId => {
+        const match = entityId.match(pattern);
+        if (match) {
+          // Convert slug back to readable name
+          const slug = match[1];
+          const zoneName = this._unslugifyZone(slug);
+          zones.add(zoneName);
+        }
+      });
+
+      return Array.from(zones).sort();
+    }
+
+    // Convert slug to readable zone name (reverse of _slugifyZone)
+    _unslugifyZone(slug) {
+      return slug
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+
+    // Get all data for a specific zone (for multi-zone view)
+    _getZoneData(zoneName) {
+      const savedZone = this.config.zone;
+      this.config.zone = zoneName;
+
+      const kCoefEntityId = this._getEntityId("coefficient_k");
+      const insulationEntityId = this._getEntityId("note_d_isolation");
+      const energyMeasuredId = this._getEntityId("energie_mesuree_jour");
+      const energyEstimatedId = this._getEntityId("energie_24h_estimee");
+      const heatingTimeId = this._getEntityId("temps_de_chauffe_24h");
+      const deltaTId = this._getEntityId("dt_moyen_24h");
+      const dataReadyId = this._getBinaryEntityId("donnees_pretes");
+
+      const kCoef = this._getState(kCoefEntityId);
+      const kCoef24h = this._getAttribute(kCoefEntityId, "k_24h");  // K instantané (24h)
+      const kPerM3 = this._getState(this._getEntityId("k_par_m3"));
+      const insulation = this._getState(insulationEntityId);
+      const insulationAttrs = {
+        status: this._getAttribute(insulationEntityId, "status"),
+        season: this._getAttribute(insulationEntityId, "season"),
+        message: this._getAttribute(insulationEntityId, "message"),
+        k_value: this._getAttribute(insulationEntityId, "k_value"),
+        k_source: this._getAttribute(insulationEntityId, "k_source"),
       };
-    }
 
-    // Handle excellent inferred
-    if (rating === "excellent_inferred" || status === "excellent_inferred") {
-      return data.excellent_inferred;
-    }
-
-    // Handle waiting states
-    if (!rating || rating === "unknown" || rating === "unavailable") {
-      // Check if we have a last valid K to show
-      if (kValue && kSource === "last_valid") {
-        return {
-          label: this._t('waiting'),
-          color: "#6b7280",
-          icon: "mdi:shield-outline",
-          desc: `${this._t('last_k')}: ${kValue} W/°C`
-        };
+      // Get energy (prefer measured, fallback to estimated)
+      let dailyEnergy = this._getState(energyMeasuredId);
+      if (!this._isValidValue(dailyEnergy)) {
+        dailyEnergy = this._getState(energyEstimatedId);
       }
-      // Show specific message from status
-      if (message) {
-        return { label: this._t('waiting'), color: "#6b7280", icon: "mdi:shield-outline", desc: message };
-      }
-      return { label: this._t('waiting'), color: "#6b7280", icon: "mdi:shield-outline", desc: this._t('waiting_desc') };
-    }
 
-    // Get base rating data
-    const baseData = data[rating] || { label: rating, color: "#6b7280", icon: "mdi:shield-outline", desc: "" };
+      const heatingTime = this._getState(heatingTimeId);
+      const deltaT = this._getState(deltaTId);
+      const dataReady = this._getState(dataReadyId) === "on";
 
-    // Add date info if K is from a previous day
-    if (lastKDate && kValue) {
-      const today = new Date().toISOString().split('T')[0];
-      if (lastKDate !== today) {
-        // Format date as DD/MM
-        const dateParts = lastKDate.split('-');
-        const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
-        return {
-          ...baseData,
-          desc: `${baseData.desc} (K du ${formattedDate})`,
-          lastKDate: lastKDate,
-        };
-      }
-    }
+      // Indoor/outdoor temps
+      const indoorTemp = this._getAttribute(deltaTId, "indoor_temp");
+      const outdoorTemp = this._getAttribute(deltaTId, "outdoor_temp");
 
-    return baseData;
-  }
+      // K history for sparkline
+      const kHistory = this._getAttribute(kCoefEntityId, "k_history_7d") || [];
 
-  _getPerformanceData(level) {
-    const data = {
-      excellent: { label: this._t('perf_excellent'), color: "#10b981", icon: "mdi:leaf", badge: "−40%" },
-      standard: { label: this._t('perf_standard'), color: "#eab308", icon: "mdi:minus", badge: "~" },
-      to_optimize: { label: this._t('perf_optimize'), color: "#f97316", icon: "mdi:trending-up", badge: "+20%" },
-    };
-    return data[level] || { label: level, color: "#6b7280", icon: "mdi:help", badge: "?" };
-  }
+      // Excellence badge
+      const excellenceBadge = this._getAttribute(kCoefEntityId, "excellence_badge") || false;
 
-  // Check if value is valid (not null, undefined, unavailable, unknown)
-  _isValidValue(value) {
-    return value !== null && value !== undefined && value !== "unavailable" && value !== "unknown";
-  }
-
-  // Format energy values to 3 decimals
-  _formatEnergy(value) {
-    if (value === "unavailable" || value === "unknown" || value === null) {
-      return value;
-    }
-    const num = parseFloat(value);
-    return isNaN(num) ? value : num.toFixed(3);
-  }
-
-  // Format heating time from decimal hours to "Xh Ymin" format
-  _formatHeatingTime(decimalHours) {
-    if (decimalHours === null || decimalHours === undefined || decimalHours === "unavailable" || decimalHours === "unknown" || isNaN(parseFloat(decimalHours))) {
-      return "0min";
-    }
-    const totalMinutes = Math.round(parseFloat(decimalHours) * 60);
-    if (totalMinutes === 0) return "0min";
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    if (hours > 0 && minutes > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (hours > 0) {
-      return `${hours}h`;
-    }
-    return `${minutes}m`;
-  }
-
-  // Demo data
-  _getDemoData() {
-    return {
-      k_coefficient: "45.2",
-      k_per_m3: "1.28",
-      daily_energy: "3.421",
-      heating_time: "6.38",  // Decimal hours (6h 23min)
-      heating_ratio: "27",
-      delta_t: "12.5",
-      indoor_temp: "21.3",
-      outdoor_temp: "8.8",
-      insulation: "good",
-      performance: "excellent",
-      k_history_7d: [
-        { date: "2024-12-18", k: 12.5, estimated: false },  // excellent
-        { date: "2024-12-19", k: 18.0, estimated: false },  // good
-        { date: "2024-12-20", k: 18.0, estimated: true },   // carry-forward
-        { date: "2024-12-21", k: 28.5, estimated: false },  // average
-        { date: "2024-12-22", k: 35.0, estimated: false },  // poor
-        { date: "2024-12-23", k: 35.0, estimated: true },   // carry-forward
-        { date: "2024-12-24", k: 22.0, estimated: false },  // good
-      ],
-    };
-  }
-
-  // Get K history from sensor attributes
-  _getKHistory() {
-    if (this.config.demo) {
-      return this._getDemoData().k_history_7d;
-    }
-    const kCoefEntityId = this._getEntityId("coefficient_k");
-    return this._getAttribute(kCoefEntityId, "k_history_7d") || [];
-  }
-
-  // ==========================================
-  // MULTI-ZONE METHODS
-  // ==========================================
-
-  // Detect all Home Performance zones from entity IDs
-  _getAllZones() {
-    if (!this.hass?.states) return [];
-
-    const zones = new Set();
-    const pattern = /^sensor\.home_performance_(.+?)_(coefficient_k|k_coefficient)$/;
-
-    Object.keys(this.hass.states).forEach(entityId => {
-      const match = entityId.match(pattern);
-      if (match) {
-        // Convert slug back to readable name
-        const slug = match[1];
-        const zoneName = this._unslugifyZone(slug);
-        zones.add(zoneName);
-      }
-    });
-
-    return Array.from(zones).sort();
-  }
-
-  // Convert slug to readable zone name (reverse of _slugifyZone)
-  _unslugifyZone(slug) {
-    return slug
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
-
-  // Get all data for a specific zone (for multi-zone view)
-  _getZoneData(zoneName) {
-    const savedZone = this.config.zone;
-    this.config.zone = zoneName;
-
-    const kCoefEntityId = this._getEntityId("coefficient_k");
-    const insulationEntityId = this._getEntityId("note_d_isolation");
-    const energyMeasuredId = this._getEntityId("energie_mesuree_jour");
-    const energyEstimatedId = this._getEntityId("energie_24h_estimee");
-    const heatingTimeId = this._getEntityId("temps_de_chauffe_24h");
-    const deltaTId = this._getEntityId("dt_moyen_24h");
-    const dataReadyId = this._getBinaryEntityId("donnees_pretes");
-
-    const kCoef = this._getState(kCoefEntityId);
-    const kCoef24h = this._getAttribute(kCoefEntityId, "k_24h");  // K instantané (24h)
-    const kPerM3 = this._getState(this._getEntityId("k_par_m3"));
-    const insulation = this._getState(insulationEntityId);
-    const insulationAttrs = {
-      status: this._getAttribute(insulationEntityId, "status"),
-      season: this._getAttribute(insulationEntityId, "season"),
-      message: this._getAttribute(insulationEntityId, "message"),
-      k_value: this._getAttribute(insulationEntityId, "k_value"),
-      k_source: this._getAttribute(insulationEntityId, "k_source"),
-    };
-
-    // Get energy (prefer measured, fallback to estimated)
-    let dailyEnergy = this._getState(energyMeasuredId);
-    if (!this._isValidValue(dailyEnergy)) {
-      dailyEnergy = this._getState(energyEstimatedId);
-    }
-
-    const heatingTime = this._getState(heatingTimeId);
-    const deltaT = this._getState(deltaTId);
-    const dataReady = this._getState(dataReadyId) === "on";
-
-    // Indoor/outdoor temps
-    const indoorTemp = this._getAttribute(deltaTId, "indoor_temp");
-    const outdoorTemp = this._getAttribute(deltaTId, "outdoor_temp");
-
-    // K history for sparkline
-    const kHistory = this._getAttribute(kCoefEntityId, "k_history_7d") || [];
-
-    // Excellence badge
-    const excellenceBadge = this._getAttribute(kCoefEntityId, "excellence_badge") || false;
-
-    // Wind data
-    const windSpeed = this._getAttribute(kCoefEntityId, "wind_speed");
-    const windDirection = this._getAttribute(kCoefEntityId, "wind_direction");
-    const windExposure = this._getAttribute(kCoefEntityId, "wind_exposure");
-    const roomOrientation = this._getAttribute(kCoefEntityId, "room_orientation");
-
-    // Temperature variation (for warning)
-    const tempVariation = this._getAttribute(kCoefEntityId, "temp_variation");
-    const indoorTempMin = this._getAttribute(kCoefEntityId, "indoor_temp_min");
-    const indoorTempMax = this._getAttribute(kCoefEntityId, "indoor_temp_max");
-
-    // Restore original zone
-    this.config.zone = savedZone;
-
-    const insulationData = this._getInsulationData(insulation, insulationAttrs);
-    const scoreLetter = this._getScoreLetter(insulation);
-
-    return {
-      name: zoneName,
-      dataReady,
-      kCoef: this._isValidValue(kCoef) ? parseFloat(kCoef).toFixed(1) : null,
-      kCoef24h: this._isValidValue(kCoef24h) ? parseFloat(kCoef24h).toFixed(1) : null,  // K instantané
-      kPerM3: this._isValidValue(kPerM3) ? parseFloat(kPerM3).toFixed(2) : null,
-      dailyEnergy: this._isValidValue(dailyEnergy) ? parseFloat(dailyEnergy).toFixed(3) : null,
-      heatingTime: this._isValidValue(heatingTime) ? this._formatHeatingTime(heatingTime) : null,
-      deltaT: this._isValidValue(deltaT) ? parseFloat(deltaT).toFixed(1) : null,
-      indoorTemp: this._isValidValue(indoorTemp) ? parseFloat(indoorTemp).toFixed(1) : null,
-      outdoorTemp: this._isValidValue(outdoorTemp) ? parseFloat(outdoorTemp).toFixed(1) : null,
-      insulation,
-      insulationData,
-      scoreLetter,
       // Wind data
-      windSpeed: this._isValidValue(windSpeed) ? parseFloat(windSpeed).toFixed(0) : null,
-      windDirection,
-      windExposure,
-      roomOrientation,
-      kHistory,
-      isOptimal: insulation === "optimal",
-      // Temperature variation warning (show if > 3°C)
-      tempVariation: this._isValidValue(tempVariation) ? parseFloat(tempVariation) : null,
-      indoorTempMin: this._isValidValue(indoorTempMin) ? parseFloat(indoorTempMin).toFixed(0) : null,
-      indoorTempMax: this._isValidValue(indoorTempMax) ? parseFloat(indoorTempMax).toFixed(0) : null,
-      hasTempWarning: (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
-        (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5),
-    };
-  }
+      const windSpeed = this._getAttribute(kCoefEntityId, "wind_speed");
+      const windDirection = this._getAttribute(kCoefEntityId, "wind_direction");
+      const windExposure = this._getAttribute(kCoefEntityId, "wind_exposure");
+      const roomOrientation = this._getAttribute(kCoefEntityId, "room_orientation");
 
-  // Get color for insulation rating
-  _getInsulationColor(rating) {
-    const colors = {
-      optimal: "#0ea5e9",
-      excellent: "#10b981",
-      good: "#22c55e",
-      average: "#eab308",
-      poor: "#f97316",
-      very_poor: "#ef4444",
-      excellent_inferred: "#059669",
-    };
-    return colors[rating] || "#6b7280";
-  }
+      // Temperature variation (for warning)
+      const tempVariation = this._getAttribute(kCoefEntityId, "temp_variation");
+      const indoorTempMin = this._getAttribute(kCoefEntityId, "indoor_temp_min");
+      const indoorTempMax = this._getAttribute(kCoefEntityId, "indoor_temp_max");
 
-  // Render sparkline SVG for pill/badge layouts (simple polyline like HA native)
-  _renderSparkline(kHistory, width = 80, height = 24, accentColor = "var(--accent)") {
-    if (!kHistory || kHistory.length < 2) return '';
+      // Restore original zone
+      this.config.zone = savedZone;
 
-    const values = kHistory.map(d => d.k);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
+      const insulationData = this._getInsulationData(insulation, insulationAttrs);
+      const scoreLetter = this._getScoreLetter(insulation);
 
-    // Use integer coordinates for crisp rendering
-    const margin = 1;
-    const graphWidth = width - margin * 2;
-    const graphHeight = height - margin * 2;
+      return {
+        name: zoneName,
+        dataReady,
+        kCoef: this._isValidValue(kCoef) ? parseFloat(kCoef).toFixed(1) : null,
+        kCoef24h: this._isValidValue(kCoef24h) ? parseFloat(kCoef24h).toFixed(1) : null,  // K instantané
+        kPerM3: this._isValidValue(kPerM3) ? parseFloat(kPerM3).toFixed(2) : null,
+        dailyEnergy: this._isValidValue(dailyEnergy) ? parseFloat(dailyEnergy).toFixed(3) : null,
+        heatingTime: this._isValidValue(heatingTime) ? this._formatHeatingTime(heatingTime) : null,
+        deltaT: this._isValidValue(deltaT) ? parseFloat(deltaT).toFixed(1) : null,
+        indoorTemp: this._isValidValue(indoorTemp) ? parseFloat(indoorTemp).toFixed(1) : null,
+        outdoorTemp: this._isValidValue(outdoorTemp) ? parseFloat(outdoorTemp).toFixed(1) : null,
+        insulation,
+        insulationData,
+        scoreLetter,
+        // Wind data
+        windSpeed: this._isValidValue(windSpeed) ? parseFloat(windSpeed).toFixed(0) : null,
+        windDirection,
+        windExposure,
+        roomOrientation,
+        kHistory,
+        isOptimal: insulation === "optimal",
+        // Temperature variation warning (show if > 3°C)
+        tempVariation: this._isValidValue(tempVariation) ? parseFloat(tempVariation) : null,
+        indoorTempMin: this._isValidValue(indoorTempMin) ? parseFloat(indoorTempMin).toFixed(0) : null,
+        indoorTempMax: this._isValidValue(indoorTempMax) ? parseFloat(indoorTempMax).toFixed(0) : null,
+        hasTempWarning: (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+          (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5),
+      };
+    }
 
-    // Calculate points
-    const points = values.map((v, i) => {
-      const x = margin + (i / (values.length - 1)) * graphWidth;
-      const y = margin + (1 - (v - min) / range) * graphHeight;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    }).join(' ');
+    // Get color for insulation rating
+    _getInsulationColor(rating) {
+      const colors = {
+        optimal: "#0ea5e9",
+        excellent: "#10b981",
+        good: "#22c55e",
+        average: "#eab308",
+        poor: "#f97316",
+        very_poor: "#ef4444",
+        excellent_inferred: "#059669",
+      };
+      return colors[rating] || "#6b7280";
+    }
 
-    return html`
+    // Render sparkline SVG for pill/badge layouts (simple polyline like HA native)
+    _renderSparkline(kHistory, width = 80, height = 24, accentColor = "var(--accent)") {
+      if (!kHistory || kHistory.length < 2) return '';
+
+      const values = kHistory.map(d => d.k);
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min || 1;
+
+      // Use integer coordinates for crisp rendering
+      const margin = 1;
+      const graphWidth = width - margin * 2;
+      const graphHeight = height - margin * 2;
+
+      // Calculate points
+      const points = values.map((v, i) => {
+        const x = margin + (i / (values.length - 1)) * graphWidth;
+        const y = margin + (1 - (v - min) / range) * graphHeight;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      }).join(' ');
+
+      return html`
       <svg
         class="sparkline"
         viewBox="0 0 ${width} ${height}"
@@ -1030,12 +1030,12 @@ class HomePerformanceCard extends LitElement {
         />
       </svg>
     `;
-  }
+    }
 
-  // Render placeholder sparkline (gray dashed line for zones without data)
-  _renderSparklinePlaceholder(width = 70, height = 24) {
-    const y = height / 2;
-    return html`
+    // Render placeholder sparkline (gray dashed line for zones without data)
+    _renderSparklinePlaceholder(width = 70, height = 24) {
+      const y = height / 2;
+      return html`
       <svg
         class="sparkline sparkline-placeholder"
         viewBox="0 0 ${width} ${height}"
@@ -1054,96 +1054,96 @@ class HomePerformanceCard extends LitElement {
         />
       </svg>
     `;
-  }
-
-  // Calculate score (K/m³) - used for both color and height
-  _getKScore(k, volume) {
-    if (volume && volume > 0) {
-      return k / volume;
     }
-    // Without volume, use K directly with typical room thresholds (assuming ~30m³)
-    return k / 30;
-  }
 
-  // Get color based on score (K/m³)
-  _getColorFromScore(score) {
-    if (score < 0.4) return "#10b981";      // excellent - green
-    if (score < 0.7) return "#22c55e";      // good - light green
-    if (score < 1.0) return "#eab308";      // average - yellow
-    if (score < 1.5) return "#f97316";      // poor - orange
-    return "#ef4444";                        // very_poor - red
-  }
+    // Calculate score (K/m³) - used for both color and height
+    _getKScore(k, volume) {
+      if (volume && volume > 0) {
+        return k / volume;
+      }
+      // Without volume, use K directly with typical room thresholds (assuming ~30m³)
+      return k / 30;
+    }
 
-  // Render bar chart for full layout
-  _renderBarChart(kHistory, volume, overrideColor = null) {
-    if (!kHistory || kHistory.length === 0) return '';
+    // Get color based on score (K/m³)
+    _getColorFromScore(score) {
+      if (score < 0.4) return "#10b981";      // excellent - green
+      if (score < 0.7) return "#22c55e";      // good - light green
+      if (score < 1.0) return "#eab308";      // average - yellow
+      if (score < 1.5) return "#f97316";      // poor - orange
+      return "#ef4444";                        // very_poor - red
+    }
 
-    // Calculate scores (K/m³) for each day - this is what determines both color AND height
-    const scores = kHistory.map(d => this._getKScore(d.k, volume));
-    const minScore = Math.min(...scores);
-    const maxScore = Math.max(...scores);
-    const range = maxScore - minScore;
-    const days = this._t('days');
+    // Render bar chart for full layout
+    _renderBarChart(kHistory, volume, overrideColor = null) {
+      if (!kHistory || kHistory.length === 0) return '';
 
-    // Bar height: 20px minimum (best) to 60px maximum (worst)
-    const minHeight = 20;
-    const maxHeight = 60;
+      // Calculate scores (K/m³) for each day - this is what determines both color AND height
+      const scores = kHistory.map(d => this._getKScore(d.k, volume));
+      const minScore = Math.min(...scores);
+      const maxScore = Math.max(...scores);
+      const range = maxScore - minScore;
+      const days = this._t('days');
 
-    return html`
+      // Bar height: 20px minimum (best) to 60px maximum (worst)
+      const minHeight = 20;
+      const maxHeight = 60;
+
+      return html`
       <div class="k-chart">
         ${kHistory.map((day, index) => {
-      const date = new Date(day.date + 'T00:00:00');
-      const dayLabel = days[date.getDay()];
-      const score = scores[index];
-      // Height based on SCORE: higher score (worse) = taller bar
-      const heightPx = range > 0.01
-        ? minHeight + ((score - minScore) / range) * (maxHeight - minHeight)
-        : (minHeight + maxHeight) / 2; // If all nearly same, show at middle height
-      // Use override color if provided, otherwise calculate from score
-      const barColor = overrideColor || this._getColorFromScore(score);
-      const isEstimated = day.estimated === true;
-      const opacity = isEstimated ? 0.5 : 1;
-      const tooltip = isEstimated
-        ? `${day.date}: ${day.k} W/°C (${this._t('tooltip_estimated')})`
-        : `${day.date}: ${day.k} W/°C`;
-      return html`
+        const date = new Date(day.date + 'T00:00:00');
+        const dayLabel = days[date.getDay()];
+        const score = scores[index];
+        // Height based on SCORE: higher score (worse) = taller bar
+        const heightPx = range > 0.01
+          ? minHeight + ((score - minScore) / range) * (maxHeight - minHeight)
+          : (minHeight + maxHeight) / 2; // If all nearly same, show at middle height
+        // Use override color if provided, otherwise calculate from score
+        const barColor = overrideColor || this._getColorFromScore(score);
+        const isEstimated = day.estimated === true;
+        const opacity = isEstimated ? 0.5 : 1;
+        const tooltip = isEstimated
+          ? `${day.date}: ${day.k} W/°C (${this._t('tooltip_estimated')})`
+          : `${day.date}: ${day.k} W/°C`;
+        return html`
             <div class="bar-wrapper ${isEstimated ? 'estimated' : ''}" title="${tooltip}">
               <div class="bar" style="height: ${heightPx}px; background: ${barColor}; opacity: ${opacity}"></div>
               <span class="bar-label">${dayLabel}</span>
             </div>
           `;
-    })}
+      })}
       </div>
     `;
-  }
-
-  render() {
-    if (!this.hass || !this.config) {
-      return html`<ha-card>${this._t('loading')}</ha-card>`;
     }
 
-    const layout = this.config.layout || "full";
+    render() {
+      if (!this.hass || !this.config) {
+        return html`<ha-card>${this._t('loading')}</ha-card>`;
+      }
 
-    // Dispatch to appropriate layout renderer
-    switch (layout) {
-      case "badge":
-        return this._renderBadgeLayout();
-      case "pill":
-        return this._renderPillLayout();
-      case "multi":
-        return this._renderMultiLayout();
-      default:
-        return this._renderFullLayout();
+      const layout = this.config.layout || "full";
+
+      // Dispatch to appropriate layout renderer
+      switch (layout) {
+        case "badge":
+          return this._renderBadgeLayout();
+        case "pill":
+          return this._renderPillLayout();
+        case "multi":
+          return this._renderMultiLayout();
+        default:
+          return this._renderFullLayout();
+      }
     }
-  }
 
-  // Full layout (default - original card)
-  _renderFullLayout() {
-    const integrationReady = this._isIntegrationReady();
-    const dataReady = this._isDataReady();
-    const progress = this._getProgress();
+    // Full layout (default - original card)
+    _renderFullLayout() {
+      const integrationReady = this._isIntegrationReady();
+      const dataReady = this._isDataReady();
+      const progress = this._getProgress();
 
-    return html`
+      return html`
       <ha-card>
         <!-- Header -->
         <div class="header">
@@ -1153,35 +1153,35 @@ class HomePerformanceCard extends LitElement {
           </div>
           <div class="header-right">
             ${dataReady
-        ? html``
-        : html`<div class="status-loading"><span class="dot"></span></div>`
-      }
+          ? html``
+          : html`<div class="status-loading"><span class="dot"></span></div>`
+        }
           </div>
         </div>
 
         <!-- Content -->
         <div class="content">
           ${!integrationReady
-        ? this._renderLoading()
-        : (!dataReady ? this._renderAnalyzing(progress) : this._renderData())}
+          ? this._renderLoading()
+          : (!dataReady ? this._renderAnalyzing(progress) : this._renderData())}
         </div>
       </ha-card>
     `;
-  }
+    }
 
-  // Badge layout (Concept A - compact vertical card)
-  _renderBadgeLayout() {
-    const integrationReady = this._isIntegrationReady();
-    const dataReady = this._isDataReady();
-    const progress = this._getProgress();
+    // Badge layout (Concept A - compact vertical card)
+    _renderBadgeLayout() {
+      const integrationReady = this._isIntegrationReady();
+      const dataReady = this._isDataReady();
+      const progress = this._getProgress();
 
-    if (!integrationReady || !dataReady) {
-      // Calculate circle progress (circumference = 2 * PI * radius)
-      const radius = 24;
-      const circumference = 2 * Math.PI * radius;
-      const offset = circumference - (progress / 100) * circumference;
+      if (!integrationReady || !dataReady) {
+        // Calculate circle progress (circumference = 2 * PI * radius)
+        const radius = 24;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (progress / 100) * circumference;
 
-      return html`
+        return html`
         <ha-card class="badge-card badge-analyzing">
           <div class="badge-progress-ring">
             <svg viewBox="0 0 56 56">
@@ -1207,41 +1207,41 @@ class HomePerformanceCard extends LitElement {
           <div class="badge-status">Analyse en cours</div>
         </ha-card>
       `;
-    }
+      }
 
-    const demo = this.config.demo ? this._getDemoData() : null;
-    const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
-    const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
-    const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
-    const kHistory = this._getKHistory();
+      const demo = this.config.demo ? this._getDemoData() : null;
+      const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
+      const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
+      const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
+      const kHistory = this._getKHistory();
 
-    const insulationEntityId = this._getEntityId("note_d_isolation");
-    const insulationAttrs = demo ? {} : {
-      status: this._getAttribute(insulationEntityId, "status"),
-      season: this._getAttribute(insulationEntityId, "season"),
-      message: this._getAttribute(insulationEntityId, "message"),
-      k_value: this._getAttribute(insulationEntityId, "k_value"),
-      k_source: this._getAttribute(insulationEntityId, "k_source"),
-    };
+      const insulationEntityId = this._getEntityId("note_d_isolation");
+      const insulationAttrs = demo ? {} : {
+        status: this._getAttribute(insulationEntityId, "status"),
+        season: this._getAttribute(insulationEntityId, "season"),
+        message: this._getAttribute(insulationEntityId, "message"),
+        k_value: this._getAttribute(insulationEntityId, "k_value"),
+        k_source: this._getAttribute(insulationEntityId, "k_source"),
+      };
 
-    // Get wind data
-    const kCoefEntityId = this._getEntityId("coefficient_k");
-    const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
-    const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
-    const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
+      // Get wind data
+      const kCoefEntityId = this._getEntityId("coefficient_k");
+      const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
+      const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
+      const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
 
-    // Get temperature variation for warning
-    const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
-    const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
-    const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
-      (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
+      // Get temperature variation for warning
+      const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
+      const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
+      const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+        (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
 
-    const insulationData = this._getInsulationData(insulation, insulationAttrs);
-    const scoreLetter = this._getScoreLetter(insulation);
-    const hasHistory = kHistory && kHistory.length >= 2;
-    const isOptimal = insulation === "optimal";
+      const insulationData = this._getInsulationData(insulation, insulationAttrs);
+      const scoreLetter = this._getScoreLetter(insulation);
+      const hasHistory = kHistory && kHistory.length >= 2;
+      const isOptimal = insulation === "optimal";
 
-    return html`
+      return html`
       <ha-card class="badge-card ${isOptimal ? 'badge-card-optimal' : ''}" style="--accent: ${insulationData.color}">
         <div class="badge-accent-bar"></div>
         <div class="badge-score-circle ${isOptimal ? 'badge-score-optimal' : ''}">
@@ -1276,16 +1276,16 @@ class HomePerformanceCard extends LitElement {
         ` : ''}
       </ha-card>
     `;
-  }
+    }
 
-  // Pill layout (Concept D - horizontal strip)
-  _renderPillLayout() {
-    const integrationReady = this._isIntegrationReady();
-    const dataReady = this._isDataReady();
-    const progress = this._getProgress();
+    // Pill layout (Concept D - horizontal strip)
+    _renderPillLayout() {
+      const integrationReady = this._isIntegrationReady();
+      const dataReady = this._isDataReady();
+      const progress = this._getProgress();
 
-    if (!integrationReady || !dataReady) {
-      return html`
+      if (!integrationReady || !dataReady) {
+        return html`
         <ha-card class="pill-card pill-analyzing">
           <div class="pill-progress-badge">
             <span class="pill-progress-percent">${Math.round(progress)}%</span>
@@ -1302,40 +1302,40 @@ class HomePerformanceCard extends LitElement {
           </div>
         </ha-card>
       `;
-    }
+      }
 
-    const demo = this.config.demo ? this._getDemoData() : null;
-    const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
-    const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
-    const deltaTRaw = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
-    const kHistory = this._getKHistory();
+      const demo = this.config.demo ? this._getDemoData() : null;
+      const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
+      const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
+      const deltaTRaw = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
+      const kHistory = this._getKHistory();
 
-    const insulationEntityId = this._getEntityId("note_d_isolation");
-    const insulationAttrs = demo ? {} : {
-      status: this._getAttribute(insulationEntityId, "status"),
-      season: this._getAttribute(insulationEntityId, "season"),
-      message: this._getAttribute(insulationEntityId, "message"),
-      k_value: this._getAttribute(insulationEntityId, "k_value"),
-      k_source: this._getAttribute(insulationEntityId, "k_source"),
-    };
+      const insulationEntityId = this._getEntityId("note_d_isolation");
+      const insulationAttrs = demo ? {} : {
+        status: this._getAttribute(insulationEntityId, "status"),
+        season: this._getAttribute(insulationEntityId, "season"),
+        message: this._getAttribute(insulationEntityId, "message"),
+        k_value: this._getAttribute(insulationEntityId, "k_value"),
+        k_source: this._getAttribute(insulationEntityId, "k_source"),
+      };
 
-    const insulationData = this._getInsulationData(insulation, insulationAttrs);
-    const scoreLetter = this._getScoreLetter(insulation);
-    const tempUnit = this._getTempUnit();
-    const deltaTEntityId = this._getEntityId("dt_moyen_24h");
-    const deltaTUnit = this._getEntityUnit(deltaTEntityId);
-    const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);
-    const hasHistory = kHistory && kHistory.length >= 2;
-    const isOptimal = insulation === "optimal";
+      const insulationData = this._getInsulationData(insulation, insulationAttrs);
+      const scoreLetter = this._getScoreLetter(insulation);
+      const tempUnit = this._getTempUnit();
+      const deltaTEntityId = this._getEntityId("dt_moyen_24h");
+      const deltaTUnit = this._getEntityUnit(deltaTEntityId);
+      const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);
+      const hasHistory = kHistory && kHistory.length >= 2;
+      const isOptimal = insulation === "optimal";
 
-    // Get temperature variation for warning
-    const kCoefEntityId = this._getEntityId("coefficient_k");
-    const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
-    const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
-    const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
-      (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
+      // Get temperature variation for warning
+      const kCoefEntityId = this._getEntityId("coefficient_k");
+      const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
+      const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
+      const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+        (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
 
-    return html`
+      return html`
       <ha-card class="pill-card ${isOptimal ? 'pill-card-optimal' : ''}" style="--accent: ${insulationData.color}">
         <div class="pill-accent-bar"></div>
         <div class="pill-score-badge ${isOptimal ? 'pill-score-optimal' : ''}">
@@ -1364,17 +1364,17 @@ class HomePerformanceCard extends LitElement {
         ${hasTempWarning ? html`<div class="pill-temp-warning">⚠️</div>` : ''}
       </ha-card>
     `;
-  }
+    }
 
-  // ==========================================
-  // MULTI-ZONE LAYOUT
-  // ==========================================
+    // ==========================================
+    // MULTI-ZONE LAYOUT
+    // ==========================================
 
-  _renderMultiLayout() {
-    const zones = this._getAllZones();
+    _renderMultiLayout() {
+      const zones = this._getAllZones();
 
-    if (zones.length === 0) {
-      return html`
+      if (zones.length === 0) {
+        return html`
         <ha-card class="multi-card">
           <div class="multi-empty">
             <ha-icon icon="mdi:home-search"></ha-icon>
@@ -1382,18 +1382,18 @@ class HomePerformanceCard extends LitElement {
           </div>
         </ha-card>
       `;
-    }
+      }
 
-    // Get data for all zones
-    const zonesData = zones.map(zone => this._getZoneData(zone));
+      // Get data for all zones
+      const zonesData = zones.map(zone => this._getZoneData(zone));
 
-    // Filter only zones with data ready
-    const readyZones = zonesData.filter(z => z.dataReady);
+      // Filter only zones with data ready
+      const readyZones = zonesData.filter(z => z.dataReady);
 
-    // Calculate average score
-    const avgScore = this._calculateAverageScore(readyZones);
+      // Calculate average score
+      const avgScore = this._calculateAverageScore(readyZones);
 
-    return html`
+      return html`
       <ha-card class="multi-card">
         <!-- Header -->
         <div class="multi-header">
@@ -1421,61 +1421,61 @@ class HomePerformanceCard extends LitElement {
         <!-- Content -->
         <div class="multi-content">
           ${this._multiView === 'list'
-        ? this._renderMultiListView(zonesData)
-        : this._renderMultiCompareView(readyZones)}
+          ? this._renderMultiListView(zonesData)
+          : this._renderMultiCompareView(readyZones)}
         </div>
       </ha-card>
     `;
-  }
-
-  _setMultiView(view) {
-    this._multiView = view;
-    this.requestUpdate();
-  }
-
-  _toggleZoneExpanded(zoneName) {
-    this._expandedZone = this._expandedZone === zoneName ? null : zoneName;
-    this.requestUpdate();
-  }
-
-  _calculateAverageScore(zonesData) {
-    const validRatings = zonesData
-      .filter(z => z.insulation && z.insulation !== 'unknown' && z.insulation !== 'unavailable')
-      .map(z => z.insulation);
-
-    if (validRatings.length === 0) {
-      return { letter: '?', color: '#6b7280' };
     }
 
-    // Score mapping (optimal = 6, highest)
-    const scoreMap = { optimal: 6, excellent: 5, excellent_inferred: 5, good: 4, average: 3, poor: 2, very_poor: 1 };
-    const avgScore = validRatings.reduce((sum, r) => sum + (scoreMap[r] || 3), 0) / validRatings.length;
+    _setMultiView(view) {
+      this._multiView = view;
+      this.requestUpdate();
+    }
 
-    if (avgScore >= 5.5) return { letter: 'S', color: '#0ea5e9' };
-    if (avgScore >= 4.5) return { letter: 'A+', color: '#10b981' };
-    if (avgScore >= 3.5) return { letter: 'A', color: '#22c55e' };
-    if (avgScore >= 2.5) return { letter: 'B', color: '#eab308' };
-    if (avgScore >= 1.5) return { letter: 'C', color: '#f97316' };
-    return { letter: 'D', color: '#ef4444' };
-  }
+    _toggleZoneExpanded(zoneName) {
+      this._expandedZone = this._expandedZone === zoneName ? null : zoneName;
+      this.requestUpdate();
+    }
 
-  _renderMultiListView(zonesData) {
-    return html`
+    _calculateAverageScore(zonesData) {
+      const validRatings = zonesData
+        .filter(z => z.insulation && z.insulation !== 'unknown' && z.insulation !== 'unavailable')
+        .map(z => z.insulation);
+
+      if (validRatings.length === 0) {
+        return { letter: '?', color: '#6b7280' };
+      }
+
+      // Score mapping (optimal = 6, highest)
+      const scoreMap = { optimal: 6, excellent: 5, excellent_inferred: 5, good: 4, average: 3, poor: 2, very_poor: 1 };
+      const avgScore = validRatings.reduce((sum, r) => sum + (scoreMap[r] || 3), 0) / validRatings.length;
+
+      if (avgScore >= 5.5) return { letter: 'S', color: '#0ea5e9' };
+      if (avgScore >= 4.5) return { letter: 'A+', color: '#10b981' };
+      if (avgScore >= 3.5) return { letter: 'A', color: '#22c55e' };
+      if (avgScore >= 2.5) return { letter: 'B', color: '#eab308' };
+      if (avgScore >= 1.5) return { letter: 'C', color: '#f97316' };
+      return { letter: 'D', color: '#ef4444' };
+    }
+
+    _renderMultiListView(zonesData) {
+      return html`
       <div class="multi-zone-list">
         ${zonesData.map(zone => this._renderMultiZoneRow(zone))}
       </div>
     `;
-  }
+    }
 
-  _renderMultiZoneRow(zone) {
-    const isExpanded = this._expandedZone === zone.name;
-    const accentColor = zone.insulationData?.color || '#6b7280';
-    const showSparklines = this.config.show_sparklines !== false; // default true
-    const hasValidHistory = zone.kHistory && zone.kHistory.length >= 2;
-    const isOptimal = zone.isOptimal;
-    const hasTempWarning = zone.hasTempWarning;
+    _renderMultiZoneRow(zone) {
+      const isExpanded = this._expandedZone === zone.name;
+      const accentColor = zone.insulationData?.color || '#6b7280';
+      const showSparklines = this.config.show_sparklines !== false; // default true
+      const hasValidHistory = zone.kHistory && zone.kHistory.length >= 2;
+      const isOptimal = zone.isOptimal;
+      const hasTempWarning = zone.hasTempWarning;
 
-    return html`
+      return html`
       <div
         class="multi-zone-row ${isExpanded ? 'expanded' : ''} ${isOptimal ? 'multi-zone-row-optimal' : ''}"
         style="--accent-color: ${accentColor}"
@@ -1503,8 +1503,8 @@ class HomePerformanceCard extends LitElement {
           ${showSparklines ? html`
             <div class="multi-zone-sparkline">
               ${hasValidHistory
-          ? this._renderSparkline(zone.kHistory, 70, 24, accentColor)
-          : this._renderSparklinePlaceholder(70, 24)}
+            ? this._renderSparkline(zone.kHistory, 70, 24, accentColor)
+            : this._renderSparklinePlaceholder(70, 24)}
             </div>
           ` : ''}
           <svg class="multi-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1514,12 +1514,12 @@ class HomePerformanceCard extends LitElement {
         ${isExpanded ? this._renderMultiZoneDetails(zone) : ''}
       </div>
     `;
-  }
+    }
 
-  _renderMultiZoneDetails(zone) {
-    const tempUnit = this._getTempUnit();
+    _renderMultiZoneDetails(zone) {
+      const tempUnit = this._getTempUnit();
 
-    return html`
+      return html`
       <div class="multi-zone-details">
         <div class="multi-zone-details-inner">
           <div class="multi-zone-details-grid">
@@ -1590,72 +1590,72 @@ class HomePerformanceCard extends LitElement {
         </div>
       </div>
     `;
-  }
-
-  _renderMultiCompareView(zonesData) {
-    if (zonesData.length === 0) {
-      return html`<div class="multi-empty-compare">${this._t('multi_no_data')}</div>`;
     }
 
-    // Rating priority order (best first)
-    const ratingPriority = {
-      optimal: 0,
-      excellent: 1,
-      excellent_inferred: 1,
-      good: 2,
-      average: 3,
-      poor: 4,
-      very_poor: 5,
-    };
+    _renderMultiCompareView(zonesData) {
+      if (zonesData.length === 0) {
+        return html`<div class="multi-empty-compare">${this._t('multi_no_data')}</div>`;
+      }
 
-    // Sort by rating level first, then by K/m³ within same level
-    const sorted = [...zonesData]
-      .filter(z => z.kPerM3 !== null)
-      .sort((a, b) => {
-        const priorityA = ratingPriority[a.insulation] ?? 99;
-        const priorityB = ratingPriority[b.insulation] ?? 99;
-        if (priorityA !== priorityB) {
-          return priorityA - priorityB;
-        }
-        // Same rating level: sort by K/m³ (lower is better)
-        return parseFloat(a.kPerM3) - parseFloat(b.kPerM3);
-      });
+      // Rating priority order (best first)
+      const ratingPriority = {
+        optimal: 0,
+        excellent: 1,
+        excellent_inferred: 1,
+        good: 2,
+        average: 3,
+        poor: 4,
+        very_poor: 5,
+      };
 
-    if (sorted.length === 0) {
-      return html`<div class="multi-empty-compare">${this._t('multi_waiting_data')}</div>`;
-    }
+      // Sort by rating level first, then by K/m³ within same level
+      const sorted = [...zonesData]
+        .filter(z => z.kPerM3 !== null)
+        .sort((a, b) => {
+          const priorityA = ratingPriority[a.insulation] ?? 99;
+          const priorityB = ratingPriority[b.insulation] ?? 99;
+          if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+          }
+          // Same rating level: sort by K/m³ (lower is better)
+          return parseFloat(a.kPerM3) - parseFloat(b.kPerM3);
+        });
 
-    // Reference is the first in ranking (best level), use its K/m³ for delta calculations
-    const refKPerM3 = parseFloat(sorted[0].kPerM3);
+      if (sorted.length === 0) {
+        return html`<div class="multi-empty-compare">${this._t('multi_waiting_data')}</div>`;
+      }
 
-    return html`
+      // Reference is the first in ranking (best level), use its K/m³ for delta calculations
+      const refKPerM3 = parseFloat(sorted[0].kPerM3);
+
+      return html`
       <div class="multi-zone-ranking">
         ${sorted.map((zone, index) => this._renderMultiRankingItem(zone, index, refKPerM3))}
       </div>
     `;
-  }
-
-  _renderMultiRankingItem(zone, index, refKPerM3) {
-    const accentColor = zone.insulationData?.color || '#6b7280';
-    const kPerM3 = parseFloat(zone.kPerM3);
-    const barWidth = refKPerM3 / kPerM3 * 100;
-    const deltaPercent = ((kPerM3 - refKPerM3) / refKPerM3 * 100).toFixed(0);
-    const isRef = index === 0;
-
-    // Delta class based on percentage difference from reference
-    let deltaClass = 'ref';
-    if (!isRef) {
-      const absDelta = Math.abs(deltaPercent);
-      if (absDelta < 50) deltaClass = 'warn';
-      else if (absDelta < 150) deltaClass = 'bad';
-      else deltaClass = 'worst';
     }
 
-    // Format delta with correct sign
-    const deltaSign = deltaPercent >= 0 ? '+' : '';
-    const deltaDisplay = isRef ? this._t('multi_ref') : `${deltaSign}${deltaPercent}%`;
+    _renderMultiRankingItem(zone, index, refKPerM3) {
+      const accentColor = zone.insulationData?.color || '#6b7280';
+      const kPerM3 = parseFloat(zone.kPerM3);
+      const barWidth = refKPerM3 / kPerM3 * 100;
+      const deltaPercent = ((kPerM3 - refKPerM3) / refKPerM3 * 100).toFixed(0);
+      const isRef = index === 0;
 
-    return html`
+      // Delta class based on percentage difference from reference
+      let deltaClass = 'ref';
+      if (!isRef) {
+        const absDelta = Math.abs(deltaPercent);
+        if (absDelta < 50) deltaClass = 'warn';
+        else if (absDelta < 150) deltaClass = 'bad';
+        else deltaClass = 'worst';
+      }
+
+      // Format delta with correct sign
+      const deltaSign = deltaPercent >= 0 ? '+' : '';
+      const deltaDisplay = isRef ? this._t('multi_ref') : `${deltaSign}${deltaPercent}%`;
+
+      return html`
       <div class="multi-ranking-item" style="--accent-color: ${accentColor}">
         <div class="multi-ranking-position">${index + 1}</div>
         <div class="multi-ranking-info">
@@ -1671,27 +1671,27 @@ class HomePerformanceCard extends LitElement {
         </div>
       </div>
     `;
-  }
+    }
 
-  // Get score letter from insulation rating
-  _getScoreLetter(rating) {
-    const letters = {
-      optimal: "S",
-      excellent: "A+",
-      excellent_inferred: "A+",
-      good: "A",
-      average: "B",
-      poor: "C",
-      very_poor: "D",
-    };
-    return letters[rating] || "?";
-  }
+    // Get score letter from insulation rating
+    _getScoreLetter(rating) {
+      const letters = {
+        optimal: "S",
+        excellent: "A+",
+        excellent_inferred: "A+",
+        good: "A",
+        average: "B",
+        poor: "C",
+        very_poor: "D",
+      };
+      return letters[rating] || "?";
+    }
 
-  _renderLoading() {
-    const zone = this._slugifyZone(this.config.zone);
-    const expectedEntity = `binary_sensor.home_performance_${zone}_donnees_pretes`;
+    _renderLoading() {
+      const zone = this._slugifyZone(this.config.zone);
+      const expectedEntity = `binary_sensor.home_performance_${zone}_donnees_pretes`;
 
-    return html`
+      return html`
       <div class="analyzing">
         <div class="loading-spinner">
           <div class="spinner"></div>
@@ -1707,13 +1707,13 @@ class HomePerformanceCard extends LitElement {
         </div>
       </div>
     `;
-  }
+    }
 
-  _renderAnalyzing(progress) {
-    const timeRemaining = this._getTimeRemaining();
-    const isReady = timeRemaining === "Prêt" || timeRemaining === "Ready" || timeRemaining === this._t('ready');
+    _renderAnalyzing(progress) {
+      const timeRemaining = this._getTimeRemaining();
+      const isReady = timeRemaining === "Prêt" || timeRemaining === "Ready" || timeRemaining === this._t('ready');
 
-    return html`
+      return html`
       <div class="analyzing">
         <div class="analyzing-header">
           <span class="analyzing-title">${this._t('analyzing')}</span>
@@ -1731,77 +1731,77 @@ class HomePerformanceCard extends LitElement {
         </div>
       </div>
     `;
-  }
-
-  _renderData() {
-    const demo = this.config.demo ? this._getDemoData() : null;
-
-    // Get values - use French slugified names matching _attr_name
-    const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
-    const kCoefEntityId = this._getEntityId("coefficient_k");
-    const kCoef24h = demo ? demo.k_coefficient_24h : this._getAttribute(kCoefEntityId, "k_24h");
-    const kPerM3_24h = demo ? demo.k_per_m3_24h : this._getAttribute(kCoefEntityId, "k_per_m3_24h");
-    const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
-    const kPerM3EntityId = this._getEntityId("k_par_m3");
-    const volume = demo ? 35 : this._getAttribute(kPerM3EntityId, "volume_m3");
-    const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
-    const performance = demo ? demo.performance : this._getState(this._getEntityId("performance_energetique"));
-    const kHistory = this._getKHistory();
-
-    // Get insulation attributes for season/inference support
-    const insulationEntityId = this._getEntityId("note_d_isolation");
-    const insulationAttrs = demo ? {} : {
-      status: this._getAttribute(insulationEntityId, "status"),
-      season: this._getAttribute(insulationEntityId, "season"),
-      message: this._getAttribute(insulationEntityId, "message"),
-      k_value: this._getAttribute(insulationEntityId, "k_value"),
-      k_source: this._getAttribute(insulationEntityId, "k_source"),
-      temp_stable: this._getAttribute(insulationEntityId, "temp_stable"),
-      last_k_date: this._getAttribute(insulationEntityId, "last_k_date"),
-    };
-
-    // Priority: measured energy (if available) > estimated energy
-    // Try both possible entity_id formats (HA slugification varies)
-    let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_mesuree_jour"));
-    if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown" || dailyEnergy === null)) {
-      // Fallback to alternative slugification
-      dailyEnergy = this._getState(this._getEntityId("energie_jour_mesuree"));
     }
-    let energyType = "mesurée";
-    if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown" || dailyEnergy === null)) {
-      dailyEnergy = this._getState(this._getEntityId("energie_24h_estimee"));
-      energyType = "estimée";
-    }
-    // Format energy to 3 decimals
-    dailyEnergy = this._formatEnergy(dailyEnergy);
 
-    const heatingTime = demo ? demo.heating_time : this._getState(this._getEntityId("temps_de_chauffe_24h"));
-    const heatingRatio = demo ? demo.heating_ratio : this._getState(this._getEntityId("ratio_de_chauffe"));
-    const deltaTRaw = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
+    _renderData() {
+      const demo = this.config.demo ? this._getDemoData() : null;
 
-    // Get temperatures from DeltaT sensor attributes (stored in Celsius)
-    const deltaTEntityId = this._getEntityId("dt_moyen_24h");
-    const indoorTempRaw = demo ? demo.indoor_temp : this._getAttribute(deltaTEntityId, "indoor_temp");
-    const outdoorTempRaw = demo ? demo.outdoor_temp : this._getAttribute(deltaTEntityId, "outdoor_temp");
+      // Get values - use French slugified names matching _attr_name
+      const kCoef = demo ? demo.k_coefficient : this._getState(this._getEntityId("coefficient_k"));
+      const kCoefEntityId = this._getEntityId("coefficient_k");
+      const kCoef24h = demo ? demo.k_coefficient_24h : this._getAttribute(kCoefEntityId, "k_24h");
+      const kPerM3_24h = demo ? demo.k_per_m3_24h : this._getAttribute(kCoefEntityId, "k_per_m3_24h");
+      const kPerM3 = demo ? demo.k_per_m3 : this._getState(this._getEntityId("k_par_m3"));
+      const kPerM3EntityId = this._getEntityId("k_par_m3");
+      const volume = demo ? 35 : this._getAttribute(kPerM3EntityId, "volume_m3");
+      const insulation = demo ? demo.insulation : this._getState(this._getEntityId("note_d_isolation"));
+      const performance = demo ? demo.performance : this._getState(this._getEntityId("performance_energetique"));
+      const kHistory = this._getKHistory();
 
-    // Convert temperatures based on user's unit system (backend stores in Celsius)
-    const tempUnit = this._getTempUnit();
-    const indoorTemp = this._convertTemp(indoorTempRaw);
-    const outdoorTemp = this._convertTemp(outdoorTempRaw);
-    const deltaTUnit = this._getEntityUnit(deltaTEntityId);
-    const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);  // Skip conversion if already in user's unit
+      // Get insulation attributes for season/inference support
+      const insulationEntityId = this._getEntityId("note_d_isolation");
+      const insulationAttrs = demo ? {} : {
+        status: this._getAttribute(insulationEntityId, "status"),
+        season: this._getAttribute(insulationEntityId, "season"),
+        message: this._getAttribute(insulationEntityId, "message"),
+        k_value: this._getAttribute(insulationEntityId, "k_value"),
+        k_source: this._getAttribute(insulationEntityId, "k_source"),
+        temp_stable: this._getAttribute(insulationEntityId, "temp_stable"),
+        last_k_date: this._getAttribute(insulationEntityId, "last_k_date"),
+      };
 
-    const insulationData = this._getInsulationData(insulation, insulationAttrs);
-    const perfData = this._getPerformanceData(performance);
+      // Priority: measured energy (if available) > estimated energy
+      // Try both possible entity_id formats (HA slugification varies)
+      let dailyEnergy = demo ? demo.daily_energy : this._getState(this._getEntityId("energie_mesuree_jour"));
+      if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown" || dailyEnergy === null)) {
+        // Fallback to alternative slugification
+        dailyEnergy = this._getState(this._getEntityId("energie_jour_mesuree"));
+      }
+      let energyType = "mesurée";
+      if (!demo && (dailyEnergy === "unavailable" || dailyEnergy === "unknown" || dailyEnergy === null)) {
+        dailyEnergy = this._getState(this._getEntityId("energie_24h_estimee"));
+        energyType = "estimée";
+      }
+      // Format energy to 3 decimals
+      dailyEnergy = this._formatEnergy(dailyEnergy);
 
-    // Get wind data from k_coefficient attributes
-    const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
-    const windSpeedUnit = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed_unit") || "km/h";
-    const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
-    const windExposure = demo ? null : this._getAttribute(kCoefEntityId, "wind_exposure");
-    const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
+      const heatingTime = demo ? demo.heating_time : this._getState(this._getEntityId("temps_de_chauffe_24h"));
+      const heatingRatio = demo ? demo.heating_ratio : this._getState(this._getEntityId("ratio_de_chauffe"));
+      const deltaTRaw = demo ? demo.delta_t : this._getState(this._getEntityId("dt_moyen_24h"));
 
-    return html`
+      // Get temperatures from DeltaT sensor attributes (stored in Celsius)
+      const deltaTEntityId = this._getEntityId("dt_moyen_24h");
+      const indoorTempRaw = demo ? demo.indoor_temp : this._getAttribute(deltaTEntityId, "indoor_temp");
+      const outdoorTempRaw = demo ? demo.outdoor_temp : this._getAttribute(deltaTEntityId, "outdoor_temp");
+
+      // Convert temperatures based on user's unit system (backend stores in Celsius)
+      const tempUnit = this._getTempUnit();
+      const indoorTemp = this._convertTemp(indoorTempRaw);
+      const outdoorTemp = this._convertTemp(outdoorTempRaw);
+      const deltaTUnit = this._getEntityUnit(deltaTEntityId);
+      const deltaT = this._convertTempDelta(deltaTRaw, deltaTUnit);  // Skip conversion if already in user's unit
+
+      const insulationData = this._getInsulationData(insulation, insulationAttrs);
+      const perfData = this._getPerformanceData(performance);
+
+      // Get wind data from k_coefficient attributes
+      const windSpeed = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed");
+      const windSpeedUnit = demo ? null : this._getAttribute(kCoefEntityId, "wind_speed_unit") || "km/h";
+      const windDirection = demo ? null : this._getAttribute(kCoefEntityId, "wind_direction");
+      const windExposure = demo ? null : this._getAttribute(kCoefEntityId, "wind_exposure");
+      const roomOrientation = demo ? null : this._getAttribute(kCoefEntityId, "room_orientation");
+
+      return html`
       <!-- Main Score - 3 columns -->
       <div class="score-section">
         <div class="score-card" style="--accent: ${insulationData.color}">
@@ -1867,8 +1867,8 @@ class HomePerformanceCard extends LitElement {
             </div>
             <div class="metric-value">${this._isValidValue(kCoef24h) ? `${kCoef24h} W/°C` : "--"}</div>
             ${this._isValidValue(kPerM3_24h)
-        ? html`<div class="metric-sub">${kPerM3_24h} W/(°C·m³)</div>`
-        : html`<div class="metric-sub">${this._t('rolling_24h')}</div>`}
+          ? html`<div class="metric-sub">${kPerM3_24h} W/(°C·m³)</div>`
+          : html`<div class="metric-sub">${this._t('rolling_24h')}</div>`}
           </div>
 
           <div class="metric">
@@ -1888,8 +1888,8 @@ class HomePerformanceCard extends LitElement {
             <div class="metric-value">${this._formatHeatingTime(heatingTime)}</div>
             <div class="metric-unit">${this._t('on_24h')}</div>
             ${this._isValidValue(heatingRatio)
-        ? html`<div class="metric-sub">${heatingRatio}% ${this._t('of_time')}</div>`
-        : ""}
+          ? html`<div class="metric-sub">${heatingRatio}% ${this._t('of_time')}</div>`
+          : ""}
           </div>
 
           <div class="metric">
@@ -1932,13 +1932,13 @@ class HomePerformanceCard extends LitElement {
 
       <!-- Temperature Variation Warning -->
       ${(() => {
-        const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
-        const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
-        const indoorTempMax = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_max");
-        const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
-          (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
-        if (!hasTempWarning) return '';
-        return html`
+          const tempVariation = demo ? null : this._getAttribute(kCoefEntityId, "temp_variation");
+          const indoorTempMin = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_min");
+          const indoorTempMax = demo ? null : this._getAttribute(kCoefEntityId, "indoor_temp_max");
+          const hasTempWarning = (this._isValidValue(tempVariation) && parseFloat(tempVariation) > 3) ||
+            (this._isValidValue(indoorTempMin) && parseFloat(indoorTempMin) < 17.5);
+          if (!hasTempWarning) return '';
+          return html`
           <div class="temp-warning-banner">
             <span class="warning-icon">⚠️</span>
             <div class="warning-content">
@@ -1947,12 +1947,12 @@ class HomePerformanceCard extends LitElement {
             </div>
           </div>
         `;
-      })()}
+        })()}
     `;
-  }
+    }
 
-  static get styles() {
-    return css`
+    static get styles() {
+      return css`
       :host {
         --bg-primary: var(--card-background-color, #1a1a2e);
         --bg-secondary: var(--secondary-background-color, #16213e);
@@ -3385,142 +3385,142 @@ class HomePerformanceCard extends LitElement {
         }
       }
     `;
-  }
-}
-
-// Card Editor
-class HomePerformanceCardEditor extends LitElement {
-  static get properties() {
-    return {
-      hass: { type: Object },
-      config: { type: Object },
-    };
+    }
   }
 
-  // Get translation for key (reuse HomePerformanceCard translations)
-  _t(key) {
-    const lang = this.hass?.language?.substring(0, 2) || 'en';
-    const translations = HomePerformanceCard._translations[lang] || HomePerformanceCard._translations['en'];
-    return translations[key] !== undefined ? translations[key] : key;
-  }
-
-  // Get available Home Performance zones from devices
-  _getAvailableZones() {
-    if (!this.hass) return [];
-
-    const zones = [];
-    const seen = new Set();
-
-    // Method 1: Find zones from devices (most reliable)
-    // Devices are named "Home Performance - {Zone Name}"
-    if (this.hass.devices) {
-      Object.values(this.hass.devices).forEach((device) => {
-        if (device.name && device.name.startsWith("Home Performance - ")) {
-          const zoneName = device.name.replace("Home Performance - ", "");
-          if (!seen.has(zoneName)) {
-            zones.push({ slug: zoneName, displayName: zoneName });
-            seen.add(zoneName);
-          }
-        }
-      });
+  // Card Editor
+  class HomePerformanceCardEditor extends LitElement {
+    static get properties() {
+      return {
+        hass: { type: Object },
+        config: { type: Object },
+      };
     }
 
-    // Method 2: Fallback - find from entities if devices not available
-    if (zones.length === 0) {
-      const knownSuffixes = ['k_coefficient', 'coefficient_k', 'k_per_m2', 'k_per_m3'];
-
-      Object.keys(this.hass.states).forEach((entityId) => {
-        for (const suffix of knownSuffixes) {
-          // Try standard pattern: sensor.home_performance_{zone}_{suffix}
-          let match = entityId.match(new RegExp(`^sensor\\.home_performance_(.+?)_${suffix}$`));
-          // Try legacy pattern: sensor.{zone}_{suffix}
-          if (!match) {
-            match = entityId.match(new RegExp(`^sensor\\.(.+?)_${suffix}$`));
-          }
-
-          if (match && !seen.has(match[1])) {
-            const slug = match[1];
-            const displayName = slug
-              .split("_")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ");
-            zones.push({ slug, displayName });
-            seen.add(slug);
-            break;
-          }
-        }
-      });
+    // Get translation for key (reuse HomePerformanceCard translations)
+    _t(key) {
+      const lang = this.hass?.language?.substring(0, 2) || 'en';
+      const translations = HomePerformanceCard._translations[lang] || HomePerformanceCard._translations['en'];
+      return translations[key] !== undefined ? translations[key] : key;
     }
 
-    console.log("[Home Performance] Available zones:", zones);
-    return zones.sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }
+    // Get available Home Performance zones from devices
+    _getAvailableZones() {
+      if (!this.hass) return [];
 
-  setConfig(config) {
-    this.config = config;
-  }
+      const zones = [];
+      const seen = new Set();
 
-  configChanged(ev) {
-    const target = ev.target;
-    const newConfig = { ...this.config };
-
-    if (target.configValue) {
-      // ha-checkbox uses 'checked' property, not 'value'
-      if (target.tagName === "HA-CHECKBOX" || target.type === "checkbox") {
-        newConfig[target.configValue] = target.checked;
-      } else {
-        newConfig[target.configValue] = target.value;
+      // Method 1: Find zones from devices (most reliable)
+      // Devices are named "Home Performance - {Zone Name}"
+      if (this.hass.devices) {
+        Object.values(this.hass.devices).forEach((device) => {
+          if (device.name && device.name.startsWith("Home Performance - ")) {
+            const zoneName = device.name.replace("Home Performance - ", "");
+            if (!seen.has(zoneName)) {
+              zones.push({ slug: zoneName, displayName: zoneName });
+              seen.add(zoneName);
+            }
+          }
+        });
       }
+
+      // Method 2: Fallback - find from entities if devices not available
+      if (zones.length === 0) {
+        const knownSuffixes = ['k_coefficient', 'coefficient_k', 'k_per_m2', 'k_per_m3'];
+
+        Object.keys(this.hass.states).forEach((entityId) => {
+          for (const suffix of knownSuffixes) {
+            // Try standard pattern: sensor.home_performance_{zone}_{suffix}
+            let match = entityId.match(new RegExp(`^sensor\\.home_performance_(.+?)_${suffix}$`));
+            // Try legacy pattern: sensor.{zone}_{suffix}
+            if (!match) {
+              match = entityId.match(new RegExp(`^sensor\\.(.+?)_${suffix}$`));
+            }
+
+            if (match && !seen.has(match[1])) {
+              const slug = match[1];
+              const displayName = slug
+                .split("_")
+                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(" ");
+              zones.push({ slug, displayName });
+              seen.add(slug);
+              break;
+            }
+          }
+        });
+      }
+
+      console.log("[Home Performance] Available zones:", zones);
+      return zones.sort((a, b) => a.displayName.localeCompare(b.displayName));
     }
 
-    const event = new CustomEvent("config-changed", {
-      detail: { config: newConfig },
-      bubbles: true,
-      composed: true,
-    });
-    this.dispatchEvent(event);
-  }
-
-  _setLayout(layout) {
-    const newConfig = { ...this.config, layout };
-    const event = new CustomEvent("config-changed", {
-      detail: { config: newConfig },
-      bubbles: true,
-      composed: true,
-    });
-    this.dispatchEvent(event);
-  }
-
-  _onZoneSelected(ev) {
-    const newConfig = { ...this.config, zone: ev.target.value };
-    const event = new CustomEvent("config-changed", {
-      detail: { config: newConfig },
-      bubbles: true,
-      composed: true,
-    });
-    this.dispatchEvent(event);
-  }
-
-  render() {
-    if (!this.hass || !this.config) {
-      return html``;
+    setConfig(config) {
+      this.config = config;
     }
 
-    const isMultiZone = this.config.layout === "multi";
-    const zones = this._getAvailableZones();
+    configChanged(ev) {
+      const target = ev.target;
+      const newConfig = { ...this.config };
 
-    return html`
+      if (target.configValue) {
+        // ha-checkbox uses 'checked' property, not 'value'
+        if (target.tagName === "HA-CHECKBOX" || target.type === "checkbox") {
+          newConfig[target.configValue] = target.checked;
+        } else {
+          newConfig[target.configValue] = target.value;
+        }
+      }
+
+      const event = new CustomEvent("config-changed", {
+        detail: { config: newConfig },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
+    }
+
+    _setLayout(layout) {
+      const newConfig = { ...this.config, layout };
+      const event = new CustomEvent("config-changed", {
+        detail: { config: newConfig },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
+    }
+
+    _onZoneSelected(ev) {
+      const newConfig = { ...this.config, zone: ev.target.value };
+      const event = new CustomEvent("config-changed", {
+        detail: { config: newConfig },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
+    }
+
+    render() {
+      if (!this.hass || !this.config) {
+        return html``;
+      }
+
+      const isMultiZone = this.config.layout === "multi";
+      const zones = this._getAvailableZones();
+
+      return html`
       <div class="editor">
         ${!isMultiZone
-        ? html`
+          ? html`
               ${zones.length > 0
-            ? html`
+              ? html`
                     <div class="zone-selector">
                       <label>${this._t('editor_zone')}</label>
                       <select @change=${this._onZoneSelected}>
                         <option value="" ?selected=${!this.config.zone}>-- ${this._t('editor_select_zone')} --</option>
                         ${zones.map(
-              (zone) => html`
+                (zone) => html`
                             <option
                               value=${zone.displayName}
                               ?selected=${this.config.zone === zone.displayName}
@@ -3528,11 +3528,11 @@ class HomePerformanceCardEditor extends LitElement {
                               ${zone.displayName}
                             </option>
                           `
-            )}
+              )}
                       </select>
                     </div>
                   `
-            : html`
+              : html`
                     <ha-textfield
                       label="${this._t('editor_zone')}"
                       .value=${this.config.zone || ""}
@@ -3541,7 +3541,7 @@ class HomePerformanceCardEditor extends LitElement {
                     ></ha-textfield>
                   `}
             `
-        : ""}
+          : ""}
 
         <ha-textfield
           label="${this._t('editor_title')}"
@@ -3614,10 +3614,10 @@ class HomePerformanceCardEditor extends LitElement {
         </ha-formfield>
       </div>
     `;
-  }
+    }
 
-  static get styles() {
-    return css`
+    static get styles() {
+      return css`
       .editor {
         display: flex;
         flex-direction: column;
@@ -3801,25 +3801,25 @@ class HomePerformanceCardEditor extends LitElement {
         opacity: 0.4;
       }
     `;
+    }
   }
-}
 
-// Register
-customElements.define("home-performance-card", HomePerformanceCard);
-customElements.define("home-performance-card-editor", HomePerformanceCardEditor);
+  // Register
+  customElements.define("home-performance-card", HomePerformanceCard);
+  customElements.define("home-performance-card-editor", HomePerformanceCardEditor);
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "home-performance-card",
-  name: "Home Performance",
-  description: "Carte performance thermique",
-  preview: true,
-});
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: "home-performance-card",
+    name: "Home Performance",
+    description: "Carte performance thermique",
+    preview: true,
+  });
 
-console.info(
-  `%c HOME-PERFORMANCE %c v${CARD_VERSION} `,
-  "color: white; background: #6366f1; font-weight: bold; border-radius: 4px 0 0 4px; padding: 2px 6px;",
-  "color: #6366f1; background: #1a1a2e; font-weight: bold; border-radius: 0 4px 4px 0; padding: 2px 6px;"
-);
+  console.info(
+    `%c HOME-PERFORMANCE %c v${CARD_VERSION} `,
+    "color: white; background: #6366f1; font-weight: bold; border-radius: 4px 0 0 4px; padding: 2px 6px;",
+    "color: #6366f1; background: #1a1a2e; font-weight: bold; border-radius: 0 4px 4px 0; padding: 2px 6px;"
+  );
 
 }))();
