@@ -23,6 +23,7 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 - [Temperature Units](#️-temperature-units-celsiusfahrenheit)
 - [Prerequisites](#-prerequisites)
 - [Configuration](#️-configuration)
+- [Translations](#-translations)
 - [Data Persistence](#-data-persistence)
 - [Usage](#-usage)
 - [Dashboard Examples](#-dashboard-examples)
@@ -232,7 +233,7 @@ The rating automatically adapts to all situations:
 | Situation | Display | Description |
 |-----------|---------|-------------|
 | 7 perfect days | **S - Optimal** | Exceptional: 7 consecutive days with minimal heating and stable comfortable temperature |
-| K calculated | **A+ to G** | Rating based on K/m³ coefficient |
+| K calculated | **A+ to D** | Rating based on K/m³ coefficient |
 | Low heating + stable T° | **🏆 Excellent (inferred)** | Excellent insulation automatically inferred |
 | Summer mode (T° out > T° in) | **☀️ Summer mode** | Measurement impossible + last K conserved |
 | Shoulder season (ΔT < 5°C) | **🌤️ Shoulder season** | Insufficient ΔT + last K conserved |
@@ -483,7 +484,7 @@ type: custom:home-performance-card
 zone: Bedroom
 layout: badge
 ```
-A compact vertical card showing the score letter (A+ to D), zone name, and K coefficient. Perfect for creating a grid of all your rooms.
+A compact vertical card showing the score letter (S to D), zone name, and K coefficient. Perfect for creating a grid of all your rooms.
 
 <img width="470" alt="Badge layout" src="https://github.com/user-attachments/assets/a03b1af9-9540-45cf-b3bc-070cf796a5ab" />
 
@@ -536,7 +537,7 @@ A comprehensive card that displays **all your zones in one place**. No need to s
 
 ### Card Features
 
-- 📊 **Visual scores** - Insulation rating from A+ to D with colors
+- 📊 **Visual scores** - Insulation rating from S to D with colors
 - 📈 **Historical K graph** - 7-day history with bar chart (full) or sparkline (badge/pill)
 - 🌡️ **Temperatures** - Indoor/Outdoor in real-time
 - 📉 **Detailed metrics** - K coefficient, Energy, Heating time
@@ -819,6 +820,18 @@ The notification is translated (EN/FR/IT) based on your Home Assistant language.
 
 > **Blueprint alternative**: A [Blueprint](blueprints/automation/home_performance/window_open_notification.yaml) is also available for advanced customization (custom messages, TTS, multiple devices...).
 
+### 🌐 Translations
+
+The integration is fully translated in **3 languages**:
+
+| Language | Coverage |
+|----------|----------|
+| 🇬🇧 English | Full (config flow, sensors, services, card, notifications) |
+| 🇫🇷 French | Full |
+| 🇮🇹 Italian | Full |
+
+The language is automatically selected based on your Home Assistant system language.
+
 ## 💾 Data Persistence
 
 Data is **automatically saved** and restored after a Home Assistant restart:
@@ -957,6 +970,10 @@ Needs optimization : beyond
 - [x] **Long-term history** - 5 years of daily data storage
 - [x] **Wind data display** - Weather entity integration with wind exposure
 - [x] **Multiple heat source types** (electric, heat pump, gas boiler, gas furnace) 🔥
+- [x] **Level S "Optimal" rating** - 7-day streak of minimal heating + stable comfortable temperature
+- [x] **Temperature variation warning** - Alert when large T° swings may bias K score
+- [x] **Dynamic COP** - Auto-calibrating efficiency factor for heat pumps (measured COP 7d)
+- [x] **Italian translation** - Full i18n support (EN/FR/IT)
 
 ### 🔜 Next - Alerts & Notifications
 
