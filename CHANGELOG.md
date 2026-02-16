@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/Hugofromfrance/home_performance/compare/v1.4.0...v1.4.1) (2026-02-16)
+
+
+### 🐛 Corrections de bugs
+
+* Energy sensor is now deletable ([6ed3c0e](https://github.com/Hugofromfrance/home_performance/commit/6ed3c0e806455f1c842ef930f61b24fba6b06d94))
+
 ## [1.4.0](https://github.com/Hugofromfrance/home_performance/compare/v1.3.0...v1.4.0) (2026-02-13)
 
 
