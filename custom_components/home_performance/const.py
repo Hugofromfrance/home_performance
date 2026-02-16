@@ -159,6 +159,11 @@ SENSOR_ENTITY_SUFFIXES = {
     "measured_energy_daily": "measured_energy_daily",
     "measured_cop": "measured_cop",
     "cop_7d": "cop_7d",
+    # Diagnostic sensors
+    "energy_source": "energy_source",
+    "heating_detection_method": "heating_detection_method",
+    "window_detection_method": "window_detection_method",
+    "last_k_update": "last_k_update",
 }
 
 BINARY_SENSOR_ENTITY_SUFFIXES = {

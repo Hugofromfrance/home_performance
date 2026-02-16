@@ -157,6 +157,18 @@
       },
       "cop_7d": {
         "name": "COP 7d Average"
+      },
+      "energy_source": {
+        "name": "Energy Source"
+      },
+      "heating_detection_method": {
+        "name": "Heating Detection Method"
+      },
+      "window_detection_method": {
+        "name": "Window Detection Method"
+      },
+      "last_k_update": {
+        "name": "Last K Update"
       }
     },
     "binary_sensor": {

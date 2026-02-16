@@ -212,6 +212,18 @@
       },
       "cop_7d": {
         "name": "COP medio 7g"
+      },
+      "energy_source": {
+        "name": "Fonte di energia"
+      },
+      "heating_detection_method": {
+        "name": "Metodo rilevamento riscaldamento"
+      },
+      "window_detection_method": {
+        "name": "Metodo rilevamento finestra"
+      },
+      "last_k_update": {
+        "name": "Ultimo aggiornamento K"
       }
     },
     "binary_sensor": {
