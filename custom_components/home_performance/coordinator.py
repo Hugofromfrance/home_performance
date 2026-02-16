@@ -25,6 +25,7 @@ from .const import (
     CONF_ENERGY_SENSOR,
     CONF_HEAT_SOURCE_TYPE,
     CONF_HEATER_POWER,
+    CONF_HEATING_ACTIVE_STATES,
     CONF_HEATING_ENTITY,
     CONF_INDOOR_TEMP_SENSOR,
     CONF_NOTIFICATION_DELAY,
@@ -42,6 +43,7 @@ from .const import (
     DEFAULT_EFFICIENCY_FACTORS,
     DEFAULT_ENABLE_DYNAMIC_COP,
     DEFAULT_HEAT_SOURCE_TYPE,
+    DEFAULT_HEATING_ACTIVE_STATES,
     DEFAULT_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
@@ -76,6 +78,14 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.indoor_temp_sensor: str = config[CONF_INDOOR_TEMP_SENSOR]
         self.outdoor_temp_sensor: str = config[CONF_OUTDOOR_TEMP_SENSOR]
         self.heating_entity: str = config[CONF_HEATING_ENTITY]
+
+        # Heating active states for select/input_select entities
+        # Parse comma-separated string into a lowercase set for case-insensitive matching
+        raw_active_states = config.get(CONF_HEATING_ACTIVE_STATES)
+        if raw_active_states:
+            self.heating_active_states: set[str] = {s.strip().lower() for s in raw_active_states.split(",") if s.strip()}
+        else:
+            self.heating_active_states = {s.lower() for s in DEFAULT_HEATING_ACTIVE_STATES}
 
         # Heat source type - migrate legacy types if needed
         raw_heat_source = config.get(CONF_HEAT_SOURCE_TYPE, DEFAULT_HEAT_SOURCE_TYPE)
@@ -1630,7 +1640,21 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Fallback to hvac_mode (less reliable - only indicates mode, not activity)
             return hvac_mode in ("heat", "heat_cool") and hvac_mode not in ("off", STATE_UNAVAILABLE, STATE_UNKNOWN)
 
-        # Handle switch/input_boolean
+        # Handle select/input_select entities (e.g. Modbus heat pump controllers)
+        if domain in ("select", "input_select"):
+            current_state = state.state.lower()
+            is_heating = current_state in self.heating_active_states
+            _LOGGER.debug(
+                "[%s] Heating via select %s: state=%s, active_states=%s -> heating=%s",
+                self.zone_name,
+                self.heating_entity,
+                state.state,
+                self.heating_active_states,
+                is_heating,
+            )
+            return is_heating
+
+        # Handle switch/input_boolean/binary_sensor (fallback)
         is_on = state.state == STATE_ON
         _LOGGER.debug(
             "[%s] Heating via switch %s: state=%s -> heating=%s",
