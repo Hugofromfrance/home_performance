@@ -88,20 +88,22 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.heater_power: float | None = config.get(CONF_HEATER_POWER)
         self.surface: float | None = config.get(CONF_SURFACE)
         self.volume: float | None = config.get(CONF_VOLUME)
-        self.power_sensor: str | None = config.get(CONF_POWER_SENSOR)
-        self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR)
+        # Normalize empty strings to None for entity fields
+        # (handles configs saved with "" due to a bug in options flow prior to v1.4.1)
+        self.power_sensor: str | None = config.get(CONF_POWER_SENSOR) or None
+        self.energy_sensor: str | None = config.get(CONF_ENERGY_SENSOR) or None
         self.power_threshold: float = config.get(CONF_POWER_THRESHOLD) or DEFAULT_POWER_THRESHOLD
-        self.window_sensor: str | None = config.get(CONF_WINDOW_SENSOR)
+        self.window_sensor: str | None = config.get(CONF_WINDOW_SENSOR) or None
 
         # Weather settings
-        self.weather_entity: str | None = config.get(CONF_WEATHER_ENTITY)
+        self.weather_entity: str | None = config.get(CONF_WEATHER_ENTITY) or None
         # Normalize orientation to lowercase (supports legacy uppercase values)
         raw_orientation = config.get(CONF_ROOM_ORIENTATION)
         self.room_orientation: str | None = raw_orientation.lower() if raw_orientation else None
 
         # Notification settings
         self.window_notification_enabled: bool = config.get(CONF_WINDOW_NOTIFICATION_ENABLED, False)
-        self.notify_device: str | None = config.get(CONF_NOTIFY_DEVICE)
+        self.notify_device: str | None = config.get(CONF_NOTIFY_DEVICE) or None
         self.notification_delay: int = config.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
 
         # Efficiency factor - use configured value or default based on heat source type
