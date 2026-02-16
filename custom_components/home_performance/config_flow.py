@@ -474,7 +474,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             )
 
         # Power sensor - only set default if value exists (EntitySelector doesn't handle None)
-        power_sensor_value = current.get(CONF_POWER_SENSOR)
+        power_sensor_value = current.get(CONF_POWER_SENSOR) or None
         if power_sensor_value is not None:
             schema_dict[vol.Optional(CONF_POWER_SENSOR, default=power_sensor_value)] = selector.EntitySelector(
                 selector.EntitySelectorConfig(
@@ -504,7 +504,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
 
         # === ENERGY CONFIGURATION GROUP ===
         # Energy sensor - required for non-electric sources, optional for electric
-        energy_sensor_value = current.get(CONF_ENERGY_SENSOR)
+        energy_sensor_value = current.get(CONF_ENERGY_SENSOR) or None
         if heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY:
             schema_dict[
                 vol.Required(
@@ -549,7 +549,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         # Note: enable_dynamic_cop is shown in step 2 only for heat pumps
 
         # Window sensor - only set default if value exists
-        window_sensor_value = current.get(CONF_WINDOW_SENSOR)
+        window_sensor_value = current.get(CONF_WINDOW_SENSOR) or None
         if window_sensor_value is not None:
             schema_dict[vol.Optional(CONF_WINDOW_SENSOR, default=window_sensor_value)] = selector.EntitySelector(
                 selector.EntitySelectorConfig(
@@ -573,7 +573,7 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         )
 
         # Notify device - only show if notifications are or will be enabled
-        notify_device_value = current.get(CONF_NOTIFY_DEVICE)
+        notify_device_value = current.get(CONF_NOTIFY_DEVICE) or None
         if notify_device_value is not None:
             schema_dict[vol.Optional(CONF_NOTIFY_DEVICE, default=notify_device_value)] = selector.DeviceSelector(
                 selector.DeviceSelectorConfig(filter=selector.DeviceFilterSelectorConfig(integration="mobile_app"))
@@ -673,12 +673,25 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
 
     def _create_entry(self, current: dict[str, Any]) -> FlowResult:
         """Create the config entry with collected data."""
+        # Entity/device selector fields that return "" when cleared by the user
+        _ENTITY_SELECTOR_FIELDS = {
+            CONF_ENERGY_SENSOR,
+            CONF_POWER_SENSOR,
+            CONF_WINDOW_SENSOR,
+            CONF_WEATHER_ENTITY,
+            CONF_NOTIFY_DEVICE,
+        }
+
         # Keep None values to allow removing sensors (override data with options)
         # But remove keys that are None AND not in current config (truly optional)
         cleaned_input = {}
         for k, v in self._data.items():
             # Treat 0 as None for heater_power (allows clearing the value)
             if k == CONF_HEATER_POWER and v == 0:
+                v = None
+            # Treat empty strings as None for entity/device selectors
+            # (HA UI returns "" instead of None when user clears the field)
+            if k in _ENTITY_SELECTOR_FIELDS and v == "":
                 v = None
             if v is not None:
                 cleaned_input[k] = v
