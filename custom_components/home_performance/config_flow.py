@@ -18,6 +18,7 @@ from .const import (
     CONF_ENERGY_SENSOR,
     CONF_HEAT_SOURCE_TYPE,
     CONF_HEATER_POWER,
+    CONF_HEATING_ACTIVE_STATES,
     CONF_HEATING_ENTITY,
     CONF_INDOOR_TEMP_SENSOR,
     CONF_NOTIFICATION_DELAY,
@@ -35,6 +36,7 @@ from .const import (
     DEFAULT_EFFICIENCY_FACTORS,
     DEFAULT_ENABLE_DYNAMIC_COP,
     DEFAULT_HEAT_SOURCE_TYPE,
+    DEFAULT_HEATING_ACTIVE_STATES,
     DEFAULT_NOTIFICATION_DELAY,
     DEFAULT_POWER_THRESHOLD,
     DOMAIN,
@@ -103,7 +105,12 @@ def get_schema_step_zone(
             selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
         ),
         vol.Required(CONF_HEATING_ENTITY): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean", "binary_sensor"])
+            selector.EntitySelectorConfig(
+                domain=["climate", "switch", "input_boolean", "binary_sensor", "select", "input_select"]
+            )
+        ),
+        vol.Optional(CONF_HEATING_ACTIVE_STATES): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
         ),
         vol.Required(CONF_HEAT_SOURCE_TYPE, default=DEFAULT_HEAT_SOURCE_TYPE): selector.SelectSelector(
             selector.SelectSelectorConfig(
@@ -440,6 +447,17 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             ),
         }
 
+        # Heating active states (for select/input_select entities)
+        heating_active_states_value = current.get(CONF_HEATING_ACTIVE_STATES) or None
+        if heating_active_states_value is not None:
+            schema_dict[vol.Optional(CONF_HEATING_ACTIVE_STATES, default=heating_active_states_value)] = (
+                selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT))
+            )
+        else:
+            schema_dict[vol.Optional(CONF_HEATING_ACTIVE_STATES)] = selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+            )
+
         # Heater power - always Optional in schema (backend validates for electric)
         heater_power_value = current.get(CONF_HEATER_POWER)
         if heater_power_value is not None and heater_power_value > 0:
@@ -673,13 +691,14 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
 
     def _create_entry(self, current: dict[str, Any]) -> FlowResult:
         """Create the config entry with collected data."""
-        # Entity/device selector fields that return "" when cleared by the user
-        _ENTITY_SELECTOR_FIELDS = {
+        # Entity/device/text selector fields that return "" when cleared by the user
+        _CLEARABLE_FIELDS = {
             CONF_ENERGY_SENSOR,
             CONF_POWER_SENSOR,
             CONF_WINDOW_SENSOR,
             CONF_WEATHER_ENTITY,
             CONF_NOTIFY_DEVICE,
+            CONF_HEATING_ACTIVE_STATES,
         }
 
         # Keep None values to allow removing sensors (override data with options)
@@ -689,9 +708,9 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             # Treat 0 as None for heater_power (allows clearing the value)
             if k == CONF_HEATER_POWER and v == 0:
                 v = None
-            # Treat empty strings as None for entity/device selectors
+            # Treat empty strings as None for entity/device/text selectors
             # (HA UI returns "" instead of None when user clears the field)
-            if k in _ENTITY_SELECTOR_FIELDS and v == "":
+            if k in _CLEARABLE_FIELDS and v == "":
                 v = None
             if v is not None:
                 cleaned_input[k] = v

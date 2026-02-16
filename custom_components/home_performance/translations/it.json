@@ -31,6 +31,7 @@
           "indoor_temp_sensor": "Sensore temperatura interna",
           "outdoor_temp_sensor": "Sensore temperatura esterna",
           "heating_entity": "Entità di riscaldamento",
+          "heating_active_states": "Stati di riscaldamento attivo",
           "heat_source_type": "Tipo di fonte di calore",
           "heater_power": "Potenza riscaldatore",
           "efficiency_factor": "Fattore di efficienza"
@@ -39,7 +40,8 @@
           "zone_name": "Nome univoco per identificare questa stanza (es. Camera da letto, Soggiorno)",
           "indoor_temp_sensor": "Sensore che misura la temperatura della stanza",
           "outdoor_temp_sensor": "Sensore che misura la temperatura esterna",
-          "heating_entity": "Interruttore, termostato o climate che controlla il riscaldamento",
+          "heating_entity": "Interruttore, termostato, climate o entità select che controlla il riscaldamento",
+          "heating_active_states": "Lista separata da virgole degli stati che indicano riscaldamento attivo (per entità select). Predefinito: heating, heat, on",
           "heat_source_type": "Tipo di sistema di riscaldamento",
           "heater_power": "Potenza nominale in Watt (obbligatorio per elettrico, opzionale per altri)",
           "efficiency_factor": "Converte energia consumata in calore. Elettrico: 1.0, Pompa di calore: 2.5-4.0 (COP), Caldaia a gas: 0.85-0.95, Forno a gas: 0.78-0.90"
@@ -101,6 +103,7 @@
         "description": "Modifica i parametri di questa zona.",
         "data": {
           "heat_source_type": "Tipo di fonte di calore",
+          "heating_active_states": "Stati di riscaldamento attivo",
           "heater_power": "Potenza riscaldatore",
           "efficiency_factor": "Fattore di efficienza",
           "surface": "Superficie stanza",
@@ -117,6 +120,7 @@
         },
         "data_description": {
           "heat_source_type": "Tipo di sistema di riscaldamento",
+          "heating_active_states": "Lista separata da virgole degli stati che indicano riscaldamento attivo (per entità select). Predefinito: heating, heat, on",
           "heater_power": "Potenza nominale in Watt (obbligatorio per elettrico, opzionale per altri)",
           "efficiency_factor": "Converte energia consumata in calore. Elettrico: 1.0, Pompa di calore: 2.5-4.0 (COP), Caldaia a gas: 0.85-0.95, Forno a gas: 0.78-0.90",
           "surface": "Superficie del pavimento per calcolare il coefficiente K per m²",
