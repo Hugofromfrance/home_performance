@@ -311,9 +311,7 @@ class TestJSModuleRegistrationRegisterModules:
             call_order.append("delete")
 
         legacy_resource = {"id": "legacy-1", "url": "/home_performance/home-performance-card.js"}
-        mock_hass_with_lovelace.data["lovelace"].resources.async_items = MagicMock(
-            return_value=[legacy_resource]
-        )
+        mock_hass_with_lovelace.data["lovelace"].resources.async_items = MagicMock(return_value=[legacy_resource])
         mock_hass_with_lovelace.data["lovelace"].resources.async_create_item = AsyncMock(side_effect=track_create)
         mock_hass_with_lovelace.data["lovelace"].resources.async_delete_item = AsyncMock(side_effect=track_delete)
 
@@ -474,9 +472,7 @@ class TestJSModuleRegistrationLegacyCleanup:
         mock_lovelace.mode = "storage"
         mock_lovelace.resources.loaded = True
         mock_lovelace.resources.async_items = MagicMock(return_value=resources)
-        mock_lovelace.resources.async_delete_item = AsyncMock(
-            side_effect=[Exception("Delete failed"), None]
-        )
+        mock_lovelace.resources.async_delete_item = AsyncMock(side_effect=[Exception("Delete failed"), None])
 
         mock_hass = MagicMock()
         mock_hass.data = {"lovelace": mock_lovelace}
