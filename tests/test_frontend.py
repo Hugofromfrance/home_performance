@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from custom_components.home_performance.const import URL_BASE, VERSION
-from custom_components.home_performance.frontend import WWW_PATH, JSModuleRegistration
+from custom_components.home_performance.frontend import LEGACY_URL_BASE, WWW_PATH, JSModuleRegistration
 
 
 class TestWWWPath:
@@ -31,6 +31,22 @@ class TestWWWPath:
         """Test that WWW_PATH contains the card JavaScript file."""
         card_file = WWW_PATH / "home-performance-card.js"
         assert card_file.exists()
+
+
+class TestConstants:
+    """Test module-level constants."""
+
+    def test_legacy_url_base_uses_underscore(self):
+        """Test that LEGACY_URL_BASE uses underscore (matching old domain path)."""
+        assert LEGACY_URL_BASE == "/home_performance"
+
+    def test_url_base_uses_hyphen(self):
+        """Test that URL_BASE uses hyphen."""
+        assert URL_BASE == "/home-performance"
+
+    def test_legacy_and_current_url_differ(self):
+        """Test that legacy and current URL bases are different."""
+        assert LEGACY_URL_BASE != URL_BASE
 
 
 class TestJSModuleRegistrationInit:
@@ -111,16 +127,18 @@ class TestJSModuleRegistrationRegisterPath:
         return mock
 
     @pytest.mark.asyncio
-    async def test_register_path_calls_http_register(self, mock_hass):
-        """Test that _async_register_path registers static path."""
+    async def test_register_path_registers_both_current_and_legacy(self, mock_hass):
+        """Test that _async_register_path registers both /home-performance and /home_performance."""
         registration = JSModuleRegistration(mock_hass)
 
         await registration._async_register_path()
 
-        mock_hass.http.async_register_static_paths.assert_called_once()
-        call_args = mock_hass.http.async_register_static_paths.call_args[0][0]
-        assert len(call_args) == 1
-        assert call_args[0].url_path == URL_BASE
+        assert mock_hass.http.async_register_static_paths.call_count == 2
+        registered_paths = [
+            call[0][0][0].url_path for call in mock_hass.http.async_register_static_paths.call_args_list
+        ]
+        assert URL_BASE in registered_paths
+        assert LEGACY_URL_BASE in registered_paths
 
     @pytest.mark.asyncio
     async def test_register_path_handles_runtime_error(self, mock_hass):
@@ -128,8 +146,25 @@ class TestJSModuleRegistrationRegisterPath:
         mock_hass.http.async_register_static_paths = AsyncMock(side_effect=RuntimeError("Path already registered"))
         registration = JSModuleRegistration(mock_hass)
 
-        # Should not raise
         await registration._async_register_path()
+
+    @pytest.mark.asyncio
+    async def test_register_path_legacy_error_does_not_block_current(self, mock_hass):
+        """Test that a RuntimeError on legacy path doesn't prevent current path registration."""
+        call_count = 0
+
+        async def side_effect(paths):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise RuntimeError("Legacy path already registered")
+
+        mock_hass.http.async_register_static_paths = AsyncMock(side_effect=side_effect)
+        registration = JSModuleRegistration(mock_hass)
+
+        await registration._async_register_path()
+
+        assert call_count == 2
 
 
 class TestJSModuleRegistrationRegister:
@@ -143,6 +178,7 @@ class TestJSModuleRegistrationRegister:
         mock_lovelace.resources.loaded = True
         mock_lovelace.resources.async_items = MagicMock(return_value=[])
         mock_lovelace.resources.async_create_item = AsyncMock()
+        mock_lovelace.resources.async_delete_item = AsyncMock()
 
         mock_hass = MagicMock()
         mock_hass.data = {"lovelace": mock_lovelace}
@@ -167,9 +203,7 @@ class TestJSModuleRegistrationRegister:
 
         await registration.async_register()
 
-        # Should register static path
-        mock_hass_storage_mode.http.async_register_static_paths.assert_called_once()
-        # Should register resources
+        assert mock_hass_storage_mode.http.async_register_static_paths.call_count == 2
         mock_hass_storage_mode.data["lovelace"].resources.async_create_item.assert_called()
 
     @pytest.mark.asyncio
@@ -179,9 +213,7 @@ class TestJSModuleRegistrationRegister:
 
         await registration.async_register()
 
-        # Should register static path
-        mock_hass_yaml_mode.http.async_register_static_paths.assert_called_once()
-        # Should NOT try to register Lovelace resources
+        assert mock_hass_yaml_mode.http.async_register_static_paths.call_count == 2
         assert (
             not hasattr(mock_hass_yaml_mode.data["lovelace"].resources, "async_create_item")
             or not mock_hass_yaml_mode.data["lovelace"].resources.async_create_item.called
@@ -196,11 +228,9 @@ class TestJSModuleRegistrationRegister:
 
         registration = JSModuleRegistration(mock_hass)
 
-        # Should not raise
         await registration.async_register()
 
-        # Should still register static path
-        mock_hass.http.async_register_static_paths.assert_called_once()
+        assert mock_hass.http.async_register_static_paths.call_count == 2
 
 
 class TestJSModuleRegistrationRegisterModules:
@@ -215,6 +245,7 @@ class TestJSModuleRegistrationRegisterModules:
         mock_lovelace.resources.async_items = MagicMock(return_value=[])
         mock_lovelace.resources.async_create_item = AsyncMock()
         mock_lovelace.resources.async_update_item = AsyncMock()
+        mock_lovelace.resources.async_delete_item = AsyncMock()
 
         mock_hass = MagicMock()
         mock_hass.data = {"lovelace": mock_lovelace}
@@ -228,7 +259,6 @@ class TestJSModuleRegistrationRegisterModules:
 
         await registration._async_register_modules()
 
-        # Should create new resource
         mock_hass_with_lovelace.data["lovelace"].resources.async_create_item.assert_called()
         call_args = mock_hass_with_lovelace.data["lovelace"].resources.async_create_item.call_args[0][0]
         assert call_args["res_type"] == "module"
@@ -248,7 +278,6 @@ class TestJSModuleRegistrationRegisterModules:
 
         await registration._async_register_modules()
 
-        # Should update existing resource
         mock_hass_with_lovelace.data["lovelace"].resources.async_update_item.assert_called_once()
         call_args = mock_hass_with_lovelace.data["lovelace"].resources.async_update_item.call_args
         assert call_args[0][0] == "test-id"
@@ -267,9 +296,40 @@ class TestJSModuleRegistrationRegisterModules:
 
         await registration._async_register_modules()
 
-        # Should NOT update or create
         mock_hass_with_lovelace.data["lovelace"].resources.async_update_item.assert_not_called()
         mock_hass_with_lovelace.data["lovelace"].resources.async_create_item.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_register_modules_cleans_up_legacy_after_registration(self, mock_hass_with_lovelace):
+        """Test that legacy cleanup runs AFTER new resource registration."""
+        call_order = []
+
+        async def track_create(*args, **kwargs):
+            call_order.append("create")
+
+        async def track_delete(*args, **kwargs):
+            call_order.append("delete")
+
+        legacy_resource = {"id": "legacy-1", "url": "/home_performance/home-performance-card.js"}
+        mock_hass_with_lovelace.data["lovelace"].resources.async_items = MagicMock(return_value=[legacy_resource])
+        mock_hass_with_lovelace.data["lovelace"].resources.async_create_item = AsyncMock(side_effect=track_create)
+        mock_hass_with_lovelace.data["lovelace"].resources.async_delete_item = AsyncMock(side_effect=track_delete)
+
+        registration = JSModuleRegistration(mock_hass_with_lovelace)
+        await registration._async_register_modules()
+
+        assert call_order == ["create", "delete"]
+
+    @pytest.mark.asyncio
+    async def test_register_modules_continues_on_create_error(self, mock_hass_with_lovelace):
+        """Test that an error creating a resource is caught and logged."""
+        mock_hass_with_lovelace.data["lovelace"].resources.async_create_item = AsyncMock(
+            side_effect=Exception("Storage error")
+        )
+
+        registration = JSModuleRegistration(mock_hass_with_lovelace)
+
+        await registration._async_register_modules()
 
 
 class TestJSModuleRegistrationUnregister:
@@ -309,7 +369,6 @@ class TestJSModuleRegistrationUnregister:
 
         await registration.async_unregister()
 
-        # Should not try to delete anything
         assert (
             not hasattr(mock_lovelace.resources, "async_delete_item")
             or not mock_lovelace.resources.async_delete_item.called
@@ -329,7 +388,6 @@ class TestJSModuleRegistrationUnregister:
 
         await registration.async_unregister()
 
-        # Should not try to delete anything
         mock_lovelace.resources.async_delete_item.assert_not_called()
 
 
@@ -401,5 +459,64 @@ class TestJSModuleRegistrationLegacyCleanup:
 
         await registration._async_cleanup_legacy_resources()
 
-        # Should only delete the legacy resource
         mock_lovelace.resources.async_delete_item.assert_called_once_with("legacy-1")
+
+    @pytest.mark.asyncio
+    async def test_cleanup_continues_on_delete_error(self):
+        """Test that an error deleting one legacy resource doesn't prevent others."""
+        resources = [
+            {"id": "legacy-1", "url": "/home_performance/card-a.js"},
+            {"id": "legacy-2", "url": "/home_performance/card-b.js"},
+        ]
+        mock_lovelace = MagicMock()
+        mock_lovelace.mode = "storage"
+        mock_lovelace.resources.loaded = True
+        mock_lovelace.resources.async_items = MagicMock(return_value=resources)
+        mock_lovelace.resources.async_delete_item = AsyncMock(side_effect=[Exception("Delete failed"), None])
+
+        mock_hass = MagicMock()
+        mock_hass.data = {"lovelace": mock_lovelace}
+
+        registration = JSModuleRegistration(mock_hass)
+
+        await registration._async_cleanup_legacy_resources()
+
+        assert mock_lovelace.resources.async_delete_item.call_count == 2
+
+
+class TestJSModuleRegistrationWaitRetries:
+    """Test _async_wait_for_lovelace_resources retry behavior."""
+
+    @pytest.mark.asyncio
+    async def test_wait_gives_up_after_max_retries(self):
+        """Test that waiting gives up after MAX_WAIT_RETRIES attempts."""
+        mock_lovelace = MagicMock()
+        mock_lovelace.mode = "storage"
+        mock_lovelace.resources.loaded = False
+
+        mock_hass = MagicMock()
+        mock_hass.data = {"lovelace": mock_lovelace}
+
+        scheduled_callbacks = []
+
+        def fake_call_later(hass, delay, callback):
+            scheduled_callbacks.append(callback)
+
+        registration = JSModuleRegistration(mock_hass)
+
+        with patch(
+            "custom_components.home_performance.frontend.async_call_later",
+            side_effect=fake_call_later,
+        ):
+            await registration._async_wait_for_lovelace_resources()
+
+            for _ in range(20):
+                if not scheduled_callbacks:
+                    break
+                cb = scheduled_callbacks.pop(0)
+                await cb(None)
+
+        from custom_components.home_performance.frontend import _MAX_WAIT_RETRIES
+
+        assert len(scheduled_callbacks) == 0
+        assert _ <= _MAX_WAIT_RETRIES

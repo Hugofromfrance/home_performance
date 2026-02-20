@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/Hugofromfrance/home_performance/compare/v1.4.1...v1.4.2) (2026-02-20)
+
+
+### 🐛 Corrections de bugs
+
+* Fix lovelace card disappear after 1.4.0 ([f028467](https://github.com/Hugofromfrance/home_performance/commit/f0284677597825bcdd5c52a618b9b47cec6b8ccd))
+
 ## [1.4.1](https://github.com/Hugofromfrance/home_performance/compare/v1.4.0...v1.4.1) (2026-02-16)
 
 
