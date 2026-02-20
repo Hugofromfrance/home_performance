@@ -5,7 +5,7 @@
 
 // Wrap everything in an IIFE to handle async loading
 ((async () => {
-  const CARD_VERSION = "1.4.1";
+  const CARD_VERSION = "1.4.2";
 
   // Wait for Home Assistant custom elements to be available
   // This is necessary because Lovelace may load this script before HA is fully initialized
