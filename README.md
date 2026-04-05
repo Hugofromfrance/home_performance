@@ -17,6 +17,7 @@ A Home Assistant integration to analyze and monitor the thermal performance of y
 - [Hardware Compatibility](#-hardware-compatibility)
 - [Concept](#-concept)
 - [Created Sensors](#-created-sensors-per-zone)
+- [Diagnostic Sensors](#diagnostic-sensors)
 - [Multi-zones](#-multi-zones)
 - [Lovelace Card](#-built-in-lovelace-card)
 - [Clearing Card Cache](#clearing-the-card-cache)
@@ -92,7 +93,7 @@ You have a heating system and wonder:
 |------|---------------------|
 | Indoor temp sensor | Aqara, Sonoff SNZB-02, Xiaomi, Netatmo, Ecobee, Shelly H&T, ESPHome... |
 | Outdoor temp sensor | Local weather station, Weather services, Netatmo Outdoor... |
-| Heating entity | Any `climate.*`, `switch.*`, `input_boolean.*` or `binary_sensor.*` |
+| Heating entity | Any `climate.*`, `switch.*`, `select.*`, `input_select.*`, `input_boolean.*` or `binary_sensor.*` |
 
 ### Optional (recommended)
 
@@ -382,6 +383,26 @@ The `source` attribute on Time/Ratio indicates: `measured` (via power sensor > c
 | **Heating active** | Binary sensor indicating if heating is currently running |
 | **Open window** | Detection by rapid temperature drop or physical sensor |
 
+### Diagnostic Sensors
+
+These sensors provide troubleshooting and configuration visibility (displayed under `EntityCategory.DIAGNOSTIC` in Home Assistant):
+
+| Sensor | Description | Example Values |
+|--------|-------------|----------------|
+| **Energy source** | Which energy source is active for K calculation | `energy_sensor`, `power_sensor`, `heater_power`, `none` |
+| **Heating detection method** | How heating state is detected | `power_sensor`, `climate_hvac_action`, `select_state`, `entity_state` |
+| **Window detection method** | How window open state is detected | `sensor` (physical), `temperature` (drop detection) |
+| **Last K update** | Date of the last valid K coefficient calculation | ISO date (e.g., `2026-02-15`) |
+
+Each diagnostic sensor also exposes **extra attributes** with detailed information:
+
+- **Energy source**: configured sensors, heater power, priority description
+- **Heating detection method**: entity ID, power threshold, method description
+- **Window detection method**: sensor ID or detection algorithm description
+- **Last K update**: history days count, sample count, data hours collected
+
+> **💡 Tip**: These sensors are useful for debugging. If your K coefficient seems wrong, check `energy_source` and `heating_detection_method` to verify the integration is using the correct data.
+
 ## 🏠 Multi-zones
 
 Easily manage all your rooms!
@@ -628,7 +649,7 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 - Home Assistant 2024.4.0 or newer
 - Indoor temperature sensor (per zone)
 - Outdoor temperature sensor (shareable between zones)
-- Climate OR switch entity controlling heating (per zone)
+- Climate, switch, select, or input_boolean entity controlling heating (per zone)
 
 ## ⚙️ Configuration
 
@@ -639,7 +660,7 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 | Zone name | Room name (e.g.: Living Room) |
 | Indoor temp sensor | sensor.xxx_temperature |
 | Outdoor temp sensor | sensor.xxx_outdoor (shareable between zones) |
-| Heating entity | climate.xxx or switch.xxx (see below) |
+| Heating entity | climate.xxx, switch.xxx, select.xxx, or input_boolean.xxx (see below) |
 | Heat source type | Electric, Heat pump, Gas Boiler, or Gas Furnace |
 | Heater power | Declared power in Watts (required for Electric, optional for others) |
 
@@ -649,39 +670,47 @@ The K coefficient measures thermal loss in **Watts per degree Celsius**. This is
 |--------|-----------------|---------|
 | `climate.*` | `hvac_action` = "heating" or `hvac_mode` = "heat" | `climate.living_room` |
 | `switch.*` | State = "on" | `switch.heater` |
+| `select.*` | State in configured active states | `select.nodon_fil_pilote_mode` |
+| `input_select.*` | State in configured active states | `input_select.hvac_mode` |
 | `input_boolean.*` | State = "on" | `input_boolean.heating_active` |
 | `binary_sensor.*` | State = "on" | `binary_sensor.heater_running` |
 
-#### Using select.* Entities (Modbus, NodOn fil pilote, etc.)
+#### Using select.* / input_select.* Entities
 
-If your heating system uses a `select.*` or `input_select.*` entity (common with Modbus heat pumps, NodOn fil pilote modules, etc.), create a **template binary sensor** to bridge it:
+`select.*` and `input_select.*` entities are **natively supported**. This is common with Modbus heat pumps, NodOn fil pilote modules, and other systems that expose heating modes as a dropdown.
+
+When you select a `select.*` or `input_select.*` entity as your heating entity, a new field appears: **"Heating Active States"**. Enter a comma-separated list of states that indicate active heating.
+
+**Default active states**: `heating, heat, on`
+
+**Examples:**
+
+| System | Entity | Active States |
+|--------|--------|---------------|
+| NodOn fil pilote | `select.nodon_fil_pilote_mode` | `Confort, Eco` |
+| Modbus heat pump | `select.heatpump_mode` | `Heating` |
+| Generic HVAC | `input_select.hvac_mode` | `Heat, Auto Heat, Emergency Heat` |
+
+> **💡 Note**: State matching is **case-insensitive**. Entering `confort, eco` will match `Confort`, `ECO`, etc.
+
+<details>
+<summary>🔧 Alternative: Template binary_sensor (for advanced filtering)</summary>
+
+If you need more complex logic (e.g., combining multiple entities or conditions), you can still create a template binary sensor:
 
 ```yaml
 # In configuration.yaml
 template:
   - binary_sensor:
-      # Example 1: NodOn fil pilote (French modes)
       - name: "Radiateur Salon Actif"
         unique_id: radiateur_salon_actif
         state: "{{ states('select.nodon_fil_pilote_mode') in ['Confort', 'Eco'] }}"
         device_class: running
-
-      # Example 2: Modbus heat pump
-      - name: "Heat Pump Heating Active"
-        unique_id: heatpump_heating_active
-        state: "{{ states('select.heatpump_mode') == 'Heating' }}"
-        device_class: running
-
-      # Example 3: Multiple active states
-      - name: "HVAC Heating Active"
-        unique_id: hvac_heating_active
-        state: "{{ states('select.hvac_mode') in ['Heat', 'Auto Heat', 'Emergency Heat'] }}"
-        device_class: running
 ```
 
-Then use the binary sensor (e.g., `binary_sensor.radiateur_salon_actif`) as your heating entity in Home Performance.
+Then use `binary_sensor.radiateur_salon_actif` as your heating entity.
 
-> **💡 Why a template?** Each heating system has different state names ("Confort", "Heating", "Heat", "On"...). A template lets you define exactly which states mean "heating is active" for YOUR specific setup.
+</details>
 
 ### Optional Parameters
 
@@ -974,6 +1003,8 @@ Needs optimization : beyond
 - [x] **Temperature variation warning** - Alert when large T° swings may bias K score
 - [x] **Dynamic COP** - Auto-calibrating efficiency factor for heat pumps (measured COP 7d)
 - [x] **Italian translation** - Full i18n support (EN/FR/IT)
+- [x] **Native select/input_select support** - Direct support for select entities with configurable active states
+- [x] **Diagnostic sensors** - Energy source, heating detection method, window detection method, last K update
 
 ### 🔜 Next - Alerts & Notifications
 

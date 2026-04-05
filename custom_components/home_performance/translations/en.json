@@ -31,6 +31,7 @@
           "indoor_temp_sensor": "Indoor temperature sensor",
           "outdoor_temp_sensor": "Outdoor temperature sensor",
           "heating_entity": "Heating entity",
+          "heating_active_states": "Heating active states",
           "heat_source_type": "Heat source type",
           "heater_power": "Heater power",
           "efficiency_factor": "Efficiency factor"
@@ -39,7 +40,8 @@
           "zone_name": "Unique name to identify this room (e.g., Bedroom, Living Room)",
           "indoor_temp_sensor": "Sensor measuring the room temperature",
           "outdoor_temp_sensor": "Sensor measuring the outdoor temperature",
-          "heating_entity": "Switch, thermostat or climate controlling the heating",
+          "heating_entity": "Switch, thermostat, climate or select entity controlling the heating",
+          "heating_active_states": "Comma-separated list of states that indicate active heating (for select entities). Default: heating, heat, on",
           "heat_source_type": "Type of heating system",
           "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
           "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90"
@@ -101,6 +103,7 @@
         "description": "Modify this zone's parameters.",
         "data": {
           "heat_source_type": "Heat source type",
+          "heating_active_states": "Heating active states",
           "heater_power": "Heater power",
           "efficiency_factor": "Efficiency factor",
           "surface": "Floor Area",
@@ -117,6 +120,7 @@
         },
         "data_description": {
           "heat_source_type": "Type of heating system",
+          "heating_active_states": "Comma-separated list of states that indicate active heating (for select entities). Default: heating, heat, on",
           "heater_power": "Nominal heater power in Watts (required for electric, optional for others)",
           "efficiency_factor": "Converts consumed energy to thermal output. Electric: 1.0, Heat pump: 2.5-4.0 (COP), Gas boiler: 0.85-0.95, Gas furnace: 0.78-0.90",
           "surface": "Floor area to calculate K coefficient per m²",
@@ -208,6 +212,18 @@
       },
       "cop_7d": {
         "name": "COP 7d Average"
+      },
+      "energy_source": {
+        "name": "Energy Source"
+      },
+      "heating_detection_method": {
+        "name": "Heating Detection Method"
+      },
+      "window_detection_method": {
+        "name": "Window Detection Method"
+      },
+      "last_k_update": {
+        "name": "Last K Update"
       }
     },
     "binary_sensor": {

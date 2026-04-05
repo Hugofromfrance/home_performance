@@ -31,6 +31,7 @@
           "indoor_temp_sensor": "Capteur de température intérieure",
           "outdoor_temp_sensor": "Capteur de température extérieure",
           "heating_entity": "Entité de chauffage",
+          "heating_active_states": "États de chauffage actif",
           "heat_source_type": "Type de source de chaleur",
           "heater_power": "Puissance du radiateur",
           "efficiency_factor": "Facteur d'efficacité"
@@ -39,7 +40,8 @@
           "zone_name": "Nom unique pour identifier cette pièce (ex: Chambre, Salon)",
           "indoor_temp_sensor": "Capteur mesurant la température dans la pièce",
           "outdoor_temp_sensor": "Capteur mesurant la température extérieure",
-          "heating_entity": "Interrupteur, thermostat ou climate contrôlant le chauffage",
+          "heating_entity": "Interrupteur, thermostat, climate ou entité select contrôlant le chauffage",
+          "heating_active_states": "Liste séparée par des virgules des états indiquant un chauffage actif (pour les entités select). Défaut : heating, heat, on",
           "heat_source_type": "Type de système de chauffage",
           "heater_power": "Puissance nominale en Watts (obligatoire pour électrique, optionnel pour les autres)",
           "efficiency_factor": "Convertit l'énergie consommée en chaleur. Électrique: 1.0, PAC: 2.5-4.0 (COP), Chaudière gaz: 0.85-0.95, Fournaise gaz: 0.78-0.90"
@@ -101,6 +103,7 @@
         "description": "Modifiez les paramètres de cette zone.",
         "data": {
           "heat_source_type": "Type de source de chaleur",
+          "heating_active_states": "États de chauffage actif",
           "heater_power": "Puissance du radiateur",
           "efficiency_factor": "Facteur d'efficacité",
           "surface": "Surface de la pièce",
@@ -117,6 +120,7 @@
         },
         "data_description": {
           "heat_source_type": "Type de système de chauffage",
+          "heating_active_states": "Liste séparée par des virgules des états indiquant un chauffage actif (pour les entités select). Défaut : heating, heat, on",
           "heater_power": "Puissance nominale en Watts (obligatoire pour électrique, optionnel pour les autres)",
           "efficiency_factor": "Convertit l'énergie consommée en chaleur. Électrique: 1.0, PAC: 2.5-4.0 (COP), Chaudière gaz: 0.85-0.95, Fournaise gaz: 0.78-0.90",
           "surface": "Surface au sol pour calculer le coefficient K par m²",
@@ -208,6 +212,18 @@
       },
       "cop_7d": {
         "name": "COP moyen 7j"
+      },
+      "energy_source": {
+        "name": "Source d'énergie"
+      },
+      "heating_detection_method": {
+        "name": "Méthode de détection chauffage"
+      },
+      "window_detection_method": {
+        "name": "Méthode de détection fenêtre"
+      },
+      "last_k_update": {
+        "name": "Dernière mise à jour K"
       }
     },
     "binary_sensor": {

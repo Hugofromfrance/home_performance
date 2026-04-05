@@ -48,6 +48,7 @@ CONF_VOLUME = "volume"  # m³
 CONF_POWER_THRESHOLD = "power_threshold"  # Seuil de puissance pour détection chauffe (W)
 CONF_WINDOW_SENSOR = "window_sensor"  # Capteur d'ouverture de fenêtre (optionnel)
 CONF_HEAT_SOURCE_TYPE = "heat_source_type"  # Type de source de chaleur
+CONF_HEATING_ACTIVE_STATES = "heating_active_states"  # States indicating active heating (for select entities)
 
 # Heat source types
 HEAT_SOURCE_ELECTRIC = "electric"
@@ -115,6 +116,7 @@ DEFAULT_HEAT_SOURCE_TYPE = HEAT_SOURCE_ELECTRIC
 DEFAULT_EFFICIENCY_FACTOR = 1.0
 DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
 DEFAULT_ENABLE_DYNAMIC_COP = False  # Disabled by default, user must opt-in
+DEFAULT_HEATING_ACTIVE_STATES: list[str] = ["heating", "heat", "on"]  # Common states for select entities
 
 # Timing
 DEFAULT_SCAN_INTERVAL = 60  # seconds
@@ -157,6 +159,11 @@ SENSOR_ENTITY_SUFFIXES = {
     "measured_energy_daily": "measured_energy_daily",
     "measured_cop": "measured_cop",
     "cop_7d": "cop_7d",
+    # Diagnostic sensors
+    "energy_source": "energy_source",
+    "heating_detection_method": "heating_detection_method",
+    "window_detection_method": "window_detection_method",
+    "last_k_update": "last_k_update",
 }
 
 BINARY_SENSOR_ENTITY_SUFFIXES = {

@@ -11,7 +11,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfTemperature, UnitOfTime
+from homeassistant.const import EntityCategory, PERCENTAGE, UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -142,6 +142,16 @@ async def async_setup_entry(
     if coordinator.enable_dynamic_cop:
         entities.append(MeasuredCOPSensor(coordinator, zone_name))
         entities.append(COP7dSensor(coordinator, zone_name))
+
+    # Diagnostic sensors (always added)
+    entities.extend(
+        [
+            EnergySourceDiagnosticSensor(coordinator, zone_name),
+            HeatingDetectionMethodDiagnosticSensor(coordinator, zone_name),
+            WindowDetectionMethodDiagnosticSensor(coordinator, zone_name),
+            LastKUpdateDiagnosticSensor(coordinator, zone_name),
+        ]
+    )
 
     async_add_entities(entities)
 
@@ -1088,3 +1098,151 @@ class COP7dSensor(HomePerformanceBaseSensor):
         """Count days in history with valid COP measurements."""
         history = self.coordinator.thermal_model.daily_history
         return sum(1 for entry in history if entry.measured_cop is not None and entry.measured_cop > 0)
+
+
+# =============================================================================
+# Diagnostic sensors (EntityCategory.DIAGNOSTIC)
+# =============================================================================
+
+
+class EnergySourceDiagnosticSensor(HomePerformanceBaseSensor):
+    """Diagnostic sensor showing which energy source is active for K calculation.
+
+    Priority: energy_sensor > power_sensor > heater_power (estimation)
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:flash-alert"
+    _attr_name = "Energy source"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "energy_source")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the active energy source."""
+        if not self.coordinator.data:
+            return None
+        data = self.coordinator.data
+        if data.get("energy_sensor_configured") and data.get("external_energy_daily_kwh") is not None:
+            return "energy_sensor"
+        if data.get("power_sensor_configured") and data.get("measured_energy_daily_kwh") is not None:
+            return "power_sensor"
+        if data.get("heater_power"):
+            return "heater_power"
+        return "none"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        return {
+            "energy_sensor": self.coordinator.energy_sensor,
+            "power_sensor": self.coordinator.power_sensor,
+            "heater_power_w": data.get("heater_power"),
+            "description": "Active energy source used for K coefficient calculation (priority: energy_sensor > power_sensor > heater_power)",
+        }
+
+
+class HeatingDetectionMethodDiagnosticSensor(HomePerformanceBaseSensor):
+    """Diagnostic sensor showing how heating state is detected."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:radiator"
+    _attr_name = "Heating detection method"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "heating_detection_method")
+
+    @property
+    def native_value(self) -> str:
+        """Return the heating detection method."""
+        if self.coordinator.power_sensor:
+            return "power_sensor"
+        domain = self.coordinator.heating_entity.split(".")[0]
+        if domain == "climate":
+            return "climate_hvac_action"
+        if domain in ("select", "input_select"):
+            return "select_state"
+        return "entity_state"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        method = self.native_value
+
+        method_descriptions = {
+            "power_sensor": f"Power > {self.coordinator.power_threshold}W threshold on {self.coordinator.power_sensor}",
+            "climate_hvac_action": f"hvac_action attribute on {self.coordinator.heating_entity}",
+            "select_state": f"State in {self.coordinator.heating_active_states} on {self.coordinator.heating_entity}",
+            "entity_state": f"on/off state of {self.coordinator.heating_entity}",
+        }
+
+        return {
+            "heating_entity": self.coordinator.heating_entity,
+            "power_sensor": self.coordinator.power_sensor,
+            "power_threshold_w": self.coordinator.power_threshold if self.coordinator.power_sensor else None,
+            "description": method_descriptions.get(method, method),
+        }
+
+
+class WindowDetectionMethodDiagnosticSensor(HomePerformanceBaseSensor):
+    """Diagnostic sensor showing how window open state is detected."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:window-open-variant"
+    _attr_name = "Window detection method"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "window_detection_method")
+
+    @property
+    def native_value(self) -> str:
+        """Return the window detection method."""
+        if self.coordinator.window_sensor:
+            return "sensor"
+        return "temperature"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        if self.coordinator.window_sensor:
+            return {
+                "window_sensor": self.coordinator.window_sensor,
+                "description": f"Using physical sensor {self.coordinator.window_sensor}",
+            }
+        return {
+            "description": "Detecting window open via rapid temperature drops (no physical sensor configured)",
+        }
+
+
+class LastKUpdateDiagnosticSensor(HomePerformanceBaseSensor):
+    """Diagnostic sensor showing the date of the last valid K coefficient update."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:calendar-clock"
+    _attr_name = "Last K update"
+
+    def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, zone_name, "last_k_update")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the date of the last K coefficient update (ISO format)."""
+        return self.coordinator.thermal_model.last_k_date
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        data = self.coordinator.data or {}
+        history = self.coordinator.thermal_model.daily_history
+        return {
+            "history_days": len(history),
+            "samples_count": data.get("samples_count", 0),
+            "data_hours": data.get("data_hours", 0),
+            "description": "Date when the K coefficient was last successfully calculated",
+        }
