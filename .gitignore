@@ -5,7 +5,8 @@ __pycache__/
 *.so
 .Python
 .env
-.venv
+.venv/
+.venv*/
 venv/
 ENV/
 
@@ -14,6 +15,7 @@ ENV/
 .vscode/
 *.log
 .coverage
+.cursor/
 
 # macOS
 .DS_Store

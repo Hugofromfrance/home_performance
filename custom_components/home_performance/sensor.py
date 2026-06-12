@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DOMAIN, SENSOR_ENTITY_SUFFIXES, VERSION
+from .const import DOMAIN, MIN_DATA_HOURS, SENSOR_ENTITY_SUFFIXES, VERSION
 from .coordinator import HomePerformanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -195,6 +195,57 @@ class HomePerformanceBaseSensor(CoordinatorEntity[HomePerformanceCoordinator], S
             "sw_version": VERSION,
         }
 
+    def _is_imperial(self) -> bool:
+        """Whether the user's HA is configured for Fahrenheit."""
+        hass = getattr(self, "hass", None)
+        if hass is None:
+            return False
+        return hass.config.units.temperature_unit == UnitOfTemperature.FAHRENHEIT
+
+    def _convert_abs_temp(self, value_celsius: float) -> float:
+        """Convert an absolute temperature (°C → °F with +32 offset)."""
+        if self._is_imperial():
+            return value_celsius * 9 / 5 + 32
+        return value_celsius
+
+    def _convert_delta_temp(self, value_celsius: float) -> float:
+        """Convert a temperature delta (°C → °F, no offset)."""
+        if self._is_imperial():
+            return value_celsius * 9 / 5
+        return value_celsius
+
+    def _coordinator_value(self, key: str, round_digits: int | None = None) -> float | None:
+        """Read a numeric value from the coordinator data, optionally rounded.
+
+        Returns None when there is no data yet or the key is unset — this is the
+        pattern shared by most scalar sensors (so 'no data' shows as Unknown
+        instead of a misleading 0).
+        """
+        data = self.coordinator.data
+        if not data:
+            return None
+        value = data.get(key)
+        if value is None:
+            return None
+        return round(value, round_digits) if round_digits is not None else value
+
+
+class ScalarCoordinatorSensor(HomePerformanceBaseSensor):
+    """Base class for sensors that simply expose one rounded coordinator value.
+
+    Subclasses set ``_data_key`` (the coordinator data key) and may override
+    ``_round_digits``. Sensors needing custom attributes/icons still subclass
+    this and add their own ``extra_state_attributes``/``icon``.
+    """
+
+    _data_key: str
+    _round_digits: int | None = 2
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the (rounded) coordinator value for this sensor."""
+        return self._coordinator_value(self._data_key, self._round_digits)
+
 
 class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
     """Sensor for thermal loss coefficient K (W/°C)."""
@@ -203,6 +254,10 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:heat-wave"
     _attr_name = "K coefficient"
+    # Keep the heavy / static attributes out of the recorder database.
+    _unrecorded_attributes = frozenset(
+        {"k_history_7d", "description", "interpretation"}
+    )
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -228,103 +283,9 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
         if k_24h is not None and volume and volume > 0:
             k_per_m3_24h = round(k_24h / volume, 2)
 
-        # Build K history for sparkline/chart visualization (7 days)
-        # Strategy: Use K_7j (rolling average) for each day to match the displayed score
-        # This shows how the score EVOLVED over time, not daily fluctuations
-        history = self.coordinator.thermal_model.daily_history
-        heater_power = self.coordinator.heater_power
-        current_k_7d = k_7d  # Current K_7j (for today and fallback)
-
-        # Create a dict of history entries by date for easy lookup
-        history_by_date = {entry.date: entry for entry in history}
-
-        # Generate last 7 days
-        from datetime import datetime, timedelta
-
-        today = datetime.now().date()
-
-        # First pass: get K_7j for each day (stored at archival time)
-        days_data = []
-        for i in range(6, -1, -1):  # 6 days ago to today
-            day = today - timedelta(days=i)
-            date_str = day.strftime("%Y-%m-%d")
-            entry = history_by_date.get(date_str)
-
-            k_value = None
-            is_today = i == 0
-
-            if is_today:
-                # Today: use current K_7j (not yet archived)
-                k_value = current_k_7d
-            elif entry:
-                # Historical day: prefer stored K_7j, fallback to calculated K_daily
-                if entry.k_7d is not None:
-                    k_value = entry.k_7d
-                elif entry.avg_delta_t >= 5 and entry.heating_hours >= 0.5:
-                    # Fallback for old data without k_7d: calculate daily K
-                    # Use stored energy if available, otherwise estimate from power
-                    if entry.energy_kwh > 0:
-                        energy_wh = entry.energy_kwh * 1000
-                    elif heater_power is not None and heater_power > 0:
-                        energy_wh = heater_power * entry.heating_hours
-                    else:
-                        energy_wh = None
-
-                    if energy_wh is not None:
-                        k_value = energy_wh / (entry.avg_delta_t * 24)
-
-            # Get heating_hours for excellence badge calculation
-            heating_hours = None
-            if is_today:
-                # Today: use current heating_hours from coordinator data
-                heating_hours = data.get("heating_hours")
-            elif entry:
-                heating_hours = entry.heating_hours
-
-            days_data.append(
-                {
-                    "date": date_str,
-                    "k": k_value,  # None if no valid data
-                    "heating_hours": heating_hours,
-                }
-            )
-
-        # Second pass: fill gaps using carry-forward and backfill
-        # Forward pass: carry-forward from first valid day
-        last_valid_k = None
-        for day_data in days_data:
-            if day_data["k"] is not None:
-                last_valid_k = day_data["k"]
-            elif last_valid_k is not None:
-                day_data["k"] = last_valid_k
-                day_data["estimated"] = True
-
-        # Backward pass: backfill days before first valid day with first valid K
-        first_valid_k = None
-        for day_data in days_data:
-            if day_data["k"] is not None and "estimated" not in day_data:
-                first_valid_k = day_data["k"]
-                break
-
-        if first_valid_k is not None:
-            for day_data in days_data:
-                if day_data["k"] is None:
-                    day_data["k"] = first_valid_k
-                    day_data["estimated"] = True
-
-        # Build final k_history (only include days with K values)
-        k_history = []
-        for day_data in days_data:
-            if day_data["k"] is not None:
-                entry_data = {
-                    "date": day_data["date"],
-                    "k": round(day_data["k"], 1),
-                    "estimated": day_data.get("estimated", False),
-                }
-                # Include heating_hours if available
-                if day_data.get("heating_hours") is not None:
-                    entry_data["heating_hours"] = round(day_data["heating_hours"], 2)
-                k_history.append(entry_data)
+        # K history for sparkline/chart is now precomputed by the coordinator
+        # (once per update) to keep this property cheap.
+        k_history = data.get("k_history_7d", [])
 
         # Check if we're at optimal level (Level S)
         insulation_status = data.get("insulation_status", {})
@@ -344,16 +305,24 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
             "k_per_m3_24h": k_per_m3_24h,
             "k_history_7d": k_history,
             "is_optimal": is_optimal,
-            # Temperature variation (for warning display)
+            # Temperature variation (delta) and min/max (absolute), converted to
+            # the user's unit system.
             "temp_variation": (
-                round(data.get("temp_variation"), 1) if data.get("temp_variation") is not None else None
+                round(self._convert_delta_temp(data.get("temp_variation")), 1)
+                if data.get("temp_variation") is not None
+                else None
             ),
             "indoor_temp_min": (
-                round(data.get("indoor_temp_min"), 1) if data.get("indoor_temp_min") is not None else None
+                round(self._convert_abs_temp(data.get("indoor_temp_min")), 1)
+                if data.get("indoor_temp_min") is not None
+                else None
             ),
             "indoor_temp_max": (
-                round(data.get("indoor_temp_max"), 1) if data.get("indoor_temp_max") is not None else None
+                round(self._convert_abs_temp(data.get("indoor_temp_max")), 1)
+                if data.get("indoor_temp_max") is not None
+                else None
             ),
+            "temp_unit": "°F" if self._is_imperial() else "°C",
             "interpretation": (
                 "Lower K = better insulation. "
                 "Typical values: 10-20 (well insulated), 20-40 (average), 40+ (poorly insulated)"
@@ -368,26 +337,18 @@ class ThermalLossCoefficientSensor(HomePerformanceBaseSensor):
         }
 
 
-class KPerM2Sensor(HomePerformanceBaseSensor):
+class KPerM2Sensor(ScalarCoordinatorSensor):
     """Sensor for K normalized by surface (W/(°C·m²))."""
 
     _attr_native_unit_of_measurement = "W/(°C·m²)"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:square-outline"
     _attr_name = "K per m²"
+    _data_key = "k_per_m2"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "k_per_m2")
-
-    @property
-    def native_value(self) -> float | None:
-        """Return K/m²."""
-        if self.coordinator.data:
-            value = self.coordinator.data.get("k_per_m2")
-            if value is not None:
-                return round(value, 2)
-        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -399,26 +360,18 @@ class KPerM2Sensor(HomePerformanceBaseSensor):
         }
 
 
-class KPerM3Sensor(HomePerformanceBaseSensor):
+class KPerM3Sensor(ScalarCoordinatorSensor):
     """Sensor for K normalized by volume (W/(°C·m³))."""
 
     _attr_native_unit_of_measurement = "W/(°C·m³)"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:cube-outline"
     _attr_name = "K per m³"
+    _data_key = "k_per_m3"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "k_per_m3")
-
-    @property
-    def native_value(self) -> float | None:
-        """Return K/m³."""
-        if self.coordinator.data:
-            value = self.coordinator.data.get("k_per_m3")
-            if value is not None:
-                return round(value, 2)
-        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -430,7 +383,7 @@ class KPerM3Sensor(HomePerformanceBaseSensor):
         }
 
 
-class DailyEnergySensor(HomePerformanceBaseSensor):
+class DailyEnergySensor(ScalarCoordinatorSensor):
     """Sensor for daily energy consumption (rolling 24h window, estimated).
 
     Uses state_class TOTAL (not TOTAL_INCREASING) because this is a daily
@@ -442,19 +395,12 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:lightning-bolt-outline"
     _attr_name = "Daily estimated energy"
+    _data_key = "daily_energy_kwh"
+    _round_digits = 3
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "daily_energy")
-
-    @property
-    def native_value(self) -> float | None:
-        """Return daily energy in kWh."""
-        if self.coordinator.data:
-            value = self.coordinator.data.get("daily_energy_kwh")
-            if value is not None:
-                return round(value, 3)
-        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -469,7 +415,7 @@ class DailyEnergySensor(HomePerformanceBaseSensor):
         }
 
 
-class HeatingTimeSensor(HomePerformanceBaseSensor):
+class HeatingTimeSensor(ScalarCoordinatorSensor):
     """Sensor for heating time over 24h."""
 
     _attr_native_unit_of_measurement = UnitOfTime.HOURS
@@ -477,19 +423,11 @@ class HeatingTimeSensor(HomePerformanceBaseSensor):
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:clock-outline"
     _attr_name = "Heating time 24h"
+    _data_key = "heating_hours"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "heating_time")
-
-    @property
-    def native_value(self) -> float | None:
-        """Return heating time in hours (decimal)."""
-        if self.coordinator.data:
-            value = self.coordinator.data.get("heating_hours")
-            if value is not None:
-                return round(value, 2)
-        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -550,32 +488,42 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
 
     _attr_icon = "mdi:leaf"
     _attr_name = "Energy performance"
+    _unrecorded_attributes = frozenset({"description"})
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "energy_performance")
+        self._perf_cache_key: tuple | None = None
+        self._perf_cache: dict[str, Any] | None = None
+
+    def _perf(self) -> dict[str, Any] | None:
+        """Compute energy performance once per coordinator update (memoized).
+
+        native_value, icon and extra_state_attributes all need this; without a
+        cache it would run three times per refresh.
+        """
+        if not self.coordinator.data:
+            return None
+        daily_kwh = self.coordinator.data.get("daily_energy_kwh")
+        heater_power = self.coordinator.data.get("heater_power")
+        derived_power = self.coordinator.data.get("derived_power")
+        key = (daily_kwh, heater_power, derived_power)
+        if key != self._perf_cache_key:
+            self._perf_cache_key = key
+            self._perf_cache = get_energy_performance(daily_kwh, heater_power, derived_power)
+        return self._perf_cache
 
     @property
     def native_value(self) -> str | None:
         """Return energy performance level."""
-        if self.coordinator.data:
-            daily_kwh = self.coordinator.data.get("daily_energy_kwh")
-            heater_power = self.coordinator.data.get("heater_power")
-            derived_power = self.coordinator.data.get("derived_power")
-            perf = get_energy_performance(daily_kwh, heater_power, derived_power)
-            return perf.get("level")
-        return None
+        perf = self._perf()
+        return perf.get("level") if perf else None
 
     @property
     def icon(self) -> str:
         """Return dynamic icon based on performance level."""
-        if self.coordinator.data:
-            daily_kwh = self.coordinator.data.get("daily_energy_kwh")
-            heater_power = self.coordinator.data.get("heater_power")
-            derived_power = self.coordinator.data.get("derived_power")
-            perf = get_energy_performance(daily_kwh, heater_power, derived_power)
-            return perf.get("icon", "mdi:help-circle")
-        return "mdi:help-circle"
+        perf = self._perf()
+        return perf.get("icon", "mdi:help-circle") if perf else "mdi:help-circle"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -584,7 +532,7 @@ class EnergyPerformanceSensor(HomePerformanceBaseSensor):
         daily_kwh = data.get("daily_energy_kwh")
         heater_power = data.get("heater_power")
         derived_power = data.get("derived_power")
-        perf = get_energy_performance(daily_kwh, heater_power, derived_power)
+        perf = self._perf() or {}
 
         level_descriptions = {
             "excellent": "🟢 Excellent",
@@ -632,18 +580,13 @@ class DeltaTSensor(HomePerformanceBaseSensor):
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "avg_delta_t")
 
-    def _is_imperial(self) -> bool:
-        """Check if user's HA is configured for imperial (Fahrenheit)."""
-        return self.hass.config.units.temperature_unit == UnitOfTemperature.FAHRENHEIT
-
     def _convert_delta(self, value_celsius: float) -> float:
-        """Convert temperature delta to user's unit system.
+        """Convert temperature delta to user's unit system (no +32 offset)."""
+        return self._convert_delta_temp(value_celsius)
 
-        For deltas: Δ°F = Δ°C × 9/5 (no +32 offset!)
-        """
-        if self._is_imperial():
-            return value_celsius * 9 / 5
-        return value_celsius
+    def _convert_abs(self, value_celsius: float) -> float:
+        """Convert an absolute temperature (°C → °F with +32 offset)."""
+        return self._convert_abs_temp(value_celsius)
 
     @property
     def native_unit_of_measurement(self) -> str:
@@ -669,13 +612,18 @@ class DeltaTSensor(HomePerformanceBaseSensor):
             "description": "Average temperature difference between indoor and outdoor (rolling 24h window)",
             "window": "rolling 24h",
             "current_delta_t": (round(self._convert_delta(current_dt), 1) if current_dt is not None else None),
-            "indoor_temp": (round(data.get("indoor_temp"), 1) if data.get("indoor_temp") is not None else None),
-            "outdoor_temp": (round(data.get("outdoor_temp"), 1) if data.get("outdoor_temp") is not None else None),
+            "indoor_temp": (
+                round(self._convert_abs(data.get("indoor_temp")), 1) if data.get("indoor_temp") is not None else None
+            ),
+            "outdoor_temp": (
+                round(self._convert_abs(data.get("outdoor_temp")), 1) if data.get("outdoor_temp") is not None else None
+            ),
+            "temp_unit": "°F" if self._is_imperial() else "°C",
             "unit_note": "Temperature delta (not absolute) - correctly converted for your unit system",
         }
 
 
-class DataHoursSensor(HomePerformanceBaseSensor):
+class DataHoursSensor(ScalarCoordinatorSensor):
     """Sensor for hours of data collected."""
 
     _attr_native_unit_of_measurement = UnitOfTime.HOURS
@@ -683,19 +631,12 @@ class DataHoursSensor(HomePerformanceBaseSensor):
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:database-clock"
     _attr_name = "Data hours"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _data_key = "data_hours"
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, zone_name, "data_hours")
-
-    @property
-    def native_value(self) -> float | None:
-        """Return hours of data collected (decimal)."""
-        if self.coordinator.data:
-            value = self.coordinator.data.get("data_hours")
-            if value is not None:
-                return round(value, 2)
-        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -706,7 +647,7 @@ class DataHoursSensor(HomePerformanceBaseSensor):
             "formatted": format_duration(hours),
             "samples_count": data.get("samples_count"),
             "data_ready": data.get("data_ready"),
-            "min_hours_required": 12,
+            "min_hours_required": MIN_DATA_HOURS,
         }
 
 
@@ -718,6 +659,7 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_icon = "mdi:timer-sand"
     _attr_name = "Analysis remaining"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -736,7 +678,7 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
         if data_ready:
             return 0.0
 
-        remaining = max(0, 12 - data_hours)
+        remaining = max(0, MIN_DATA_HOURS - data_hours)
         return round(remaining, 2)
 
     @property
@@ -752,8 +694,8 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
         data = self.coordinator.data or {}
         data_hours = data.get("data_hours", 0) or 0
         data_ready = data.get("data_ready", False)
-        remaining = max(0, 12 - data_hours)
-        progress_pct = min(100, round((data_hours / 12) * 100))
+        remaining = max(0, MIN_DATA_HOURS - data_hours)
+        progress_pct = min(100, round((data_hours / MIN_DATA_HOURS) * 100))
 
         return {
             "formatted": format_duration(remaining) if not data_ready else "Ready",
@@ -761,7 +703,7 @@ class AnalysisTimeRemainingSensor(HomePerformanceBaseSensor):
             "progress_percent": 100 if data_ready else progress_pct,
             "data_ready": data_ready,
             "hours_collected": round(data_hours, 2),
-            "hours_required": 12,
+            "hours_required": MIN_DATA_HOURS,
         }
 
 
@@ -772,6 +714,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:progress-clock"
     _attr_name = "Analysis progress"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -787,7 +730,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
             if data_ready:
                 return 100
 
-            return min(100, round((data_hours / 12) * 100))
+            return min(100, round((data_hours / MIN_DATA_HOURS) * 100))
         return 0
 
     @property
@@ -818,7 +761,7 @@ class AnalysisProgressSensor(HomePerformanceBaseSensor):
 
         return {
             "hours_collected": round(data_hours, 2),
-            "hours_required": 12,
+            "hours_required": MIN_DATA_HOURS,
             "data_ready": data_ready,
             "description": "Data collection progress (0-100%)",
         }
@@ -919,6 +862,7 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:counter"
     _attr_name = "Daily measured energy"
+    _unrecorded_attributes = frozenset({"description"})
 
     def __init__(self, coordinator: HomePerformanceCoordinator, zone_name: str) -> None:
         """Initialize the sensor."""
@@ -940,7 +884,9 @@ class MeasuredEnergyDailySensor(HomePerformanceBaseSensor):
             value = self.coordinator.data.get("measured_energy_daily_kwh")
             if value is not None:
                 return round(value, 3)
-        return 0.0
+        # No data yet: report unknown rather than a misleading 0 kWh that would
+        # pollute long-term statistics.
+        return None
 
     @property
     def last_reset(self):

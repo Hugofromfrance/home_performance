@@ -137,6 +137,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             if isinstance(coordinator, HomePerformanceCoordinator):
                 if coordinator.zone_name.lower() == zone_name.lower():
                     coordinator.reset_history()
+                    await coordinator.async_save_data(force=True)
+                    await coordinator.async_request_refresh()
                     found = True
                     _LOGGER.info("History reset completed for zone: %s", zone_name)
                     break
@@ -170,6 +172,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             if isinstance(coordinator, HomePerformanceCoordinator):
                 if coordinator.zone_name.lower() == zone_name.lower():
                     coordinator.reset_all_data()
+                    await coordinator.async_save_data(force=True)
+                    await coordinator.async_request_refresh()
                     found = True
                     _LOGGER.info("Complete data reset completed for zone: %s", zone_name)
                     break
@@ -192,12 +196,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     _LOGGER.debug("Unloading Home Performance for %s", entry.title)
 
-    # Save data before unloading
+    # Save data before unloading (force=True to bypass the debounce so the
+    # latest state survives a reload).
     if entry.entry_id in hass.data.get(DOMAIN, {}):
         coordinator = hass.data[DOMAIN][entry.entry_id]
         _LOGGER.info("Saving data before unload for zone %s", coordinator.zone_name)
         try:
-            await coordinator.async_save_data()
+            await coordinator.async_save_data(force=True)
         except Exception as err:
             _LOGGER.warning("Failed to save data: %s", err)
 
@@ -205,6 +210,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id, None)
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Clean up when a config entry is removed.
+
+    When the last zone is deleted, unregister the auto-registered Lovelace
+    card resource so no dangling frontend resource is left behind.
+    """
+    remaining = [e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id]
+    if remaining:
+        return
+
+    try:
+        await JSModuleRegistration(hass).async_unregister()
+    except Exception as err:
+        _LOGGER.debug("Frontend resource cleanup skipped: %s", err)
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

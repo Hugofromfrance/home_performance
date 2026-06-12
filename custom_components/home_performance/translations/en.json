@@ -163,7 +163,8 @@
     },
     "error": {
       "entity_not_found": "Entity not found or unavailable",
-      "invalid_power": "Invalid heater power"
+      "invalid_power": "Invalid heater power",
+      "energy_sensor_required": "Energy sensor is required for this heat source type"
     }
   },
   "entity": {

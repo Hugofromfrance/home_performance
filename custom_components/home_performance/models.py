@@ -45,6 +45,63 @@ _LOGGER = logging.getLogger(__name__)
 SECONDS_PER_HOUR = 3600
 MAX_DATA_POINTS = 1440 * 2  # 48h at 1 sample per minute
 
+
+def filter_period_points(
+    points: "list[ThermalDataPoint]", hours: float, now: float | None = None
+) -> "list[ThermalDataPoint]":
+    """Return the points whose timestamp falls within the last `hours`.
+
+    Pure helper (no model state) so it can be unit-tested directly.
+    `now` defaults to the timestamp of the most recent point.
+    """
+    if not points:
+        return []
+    reference = now if now is not None else points[-1].timestamp
+    period_start = reference - hours * SECONDS_PER_HOUR
+    return [p for p in points if p.timestamp >= period_start]
+
+
+def aggregate_period(points: "list[ThermalDataPoint]") -> "AggregatedPeriod":
+    """Aggregate data points into an AggregatedPeriod (pure helper)."""
+    if not points:
+        raise ValueError("No points to aggregate")
+
+    points = sorted(points, key=lambda p: p.timestamp)
+    start_time = points[0].timestamp
+    end_time = points[-1].timestamp
+
+    heating_seconds = 0.0
+    for i in range(1, len(points)):
+        if points[i - 1].heating_on:
+            heating_seconds += points[i].timestamp - points[i - 1].timestamp
+
+    avg_indoor = sum(p.indoor_temp for p in points) / len(points)
+    avg_outdoor = sum(p.outdoor_temp for p in points) / len(points)
+
+    return AggregatedPeriod(
+        start_time=start_time,
+        end_time=end_time,
+        heating_seconds=heating_seconds,
+        avg_indoor_temp=avg_indoor,
+        avg_outdoor_temp=avg_outdoor,
+        sample_count=len(points),
+    )
+
+
+def compute_k(energy_wh: float, delta_t: float, duration_hours: float) -> float | None:
+    """K = thermal energy (Wh) / (ΔT × duration). Pure helper.
+
+    Returns None when the denominator is non-positive (avoids div-by-zero).
+    """
+    denominator = delta_t * duration_hours
+    if denominator <= 0:
+        return None
+    return energy_wh / denominator
+# Throttle the (O(n)) rolling K recomputation. Data points arrive ~every 60s but
+# the 24h K barely moves between two minutes, so recomputing every few minutes is
+# plenty and avoids scanning ~1440 points on every tick.
+K_RECALC_INTERVAL_SECONDS = 300  # 5 minutes
+
 # Season/inference constants
 TEMP_STABILITY_THRESHOLD = 3.0  # °C - max variation for "stable" temperature (increased for fast-cycling systems)
 EXCELLENT_INFERENCE_MIN_HOURS = 24  # Hours needed to infer excellent isolation
@@ -70,6 +127,11 @@ class ThermalDataPoint:
     indoor_temp: float  # °C
     outdoor_temp: float  # °C
     heating_on: bool  # True if heater is running
+    # Raw consumed energy (kWh) attributed to the interval ending at this point.
+    # Measured (energy/power sensor) when available, otherwise estimated from
+    # heater_power. Used to compute a *windowed* energy total for the K formula
+    # instead of a lifetime-cumulative value. Efficiency factor is applied later.
+    energy_kwh: float = 0.0
 
 
 @dataclass
@@ -241,6 +303,7 @@ class ThermalLossModel:
 
         # Tracking
         self._last_point: ThermalDataPoint | None = None
+        self._last_k_calc_ts: float = 0.0  # Timestamp of last rolling-K recomputation
 
     @property
     def derived_power(self) -> float | None:
@@ -384,7 +447,7 @@ class ThermalLossModel:
             point: The thermal data point
             measured_energy_kwh: Energy measured from external sensor (for energy-based sources)
         """
-        # Track heating time
+        # Track heating time and attribute consumed energy to this interval.
         if self._last_point is not None and self._last_point.heating_on:
             time_delta_hours = (point.timestamp - self._last_point.timestamp) / SECONDS_PER_HOUR
             if time_delta_hours > 0:
@@ -392,20 +455,29 @@ class ThermalLossModel:
 
                 # Calculate energy: use measured if available, otherwise estimate from power
                 if measured_energy_kwh is not None:
-                    # Energy-based source: use provided energy increment
+                    # Measured source (energy or power sensor): use provided increment
+                    interval_energy_kwh = measured_energy_kwh
                     self._measured_energy_kwh += measured_energy_kwh
-                    self._total_energy_kwh += measured_energy_kwh
                 elif self.heater_power is not None and self.heater_power > 0:
                     # Power-based source: estimate energy = Power × time
-                    energy_kwh = (self.heater_power / 1000) * time_delta_hours
-                    self._total_energy_kwh += energy_kwh
+                    interval_energy_kwh = (self.heater_power / 1000) * time_delta_hours
+                else:
+                    interval_energy_kwh = 0.0
+
+                # Store on the point for windowed K calculation, and keep the
+                # lifetime cumulative total for derived_power.
+                point.energy_kwh = interval_energy_kwh
+                self._total_energy_kwh += interval_energy_kwh
 
         self.data_points.append(point)
         self._last_point = point
 
-        # Recalculate K if we have enough data
+        # Recalculate K if we have enough data, throttled to avoid an O(n) scan
+        # on every tick. Always compute the very first time (ts == 0).
         if self.data_hours >= MIN_DATA_HOURS:
-            self._calculate_k()
+            if point.timestamp - self._last_k_calc_ts >= K_RECALC_INTERVAL_SECONDS:
+                self._last_k_calc_ts = point.timestamp
+                self._calculate_k()
 
     def _calculate_k(self, period_energy_kwh: float | None = None) -> None:
         """Calculate K from aggregated data over the last AGGREGATION_PERIOD_HOURS.
@@ -422,11 +494,8 @@ class ThermalLossModel:
         if len(self.data_points) < 2:
             return
 
-        now = self.data_points[-1].timestamp
-        period_start = now - (AGGREGATION_PERIOD_HOURS * SECONDS_PER_HOUR)
-
-        # Get points in the aggregation period
-        period_points = [p for p in self.data_points if p.timestamp >= period_start]
+        # Get points in the aggregation period (pure helper)
+        period_points = filter_period_points(list(self.data_points), AGGREGATION_PERIOD_HOURS)
 
         if len(period_points) < 10:  # Need minimum points for aggregation
             _LOGGER.debug("Not enough points for K calculation: %d", len(period_points))
@@ -462,17 +531,23 @@ class ThermalLossModel:
         # - Heat pump (3.0): 1 kWh consumed = 3 kWh heat (COP)
         # - Gas boiler (0.9): 1 kWh gas = 0.9 kWh heat (combustion efficiency)
         # - Gas furnace (0.85): 1 kWh gas = 0.85 kWh heat (combustion + distribution losses)
+        # Windowed consumed energy: sum of the per-interval energy attributed to
+        # the points inside the aggregation window. This is measured (energy/power
+        # sensor) when available, otherwise estimated from heater_power. Using a
+        # windowed sum (instead of the lifetime cumulative _measured_energy_kwh)
+        # prevents K from drifting upward over time.
+        windowed_energy_kwh = sum(p.energy_kwh for p in period_points)
+
         if period_energy_kwh is not None and period_energy_kwh > 0:
-            # 1. External energy sensor (most accurate - actual consumption)
+            # 1. Explicit period energy override (most accurate - actual consumption)
             # Apply efficiency_factor to convert to thermal energy
             energy_wh = period_energy_kwh * 1000 * self.efficiency_factor  # Convert kWh to Wh thermal
             energy_source = "energy_sensor"
-        elif self._measured_energy_kwh > 0 and aggregation.heating_hours > 0:
-            # 2. Integrated from power sensor (accurate - real power readings)
-            # Scale measured energy to the aggregation period based on heating ratio
-            # Apply efficiency_factor to convert to thermal energy
-            energy_wh = self._measured_energy_kwh * 1000 * self.efficiency_factor  # Convert kWh to Wh thermal
-            energy_source = "power_sensor"
+        elif windowed_energy_kwh > 0:
+            # 2. Measured energy windowed over the aggregation period
+            # (energy or power sensor). Apply efficiency_factor for thermal output.
+            energy_wh = windowed_energy_kwh * 1000 * self.efficiency_factor  # Convert kWh to Wh thermal
+            energy_source = "windowed_measured"
         elif self.heater_power is not None and self.heater_power > 0:
             # 3. Estimated from declared power (least accurate)
             # Apply efficiency_factor to convert to thermal energy
@@ -488,7 +563,9 @@ class ThermalLossModel:
 
         # K = Thermal Energy / (ΔT × duration)
         # K represents heat loss in W/°C (thermal watts, not electric watts)
-        k = energy_wh / (aggregation.delta_t * aggregation.duration_hours)
+        k = compute_k(energy_wh, aggregation.delta_t, aggregation.duration_hours)
+        if k is None:
+            return
 
         self._k_coefficient = k
         self._last_valid_k = k  # Preserve this valid K
@@ -508,35 +585,8 @@ class ThermalLossModel:
         )
 
     def _aggregate_period(self, points: list[ThermalDataPoint]) -> AggregatedPeriod:
-        """Aggregate data points over a period."""
-        if not points:
-            raise ValueError("No points to aggregate")
-
-        # Sort by timestamp
-        points = sorted(points, key=lambda p: p.timestamp)
-
-        start_time = points[0].timestamp
-        end_time = points[-1].timestamp
-
-        # Calculate heating time by summing intervals where heating was on
-        heating_seconds = 0.0
-        for i in range(1, len(points)):
-            if points[i - 1].heating_on:
-                interval = points[i].timestamp - points[i - 1].timestamp
-                heating_seconds += interval
-
-        # Calculate average temperatures
-        avg_indoor = sum(p.indoor_temp for p in points) / len(points)
-        avg_outdoor = sum(p.outdoor_temp for p in points) / len(points)
-
-        return AggregatedPeriod(
-            start_time=start_time,
-            end_time=end_time,
-            heating_seconds=heating_seconds,
-            avg_indoor_temp=avg_indoor,
-            avg_outdoor_temp=avg_outdoor,
-            sample_count=len(points),
-        )
+        """Aggregate data points over a period (delegates to the pure helper)."""
+        return aggregate_period(points)
 
     def add_daily_summary(
         self,
@@ -806,7 +856,10 @@ class ThermalLossModel:
         self._last_k_date = None
         self._last_aggregation = None
         self._total_energy_kwh = 0.0
+        self._measured_energy_kwh = 0.0
+        self._total_heating_hours = 0.0
         self._last_point = None
+        self._last_k_calc_ts = 0.0
 
         _LOGGER.info(
             "[%s] 🗑️ COMPLETE RESET: Cleared %d history days, %d data points, all K coefficients",
@@ -1031,12 +1084,15 @@ class ThermalLossModel:
                 "temp_stable": stability["stable"],
             }
 
-        # Case 4: K is calculated
-        if self._k_coefficient is not None:
+        # Case 4: K is calculated (prefer the stable 7-day K, fall back to 24h).
+        # Using the k_coefficient property avoids reporting "waiting" when only the
+        # 7-day K is available (e.g. right after a storage migration).
+        k_value = self.k_coefficient
+        if k_value is not None:
             return {
                 "status": INSULATION_CALCULATED,
                 "rating": self.get_insulation_rating(),
-                "k_value": self._k_coefficient,
+                "k_value": k_value,
                 "k_source": "calculated",
                 "season": season,
                 "message": None,
@@ -1097,6 +1153,7 @@ class ThermalLossModel:
                     "indoor_temp": p.indoor_temp,
                     "outdoor_temp": p.outdoor_temp,
                     "heating_on": p.heating_on,
+                    "energy_kwh": p.energy_kwh,
                 }
                 for p in self.data_points
             ],
@@ -1137,6 +1194,7 @@ class ThermalLossModel:
                         indoor_temp=p["indoor_temp"],
                         outdoor_temp=p["outdoor_temp"],
                         heating_on=p["heating_on"],
+                        energy_kwh=p.get("energy_kwh", 0.0),
                     )
                 )
 

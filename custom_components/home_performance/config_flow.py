@@ -71,6 +71,37 @@ def get_last_weather_entity(hass: HomeAssistant) -> str | None:
     return None
 
 
+# State values that mean the entity exists but carries no usable value.
+_UNUSABLE_STATES = {"unavailable", "unknown"}
+
+
+def validate_entity(hass: HomeAssistant, entity_id: str | None) -> str | None:
+    """Validate that an entity exists and is usable.
+
+    Returns an error key ("entity_not_found") or None when the entity is fine.
+    An empty/None entity_id is treated as "not provided" and returns None
+    (callers decide whether the field is required).
+    """
+    if not entity_id:
+        return None
+    state = hass.states.get(entity_id)
+    if state is None or state.state in _UNUSABLE_STATES:
+        return "entity_not_found"
+    return None
+
+
+def _optional(key: str, value: Any) -> vol.Optional:
+    """Return a vol.Optional marker, pre-filling a default only when meaningful.
+
+    Collapses the repeated ``if value is not None: ... else: ...`` blocks used
+    throughout the options schema (NumberSelector/EntitySelector reject None
+    defaults, so the marker must omit the default entirely when there is none).
+    """
+    if value is not None and value != "":
+        return vol.Optional(key, default=value)
+    return vol.Optional(key)
+
+
 def get_schema_step_zone(
     hass: HomeAssistant,
     default_outdoor: str | None = None,
@@ -266,13 +297,13 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             outdoor_temp = user_input.get(CONF_OUTDOOR_TEMP_SENSOR)
             heating = user_input.get(CONF_HEATING_ENTITY)
 
-            # Check if entities exist
-            if not self.hass.states.get(indoor_temp):
-                errors[CONF_INDOOR_TEMP_SENSOR] = "entity_not_found"
-            if not self.hass.states.get(outdoor_temp):
-                errors[CONF_OUTDOOR_TEMP_SENSOR] = "entity_not_found"
-            if not self.hass.states.get(heating):
-                errors[CONF_HEATING_ENTITY] = "entity_not_found"
+            # Check if entities exist and are usable
+            if err := validate_entity(self.hass, indoor_temp):
+                errors[CONF_INDOOR_TEMP_SENSOR] = err
+            if err := validate_entity(self.hass, outdoor_temp):
+                errors[CONF_OUTDOOR_TEMP_SENSOR] = err
+            if err := validate_entity(self.hass, heating):
+                errors[CONF_HEATING_ENTITY] = err
 
             # Get heat source type (default to electric for backward compat)
             heat_source_type = user_input.get(CONF_HEAT_SOURCE_TYPE, HEAT_SOURCE_ELECTRIC)
@@ -292,6 +323,8 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Check if zone name is already used (use slugify for consistent comparison)
             zone_name = user_input.get(CONF_ZONE_NAME, "").strip()
+            # Persist the normalized (stripped) name rather than the raw input.
+            user_input[CONF_ZONE_NAME] = zone_name
             zone_slug = slugify(zone_name, separator="_")
             for entry in self.hass.config_entries.async_entries(DOMAIN):
                 existing_name = entry.data.get(CONF_ZONE_NAME, "")
@@ -327,14 +360,12 @@ class HomePerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             # Validate energy sensor if provided (optional for all heat sources)
-            energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
-            if energy_sensor and not self.hass.states.get(energy_sensor):
-                errors[CONF_ENERGY_SENSOR] = "entity_not_found"
+            if err := validate_entity(self.hass, user_input.get(CONF_ENERGY_SENSOR)):
+                errors[CONF_ENERGY_SENSOR] = err
 
             # Validate power sensor if provided
-            power_sensor = user_input.get(CONF_POWER_SENSOR)
-            if power_sensor and not self.hass.states.get(power_sensor):
-                errors[CONF_POWER_SENSOR] = "entity_not_found"
+            if err := validate_entity(self.hass, user_input.get(CONF_POWER_SENSOR)):
+                errors[CONF_POWER_SENSOR] = err
 
             if not errors:
                 self._data.update(user_input)
@@ -393,21 +424,32 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
                 heater_power = user_input.get(CONF_HEATER_POWER)
                 if not heater_power or heater_power <= 0:
                     errors[CONF_HEATER_POWER] = "invalid_power"
+            else:
+                # Non-electric: power is optional but must not be negative if set
+                heater_power = user_input.get(CONF_HEATER_POWER)
+                if heater_power is not None and heater_power < 0:
+                    errors[CONF_HEATER_POWER] = "invalid_power"
 
             # Validate power sensor if provided
-            power_sensor = user_input.get(CONF_POWER_SENSOR)
-            if power_sensor and not self.hass.states.get(power_sensor):
-                errors[CONF_POWER_SENSOR] = "entity_not_found"
+            if err := validate_entity(self.hass, user_input.get(CONF_POWER_SENSOR)):
+                errors[CONF_POWER_SENSOR] = err
 
-            # Validate energy sensor if provided (optional for all heat sources)
+            # Validate energy sensor: required for energy-based sources (heat pump,
+            # gas), optional otherwise. Validation must follow the NEW selection,
+            # not the previously-stored heat source type.
             energy_sensor = user_input.get(CONF_ENERGY_SENSOR)
-            if energy_sensor and not self.hass.states.get(energy_sensor):
-                errors[CONF_ENERGY_SENSOR] = "entity_not_found"
+            if new_heat_source in HEAT_SOURCES_REQUIRING_ENERGY and not energy_sensor:
+                errors[CONF_ENERGY_SENSOR] = "energy_sensor_required"
+            elif err := validate_entity(self.hass, energy_sensor):
+                errors[CONF_ENERGY_SENSOR] = err
 
             # Validate window sensor if provided
-            window_sensor = user_input.get(CONF_WINDOW_SENSOR)
-            if window_sensor and not self.hass.states.get(window_sensor):
-                errors[CONF_WINDOW_SENSOR] = "entity_not_found"
+            if err := validate_entity(self.hass, user_input.get(CONF_WINDOW_SENSOR)):
+                errors[CONF_WINDOW_SENSOR] = err
+
+            # Validate weather entity if provided
+            if err := validate_entity(self.hass, user_input.get(CONF_WEATHER_ENTITY)):
+                errors[CONF_WEATHER_ENTITY] = err
 
             if not errors:
                 # Store data for potential step 2
@@ -449,64 +491,33 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
 
         # Heating active states (for select/input_select entities)
         heating_active_states_value = current.get(CONF_HEATING_ACTIVE_STATES) or None
-        if heating_active_states_value is not None:
-            schema_dict[vol.Optional(CONF_HEATING_ACTIVE_STATES, default=heating_active_states_value)] = (
-                selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT))
-            )
-        else:
-            schema_dict[vol.Optional(CONF_HEATING_ACTIVE_STATES)] = selector.TextSelector(
-                selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
-            )
+        schema_dict[_optional(CONF_HEATING_ACTIVE_STATES, heating_active_states_value)] = selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+        )
 
-        # Heater power - always Optional in schema (backend validates for electric)
+        # Heater power - always Optional in schema (backend validates for electric).
+        # Only pre-fill a positive declared power.
         heater_power_value = current.get(CONF_HEATER_POWER)
-        if heater_power_value is not None and heater_power_value > 0:
-            schema_dict[vol.Optional(CONF_HEATER_POWER, default=heater_power_value)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
-            )
-        else:
-            schema_dict[vol.Optional(CONF_HEATER_POWER)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
-            )
+        if not (heater_power_value is not None and heater_power_value > 0):
+            heater_power_value = None
+        schema_dict[_optional(CONF_HEATER_POWER, heater_power_value)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0, max=100000, step=50, unit_of_measurement="W", mode="box")
+        )
 
-        # Surface - only set default if value exists (NumberSelector doesn't support None)
-        surface_value = current.get(CONF_SURFACE)
-        if surface_value is not None:
-            schema_dict[vol.Optional(CONF_SURFACE, default=surface_value)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box")
-            )
-        else:
-            schema_dict[vol.Optional(CONF_SURFACE)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box")
-            )
+        # Surface (NumberSelector doesn't support None defaults)
+        schema_dict[_optional(CONF_SURFACE, current.get(CONF_SURFACE))] = selector.NumberSelector(
+            selector.NumberSelectorConfig(min=1, max=500, step=0.5, unit_of_measurement="m²", mode="box")
+        )
 
-        # Volume - only set default if value exists
-        volume_value = current.get(CONF_VOLUME)
-        if volume_value is not None:
-            schema_dict[vol.Optional(CONF_VOLUME, default=volume_value)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box")
-            )
-        else:
-            schema_dict[vol.Optional(CONF_VOLUME)] = selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box")
-            )
+        # Volume
+        schema_dict[_optional(CONF_VOLUME, current.get(CONF_VOLUME))] = selector.NumberSelector(
+            selector.NumberSelectorConfig(min=1, max=1500, step=0.5, unit_of_measurement="m³", mode="box")
+        )
 
-        # Power sensor - only set default if value exists (EntitySelector doesn't handle None)
-        power_sensor_value = current.get(CONF_POWER_SENSOR) or None
-        if power_sensor_value is not None:
-            schema_dict[vol.Optional(CONF_POWER_SENSOR, default=power_sensor_value)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="power",
-                )
-            )
-        else:
-            schema_dict[vol.Optional(CONF_POWER_SENSOR)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="power",
-                )
-            )
+        # Power sensor
+        schema_dict[_optional(CONF_POWER_SENSOR, current.get(CONF_POWER_SENSOR) or None)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="power")
+        )
 
         # Power threshold - always show with default
         power_threshold_value = current.get(CONF_POWER_THRESHOLD, DEFAULT_POWER_THRESHOLD)
@@ -521,34 +532,13 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         )
 
         # === ENERGY CONFIGURATION GROUP ===
-        # Energy sensor - required for non-electric sources, optional for electric
-        energy_sensor_value = current.get(CONF_ENERGY_SENSOR) or None
-        if heat_source_type in HEAT_SOURCES_REQUIRING_ENERGY:
-            schema_dict[
-                vol.Required(
-                    CONF_ENERGY_SENSOR,
-                    default=energy_sensor_value,
-                )
-            ] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="energy",
-                )
-            )
-        elif energy_sensor_value is not None:
-            schema_dict[vol.Optional(CONF_ENERGY_SENSOR, default=energy_sensor_value)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="energy",
-                )
-            )
-        else:
-            schema_dict[vol.Optional(CONF_ENERGY_SENSOR)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="sensor",
-                    device_class="energy",
-                )
-            )
+        # Energy sensor is always Optional in the schema: whether it is *required*
+        # depends on the heat source chosen in THIS form, which we can only know at
+        # submit time. The backend enforces it (energy_sensor_required) so the
+        # Required/Optional flag never drifts from the live selection.
+        schema_dict[_optional(CONF_ENERGY_SENSOR, current.get(CONF_ENERGY_SENSOR) or None)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="energy")
+        )
 
         # Efficiency factor - right after energy sensor for UX clarity
         efficiency_value = current.get(CONF_EFFICIENCY_FACTOR)
@@ -566,22 +556,10 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
 
         # Note: enable_dynamic_cop is shown in step 2 only for heat pumps
 
-        # Window sensor - only set default if value exists
-        window_sensor_value = current.get(CONF_WINDOW_SENSOR) or None
-        if window_sensor_value is not None:
-            schema_dict[vol.Optional(CONF_WINDOW_SENSOR, default=window_sensor_value)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="binary_sensor",
-                    device_class=["window", "door", "opening"],
-                )
-            )
-        else:
-            schema_dict[vol.Optional(CONF_WINDOW_SENSOR)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="binary_sensor",
-                    device_class=["window", "door", "opening"],
-                )
-            )
+        # Window sensor
+        schema_dict[_optional(CONF_WINDOW_SENSOR, current.get(CONF_WINDOW_SENSOR) or None)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor", device_class=["window", "door", "opening"])
+        )
 
         # === NOTIFICATION OPTIONS ===
         # Enable window notifications
@@ -590,16 +568,10 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
             selector.BooleanSelector()
         )
 
-        # Notify device - only show if notifications are or will be enabled
-        notify_device_value = current.get(CONF_NOTIFY_DEVICE) or None
-        if notify_device_value is not None:
-            schema_dict[vol.Optional(CONF_NOTIFY_DEVICE, default=notify_device_value)] = selector.DeviceSelector(
-                selector.DeviceSelectorConfig(filter=selector.DeviceFilterSelectorConfig(integration="mobile_app"))
-            )
-        else:
-            schema_dict[vol.Optional(CONF_NOTIFY_DEVICE)] = selector.DeviceSelector(
-                selector.DeviceSelectorConfig(filter=selector.DeviceFilterSelectorConfig(integration="mobile_app"))
-            )
+        # Notify device
+        schema_dict[_optional(CONF_NOTIFY_DEVICE, current.get(CONF_NOTIFY_DEVICE) or None)] = selector.DeviceSelector(
+            selector.DeviceSelectorConfig(filter=selector.DeviceFilterSelectorConfig(integration="mobile_app"))
+        )
 
         # Notification delay
         notification_delay = current.get(CONF_NOTIFICATION_DELAY, DEFAULT_NOTIFICATION_DELAY)
@@ -618,48 +590,26 @@ class HomePerformanceOptionsFlow(config_entries.OptionsFlow):
         weather_entity_value = current.get(CONF_WEATHER_ENTITY)
         if not weather_entity_value:
             weather_entity_value = get_last_weather_entity(self.hass)
-        if weather_entity_value is not None:
-            schema_dict[vol.Optional(CONF_WEATHER_ENTITY, default=weather_entity_value)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="weather")
-            )
-        else:
-            schema_dict[vol.Optional(CONF_WEATHER_ENTITY)] = selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="weather")
-            )
+        schema_dict[_optional(CONF_WEATHER_ENTITY, weather_entity_value)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="weather")
+        )
 
         # Room orientation
         # Normalize to lowercase for case-insensitive matching with ORIENTATIONS (legacy data fix)
+        # Normalize to lowercase for case-insensitive matching with ORIENTATIONS
+        # (legacy data fix); only keep it as default when it's a valid orientation.
         room_orientation_value = current.get(CONF_ROOM_ORIENTATION)
         if room_orientation_value is not None:
             room_orientation_value = room_orientation_value.lower()
-            # Only use as default if it's a valid orientation
-            if room_orientation_value in ORIENTATIONS:
-                schema_dict[vol.Optional(CONF_ROOM_ORIENTATION, default=room_orientation_value)] = (
-                    selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=ORIENTATIONS,
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                            translation_key="room_orientation",
-                        )
-                    )
-                )
-            else:
-                # Invalid legacy value, show empty selector
-                schema_dict[vol.Optional(CONF_ROOM_ORIENTATION)] = selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ORIENTATIONS,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                        translation_key="room_orientation",
-                    )
-                )
-        else:
-            schema_dict[vol.Optional(CONF_ROOM_ORIENTATION)] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=ORIENTATIONS,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    translation_key="room_orientation",
-                )
+            if room_orientation_value not in ORIENTATIONS:
+                room_orientation_value = None
+        schema_dict[_optional(CONF_ROOM_ORIENTATION, room_orientation_value)] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=ORIENTATIONS,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                translation_key="room_orientation",
             )
+        )
 
         return self.async_show_form(
             step_id="init",

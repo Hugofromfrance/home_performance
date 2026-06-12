@@ -1,5 +1,34 @@
 # Changelog
 
+## [Unreleased]
+
+### 🐛 Corrections de bugs
+
+* Fix crash on shutdown/unload (`async_save_data(force=True)` argument inexistant).
+* Reset services (`reset_history`, `reset_all`) sont désormais persistés et rafraîchissent l'état.
+* K 24h: l'énergie est calculée sur une fenêtre glissante (par point) au lieu d'un cumul depuis l'installation, ce qui empêchait K de dériver à la hausse.
+* Le `power_sensor` alimente désormais réellement le modèle thermique pour le calcul de K.
+
+### ⚡ Performance & robustesse
+
+* Recalcul de K limité (throttle) au lieu d'un calcul O(n) à chaque tick de 60s.
+* Attributs lourds de capteurs (`k_history_7d`) calculés une fois par cycle côté coordinator + `_unrecorded_attributes` pour soulager le recorder.
+* Carte: `shouldUpdate` filtrant les entités de la zone + cache des IDs résolus (moins de re-renders).
+* Sérialisation des mutations concurrentes (lock) entre listeners temps-réel et poll; reset du baseline énergie externe à minuit.
+* Capteurs/binaires renvoient `unknown` (et non `0`/`off`) avant la première mesure.
+
+### ♿ Carte (UX/accessibilité)
+
+* Theming piloté par les variables Home Assistant (fallbacks neutres) au lieu de couleurs codées en dur.
+* Accessibilité: `role`/`tabindex`/`aria-*`, navigation clavier, focus visible, `prefers-reduced-motion`, libellés sur les alertes.
+* État d'erreur explicite quand les entités sont indisponibles; i18n corrigée; `Reload` ciblé sur la ressource.
+
+### ⚙️ Interne
+
+* Migration du stockage en v2: les données 24h biaisées (points/K) sont invalidées pour un recalcul propre. L'historique journalier est conservé. **Impact**: K_24h se recalcule après mise à jour; les valeurs affichées peuvent changer (plus justes).
+* Validation du flux d'options alignée sur la source de chaleur sélectionnée (`energy_sensor_required`); helper `validate_entity` (absent/`unavailable`); `zone_name` normalisé.
+* Refactor maintenabilité: fonctions pures `aggregate_period`/`compute_k`/`filter_period_points`, helpers de session chauffage factorisés, base `ScalarCoordinatorSensor`, diagnostics bootstrap en `EntityCategory.DIAGNOSTIC`, suppression de code mort et réduction des logs du hot path. Couverture de tests étendue (models, coordinator, config_flow, capteurs).
+
 ## [1.4.2](https://github.com/Hugofromfrance/home_performance/compare/v1.4.1...v1.4.2) (2026-02-20)
 
 

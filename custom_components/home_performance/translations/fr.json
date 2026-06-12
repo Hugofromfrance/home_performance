@@ -163,7 +163,8 @@
     },
     "error": {
       "entity_not_found": "Entité introuvable ou indisponible",
-      "invalid_power": "Puissance invalide"
+      "invalid_power": "Puissance invalide",
+      "energy_sensor_required": "Un capteur d'énergie est requis pour ce type de source de chaleur"
     }
   },
   "entity": {

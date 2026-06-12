@@ -113,7 +113,6 @@ CONF_NOTIFICATION_DELAY = "notification_delay"
 # Default values
 DEFAULT_NOTIFICATION_DELAY = 2  # minutes
 DEFAULT_HEAT_SOURCE_TYPE = HEAT_SOURCE_ELECTRIC
-DEFAULT_EFFICIENCY_FACTOR = 1.0
 DEFAULT_POWER_THRESHOLD = 50  # W - Seuil par défaut pour détecter si le chauffage est actif
 DEFAULT_ENABLE_DYNAMIC_COP = False  # Disabled by default, user must opt-in
 DEFAULT_HEATING_ACTIVE_STATES: list[str] = ["heating", "heat", "on"]  # Common states for select entities

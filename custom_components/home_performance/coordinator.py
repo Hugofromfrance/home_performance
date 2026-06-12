@@ -59,8 +59,36 @@ from .models import ThermalDataPoint, ThermalLossModel
 _LOGGER = logging.getLogger(__name__)
 
 # Storage version and save interval
-STORAGE_VERSION = 1
+# v2: K is now computed from a *windowed* energy total (per-point energy_kwh)
+# instead of a lifetime-cumulative value. The old stored 24h points/K were biased,
+# so the migration drops them to force a clean recalculation. Daily history is kept.
+STORAGE_VERSION = 2
 SAVE_INTERVAL_SECONDS = 300  # Save every 5 minutes
+
+
+class HomePerformanceStore(Store):
+    """Store with migration that invalidates the biased pre-v2 24h K data."""
+
+    async def _async_migrate_func(
+        self,
+        old_major_version: int,
+        old_minor_version: int,
+        old_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Migrate stored data to the current version."""
+        if old_major_version < 2:
+            _LOGGER.info(
+                "Migrating Home Performance storage to v2: invalidating biased 24h K data "
+                "(daily history preserved)"
+            )
+            model = old_data.get("thermal_model")
+            if isinstance(model, dict):
+                # Drop rolling-window state computed with the old cumulative energy.
+                # daily_history is kept (its per-day energy was already windowed).
+                model["data_points"] = []
+                model["last_point"] = None
+                model["k_coefficient"] = None
+        return old_data
 
 
 class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -169,6 +197,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._measured_energy_total_kwh: float = 0.0
         self._measured_energy_daily_kwh: float = 0.0
         self._last_external_energy: float | None = None  # For energy-based sources
+        # Per-tick energy increment integrated from the power sensor (kWh), fed to
+        # the thermal model so K uses real measured consumption when available.
+        self._last_measured_energy_increment: float | None = None
 
         # Energy sensor tracking (external daily energy counter)
         # User provides a daily counter (e.g., Utility Meter) - we use its value directly
@@ -214,13 +245,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Persistence - use slugify for consistent handling of special characters
         zone_slug = slugify(self.zone_name, separator="_")
-        self._store = Store(
+        self._store = HomePerformanceStore(
             hass,
             STORAGE_VERSION,
             f"{DOMAIN}.{zone_slug}",
         )
         self._last_save_time: float = 0
         self._data_loaded: bool = False
+        # Serialize update cycles so a service-triggered refresh cannot interleave
+        # with the scheduled poll while both mutate the daily counters.
+        self._update_lock = asyncio.Lock()
 
         super().__init__(
             hass,
@@ -294,8 +328,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     duration = now - self._heating_start_time
                     self._heating_seconds_daily += duration
                     # Update estimated energy (only if heater_power is available)
-                    if self.heater_power is not None and self.heater_power > 0:
-                        energy_kwh = (self.heater_power / 1000) * (duration / 3600)
+                    energy_kwh = self._session_energy_kwh(duration)
+                    if energy_kwh > 0:
                         self._estimated_energy_daily_kwh += energy_kwh
                         _LOGGER.info(
                             "[%s] ❄️ Heating stopped (real-time). Duration: %.1fs (%.2f min), Energy: %.4f kWh",
@@ -536,9 +570,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._is_heating_realtime and self._heating_start_time is not None:
             duration = time.time() - self._heating_start_time
             self._heating_seconds_daily += duration
-            if self.heater_power is not None and self.heater_power > 0:
-                energy_kwh = (self.heater_power / 1000) * (duration / 3600)
-                self._estimated_energy_daily_kwh += energy_kwh
+            self._estimated_energy_daily_kwh += self._session_energy_kwh(duration)
             _LOGGER.info("[%s] Finalized heating session on shutdown: %.1fs", self.zone_name, duration)
 
         # Save data before shutdown
@@ -613,8 +645,14 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:
             _LOGGER.error("Error loading persisted data: %s", err)
 
-    async def async_save_data(self) -> None:
-        """Save data to persistent storage."""
+    async def async_save_data(self, force: bool = False) -> None:
+        """Save data to persistent storage.
+
+        Args:
+            force: Kept for API symmetry with ``_async_maybe_save``. This method
+                always writes immediately; ``force`` makes the intent explicit at
+                call sites such as shutdown and reset services.
+        """
         try:
             data = {
                 "thermal_model": self.thermal_model.to_dict(),
@@ -647,6 +685,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from sensors and update thermal model."""
+        async with self._update_lock:
+            return await self._async_update_data_locked()
+
+    async def _async_update_data_locked(self) -> dict[str, Any]:
+        """Single, non-overlapping update cycle (holds _update_lock)."""
         try:
             # Get current sensor values
             indoor_temp = self._get_temperature(self.indoor_temp_sensor)
@@ -682,17 +725,24 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 heating_on=heating_on,
             )
 
-            # For energy-based sources, get energy increment to pass to model
+            # Integrate the power sensor first (if any) so the per-interval energy
+            # increment is available to attribute to the data point below.
+            measured_power = self._update_measured_energy(now)
+
+            # Determine the per-interval consumed energy increment to feed the model.
+            # Priority: external energy sensor (cumulative counter) > integrated power sensor.
             measured_energy_increment = None
-            if self._uses_energy_based_calculation and heating_on:
-                # Get energy from external sensor and calculate increment
+            if self._uses_energy_based_calculation:
+                # Read the external energy counter every tick to avoid a stale
+                # baseline; only count an increment while heating is on.
                 external_energy = self._get_external_energy()
-                if external_energy is not None and hasattr(self, "_last_external_energy"):
-                    if self._last_external_energy is not None:
-                        measured_energy_increment = max(0, external_energy - self._last_external_energy)
+                if external_energy is not None:
+                    if heating_on and self._last_external_energy is not None:
+                        measured_energy_increment = max(0.0, external_energy - self._last_external_energy)
                     self._last_external_energy = external_energy
-                elif external_energy is not None:
-                    self._last_external_energy = external_energy
+            elif self._last_measured_energy_increment is not None:
+                # Power sensor integration (W → kWh) computed in _update_measured_energy
+                measured_energy_increment = self._last_measured_energy_increment
 
             self.thermal_model.add_data_point(data_point, measured_energy_increment)
 
@@ -711,9 +761,6 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Get analysis from model (for K coefficient - rolling 24h)
             analysis = self.thermal_model.get_analysis()
 
-            # Update measured energy from power sensor (if configured)
-            measured_power = self._update_measured_energy(now)
-
             # Get external energy sensor value (if configured)
             # If user configured an energy_sensor, we use its value DIRECTLY
             # (user is responsible for providing a daily counter like Utility Meter)
@@ -727,19 +774,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Update wind counters for daily average
             self._update_wind_counters(weather_data)
 
-            # Calculate daily values (minuit-minuit)
-            # Include ongoing heating session in the total
-            heating_seconds = self._heating_seconds_daily
-            estimated_energy = self._estimated_energy_daily_kwh
-            if self._is_heating_realtime and self._heating_start_time is not None:
-                # Add time from current ongoing heating session
-                ongoing_duration = now - self._heating_start_time
-                heating_seconds += ongoing_duration
-                # Add energy from current ongoing heating session
-                if self.heater_power is not None and self.heater_power > 0:
-                    ongoing_energy_kwh = (self.heater_power / 1000) * (ongoing_duration / 3600)
-                    estimated_energy += ongoing_energy_kwh
-            heating_hours_daily = heating_seconds / 3600
+            # Calculate daily values (minuit-minuit), including any ongoing session
+            heating_hours_daily, estimated_energy = self._current_daily_heating_totals(now)
 
             # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
             # (plus stable que le calcul depuis minuit)
@@ -793,6 +829,10 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "k_coefficient_7d": analysis.get("k_coefficient_7d"),  # Stable 7-day K
                 "k_per_m2": analysis.get("k_per_m2"),
                 "k_per_m3": analysis.get("k_per_m3"),
+                # 7-day K history for the card sparkline (computed once per update)
+                "k_history_7d": self._build_k_history(
+                    analysis.get("k_coefficient_7d"), heating_hours_daily
+                ),
                 # Usage data (24h rolling window)
                 "heating_hours": heating_hours_daily,
                 "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
@@ -851,85 +891,37 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.error("Error updating home performance data: %s", err)
             raise UpdateFailed(f"Error updating data: {err}") from err
 
-    def _get_empty_data(self) -> dict[str, Any]:
-        """Return empty data structure."""
-        return {
-            "indoor_temp": None,
-            "outdoor_temp": None,
-            "heating_on": self._is_heating_realtime,
-            "delta_t": None,
-            "window_open": self._window_open_realtime,
-            "window_detection_method": "sensor" if self.window_sensor else "temperature",
-            "k_coefficient": None,
-            "k_coefficient_24h": None,
-            "k_coefficient_7d": None,
-            "k_per_m2": None,
-            "k_per_m3": None,
-            "heating_hours": None,
-            "heating_ratio": None,
-            "avg_delta_t": None,
-            "daily_energy_kwh": None,
-            "total_energy_kwh": 0.0,
-            "external_energy_total_kwh": None,
-            "external_energy_daily_kwh": None,
-            "energy_sensor_configured": self.energy_sensor is not None,
-            "data_hours": 0,
-            "samples_count": 0,
-            "data_ready": False,
-            "storage_loaded": self._data_loaded,
-            "history_days": 0,
-            "history_has_valid_k": False,
-            "heater_power": self.heater_power,
-            "effective_power": self.heater_power,
-            "derived_power": None,
-            "heat_source_type": self.heat_source_type,
-            "efficiency_factor": self.efficiency_factor,
-            "effective_efficiency": self.efficiency_factor,
-            "enable_dynamic_cop": self.enable_dynamic_cop,
-            "measured_cop": None,
-            "cop_7d": None,
-            "cop_status": "waiting_data" if self.enable_dynamic_cop else None,
-            "surface": self.surface,
-            "volume": self.volume,
-            "power_threshold": self.power_threshold,
-            # Temperature variation (rolling 24h)
-            **self._get_temp_variation_24h(),
-            "insulation_rating": None,
-            "insulation_status": {
-                "status": "waiting_data",
-                "rating": None,
-                "k_value": None,
-                "k_source": None,
-                "season": "heating_season",
-                "message": "Data collection in progress",
-                "temp_stable": None,
-            },
-            "last_valid_k": None,
-            # Weather data
-            "wind_speed": None,
-            "wind_speed_unit": None,
-            "wind_bearing": None,
-            "wind_direction": None,
-            "wind_exposure": None,
-            "room_orientation": self.room_orientation,
-        }
+    def _session_energy_kwh(self, duration_seconds: float) -> float:
+        """Estimated energy (kWh) for a heating session of the given duration.
+
+        Returns 0 when no declared heater_power is available.
+        """
+        if self.heater_power is not None and self.heater_power > 0:
+            return (self.heater_power / 1000) * (duration_seconds / 3600)
+        return 0.0
+
+    def _current_daily_heating_totals(self, now: float | None = None) -> tuple[float, float]:
+        """Daily heating totals including the in-progress session (read-only).
+
+        Returns ``(heating_hours_daily, estimated_energy_kwh)`` without mutating
+        any counter — used by both the live and the restored data builders.
+        """
+        if now is None:
+            now = time.time()
+        heating_seconds = self._heating_seconds_daily
+        estimated_energy = self._estimated_energy_daily_kwh
+        if self._is_heating_realtime and self._heating_start_time is not None:
+            ongoing_duration = now - self._heating_start_time
+            heating_seconds += ongoing_duration
+            estimated_energy += self._session_energy_kwh(ongoing_duration)
+        return heating_seconds / 3600, estimated_energy
 
     def _get_restored_data(self) -> dict[str, Any]:
         """Return data from restored thermal model (when sensors not yet available)."""
         analysis = self.thermal_model.get_analysis()
 
-        # Calculate restored heating values
-        # Include ongoing heating session in the total
-        heating_seconds = self._heating_seconds_daily
-        estimated_energy = self._estimated_energy_daily_kwh
-        if self._is_heating_realtime and self._heating_start_time is not None:
-            ongoing_duration = time.time() - self._heating_start_time
-            heating_seconds += ongoing_duration
-            # Add energy from current ongoing heating session
-            if self.heater_power is not None and self.heater_power > 0:
-                ongoing_energy_kwh = (self.heater_power / 1000) * (ongoing_duration / 3600)
-                estimated_energy += ongoing_energy_kwh
-        heating_hours_daily = heating_seconds / 3600
+        # Calculate restored heating values (includes any ongoing session)
+        heating_hours_daily, estimated_energy = self._current_daily_heating_totals()
 
         # ΔT moyen : utiliser la valeur 24h glissante du modèle thermique
         avg_delta_t_rolling = analysis.get("avg_delta_t")
@@ -947,6 +939,9 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "k_coefficient_7d": analysis.get("k_coefficient_7d"),
             "k_per_m2": analysis.get("k_per_m2"),
             "k_per_m3": analysis.get("k_per_m3"),
+            "k_history_7d": self._build_k_history(
+                analysis.get("k_coefficient_7d"), heating_hours_daily
+            ),
             # Restored usage data (24h rolling window)
             "heating_hours": heating_hours_daily,
             "heating_ratio": heating_hours_daily / 24 if heating_hours_daily else 0,
@@ -1039,6 +1034,11 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._reset_daily_wind_counters()
             self._last_daily_reset_date = today
             self._daily_reset_datetime = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # Drop the external energy baseline so the first post-midnight reading
+            # (e.g. a Utility Meter that also reset to 0) does not produce a bogus
+            # negative/huge increment.
+            self._last_external_energy = None
 
             # Note: energy_sensor_daily_kwh is read directly from external sensor
             # No need to reset it here - the external Utility Meter handles its own reset
@@ -1359,6 +1359,83 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (ValueError, TypeError):
             return None
 
+    def _build_k_history(self, k_7d: float | None, heating_hours_today: float | None) -> list[dict[str, Any]]:
+        """Build the 7-day K history for the card sparkline.
+
+        Moved here from the sensor property so the (O(history)) computation runs
+        once per coordinator update instead of on every entity attribute read.
+        Uses the rolling K_7j per day to match the displayed score.
+        """
+        history = self.thermal_model.daily_history
+        heater_power = self.heater_power
+        history_by_date = {entry.date: entry for entry in history}
+
+        today = dt_util.now().date()
+
+        days_data: list[dict[str, Any]] = []
+        for i in range(6, -1, -1):  # 6 days ago to today
+            day = today - timedelta(days=i)
+            date_str = day.strftime("%Y-%m-%d")
+            entry = history_by_date.get(date_str)
+
+            k_value: float | None = None
+            is_today = i == 0
+
+            if is_today:
+                k_value = k_7d
+            elif entry:
+                if entry.k_7d is not None:
+                    k_value = entry.k_7d
+                elif entry.avg_delta_t >= 5 and entry.heating_hours >= 0.5:
+                    if entry.energy_kwh > 0:
+                        energy_wh = entry.energy_kwh * 1000
+                    elif heater_power is not None and heater_power > 0:
+                        energy_wh = heater_power * entry.heating_hours
+                    else:
+                        energy_wh = None
+                    if energy_wh is not None:
+                        k_value = energy_wh / (entry.avg_delta_t * 24)
+
+            heating_hours = heating_hours_today if is_today else (entry.heating_hours if entry else None)
+
+            days_data.append({"date": date_str, "k": k_value, "heating_hours": heating_hours})
+
+        # Forward pass: carry-forward from first valid day
+        last_valid_k = None
+        for day_data in days_data:
+            if day_data["k"] is not None:
+                last_valid_k = day_data["k"]
+            elif last_valid_k is not None:
+                day_data["k"] = last_valid_k
+                day_data["estimated"] = True
+
+        # Backward pass: backfill leading gaps with first valid K
+        first_valid_k = None
+        for day_data in days_data:
+            if day_data["k"] is not None and "estimated" not in day_data:
+                first_valid_k = day_data["k"]
+                break
+
+        if first_valid_k is not None:
+            for day_data in days_data:
+                if day_data["k"] is None:
+                    day_data["k"] = first_valid_k
+                    day_data["estimated"] = True
+
+        k_history: list[dict[str, Any]] = []
+        for day_data in days_data:
+            if day_data["k"] is not None:
+                entry_data = {
+                    "date": day_data["date"],
+                    "k": round(day_data["k"], 1),
+                    "estimated": day_data.get("estimated", False),
+                }
+                if day_data.get("heating_hours") is not None:
+                    entry_data["heating_hours"] = round(day_data["heating_hours"], 2)
+                k_history.append(entry_data)
+
+        return k_history
+
     def _get_temp_variation_24h(self) -> dict[str, Any]:
         """Get temperature variation over the last 24 hours (rolling window)."""
         if not self._indoor_temp_history_24h:
@@ -1441,8 +1518,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             # Check if we can upgrade to optimal
             current_rating = status.get("rating", "")
-            _LOGGER.info(
-                "[%s] 🔍 Optimal check: current_rating=%s",
+            _LOGGER.debug(
+                "[%s] Optimal check: current_rating=%s",
                 self.zone_name,
                 current_rating,
             )
@@ -1451,23 +1528,21 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Check 7-day history for excellence streak
             history = self.thermal_model.daily_history
-            _LOGGER.info(
-                "[%s] 🔍 Optimal check: history has %d days",
+            _LOGGER.debug(
+                "[%s] Optimal check: history has %d days",
                 self.zone_name,
                 len(history) if history else 0,
             )
             if not history or len(history) < 6:
-                _LOGGER.info(
-                    "[%s] ❌ Optimal check: not enough history days (need 6, have %d)",
+                _LOGGER.debug(
+                    "[%s] Optimal check: not enough history days (need 6, have %d)",
                     self.zone_name,
                     len(history) if history else 0,
                 )
                 return status
 
-            # Get last 7 days
-            from datetime import datetime, timedelta
-
-            today = datetime.now().date()
+            # Get last 7 days (use HA timezone so "today" matches the midnight reset)
+            today = dt_util.now().date()
             last_7_days = []
 
             for i in range(7):
@@ -1477,16 +1552,16 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if entry:
                     last_7_days.append(entry)
 
-            _LOGGER.info(
-                "[%s] 🔍 Optimal check: found %d matching days in last 7",
+            _LOGGER.debug(
+                "[%s] Optimal check: found %d matching days in last 7",
                 self.zone_name,
                 len(last_7_days),
             )
 
             # Need at least 6 historical days (today may not be archived yet)
             if len(last_7_days) < 6:
-                _LOGGER.info(
-                    "[%s] ❌ Optimal check: not enough matching days (need 6, have %d)",
+                _LOGGER.debug(
+                    "[%s] Optimal check: not enough matching days (need 6, have %d)",
                     self.zone_name,
                     len(last_7_days),
                 )
@@ -1507,22 +1582,22 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             today_heating_hours = analysis.get("heating_hours") if analysis else None
             if today_heating_hours is not None and today_heating_hours >= 0.5:
                 all_low_heating = False
-                _LOGGER.info(
-                    "[%s] ❌ Optimal check: today has %.2f hours heating (>= 0.5)",
+                _LOGGER.debug(
+                    "[%s] Optimal check: today has %.2f hours heating (>= 0.5)",
                     self.zone_name,
                     today_heating_hours,
                 )
 
             if days_over_threshold:
-                _LOGGER.info(
-                    "[%s] ❌ Optimal check: %d days with >= 30min heating: %s",
+                _LOGGER.debug(
+                    "[%s] Optimal check: %d days with >= 30min heating: %s",
                     self.zone_name,
                     len(days_over_threshold),
                     days_over_threshold,
                 )
             else:
-                _LOGGER.info(
-                    "[%s] ✅ Optimal check: all %d days have < 30min heating, today=%.2f",
+                _LOGGER.debug(
+                    "[%s] Optimal check: all %d days have < 30min heating, today=%.2f",
                     self.zone_name,
                     len(last_7_days),
                     today_heating_hours or 0,
@@ -1726,6 +1801,7 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Uses trapezoidal integration for better accuracy.
         Automatically resets daily counter at midnight.
         """
+        self._last_measured_energy_increment = None
         if self.power_sensor is None:
             return None
 
@@ -1764,6 +1840,8 @@ class HomePerformanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Add to counters
             self._measured_energy_daily_kwh += energy_kwh
             self._measured_energy_total_kwh += energy_kwh
+            # Expose the increment so it can be attributed to the model data point
+            self._last_measured_energy_increment = energy_kwh
 
         # Update tracking values
         self._last_power_update = now

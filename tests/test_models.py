@@ -15,7 +15,69 @@ from custom_components.home_performance.models import (
     DailyHistoryEntry,
     ThermalDataPoint,
     ThermalLossModel,
+    aggregate_period,
+    compute_k,
+    filter_period_points,
 )
+
+
+def _pt(ts: float, heating: bool = True, indoor: float = 20.0, outdoor: float = 5.0):
+    return ThermalDataPoint(
+        timestamp=ts,
+        indoor_temp=indoor,
+        outdoor_temp=outdoor,
+        heating_on=heating,
+    )
+
+
+class TestPureHelpers:
+    """Tests for the extracted pure helper functions."""
+
+    def test_filter_period_points_empty(self):
+        assert filter_period_points([], 24) == []
+
+    def test_filter_period_points_window(self):
+        now = 100_000.0
+        pts = [_pt(now - i * SECONDS_PER_HOUR) for i in range(48)]
+        pts.sort(key=lambda p: p.timestamp)
+        kept = filter_period_points(pts, 24, now=now)
+        # Points within the last 24h inclusive => 25 points (0..24h ago)
+        assert all(p.timestamp >= now - 24 * SECONDS_PER_HOUR for p in kept)
+        assert len(kept) == 25
+
+    def test_filter_period_points_default_now_is_last(self):
+        pts = [_pt(0.0), _pt(SECONDS_PER_HOUR), _pt(2 * SECONDS_PER_HOUR)]
+        kept = filter_period_points(pts, 1)
+        assert kept == [pts[1], pts[2]]
+
+    def test_aggregate_period_raises_on_empty(self):
+        with pytest.raises(ValueError):
+            aggregate_period([])
+
+    def test_aggregate_period_basic(self):
+        pts = [
+            _pt(0.0, heating=True, indoor=20.0, outdoor=4.0),
+            _pt(SECONDS_PER_HOUR, heating=True, indoor=22.0, outdoor=6.0),
+            _pt(2 * SECONDS_PER_HOUR, heating=False),
+        ]
+        agg = aggregate_period(pts)
+        assert agg.sample_count == 3
+        assert agg.heating_seconds == pytest.approx(2 * SECONDS_PER_HOUR)
+        assert agg.avg_indoor_temp == pytest.approx((20.0 + 22.0 + 20.0) / 3)
+
+    def test_aggregate_period_sorts_unordered(self):
+        pts = [_pt(2 * SECONDS_PER_HOUR), _pt(0.0), _pt(SECONDS_PER_HOUR)]
+        agg = aggregate_period(pts)
+        assert agg.start_time == 0.0
+        assert agg.end_time == 2 * SECONDS_PER_HOUR
+
+    def test_compute_k_basic(self):
+        assert compute_k(1000.0, 10.0, 2.0) == pytest.approx(50.0)
+
+    def test_compute_k_zero_denominator(self):
+        assert compute_k(1000.0, 0.0, 2.0) is None
+        assert compute_k(1000.0, 10.0, 0.0) is None
+        assert compute_k(1000.0, -5.0, 2.0) is None
 
 
 class TestThermalDataPoint:
@@ -1234,3 +1296,120 @@ class TestThermalLossModelLastKDate:
         new_model.from_dict(data)
 
         assert new_model.last_k_date == "2025-01-15"
+
+
+def _fill_measured(
+    model: ThermalLossModel,
+    hours: int,
+    *,
+    power_w: float,
+    delta_t: float = 15.0,
+    indoor: float = 20.0,
+) -> None:
+    """Feed `hours` of continuous heating with a measured energy increment.
+
+    Mimics the coordinator integrating a power sensor: each minute carries the
+    energy consumed during that minute (power_w for 60s).
+    """
+    base_time = time.time() - hours * SECONDS_PER_HOUR
+    per_minute_kwh = (power_w / 1000.0) * (60.0 / SECONDS_PER_HOUR)
+    for minute in range(hours * 60 + 1):
+        ts = base_time + minute * 60
+        model.add_data_point(
+            ThermalDataPoint(
+                timestamp=ts,
+                indoor_temp=indoor,
+                outdoor_temp=indoor - delta_t,
+                heating_on=True,
+            ),
+            measured_energy_kwh=per_minute_kwh,
+        )
+
+
+class TestEnergyWindowing:
+    """Regression tests for the windowed energy K calculation (v2)."""
+
+    def test_measured_energy_stored_on_point(self, zone_name: str):
+        """The per-interval measured energy is attributed to the data point."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=None)
+        base = time.time()
+        model.add_data_point(ThermalDataPoint(base, 20.0, 5.0, True))
+        # Second point: heating was on during the interval, energy attributed here
+        model.add_data_point(
+            ThermalDataPoint(base + 60, 20.0, 5.0, True),
+            measured_energy_kwh=0.5,
+        )
+        assert model.data_points[-1].energy_kwh == pytest.approx(0.5)
+
+    def test_power_sensor_drives_k_without_heater_power(self, zone_name: str):
+        """K is computed from measured energy even when heater_power is None."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=None)
+        _fill_measured(model, 24, power_w=1000.0, delta_t=15.0)
+        # K = windowed energy (24000 Wh) / (15 * 24) ≈ 66.7 W/°C
+        assert model.k_coefficient_24h is not None
+        assert model.k_coefficient_24h == pytest.approx(66.7, rel=0.1)
+
+    def test_windowed_energy_does_not_drift_upward(self, zone_name: str):
+        """Cumulative-energy bug regression: K must stay bounded over time.
+
+        With the old cumulative `_measured_energy_kwh`, K kept growing as more
+        energy accumulated beyond the 24h window. The windowed sum keeps it flat.
+        """
+        model = ThermalLossModel(zone_name=zone_name, heater_power=None)
+        # 48h of continuous 1000W heating, ΔT=15
+        _fill_measured(model, 48, power_w=1000.0, delta_t=15.0)
+        k_after_48h = model.k_coefficient_24h
+        assert k_after_48h is not None
+        # Should reflect ~24h window (≈66.7), NOT the 48h cumulative (~133)
+        assert k_after_48h == pytest.approx(66.7, rel=0.15)
+        assert k_after_48h < 90  # would be ~133 with the cumulative bug
+
+    def test_efficiency_factor_applied_to_windowed_energy(self, zone_name: str):
+        """Heat-pump efficiency multiplies the windowed energy into thermal Wh."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=None, efficiency_factor=3.0)
+        _fill_measured(model, 24, power_w=1000.0, delta_t=15.0)
+        # thermal energy = 24000 * 3 Wh; K ≈ 72000 / (15*24) = 200
+        assert model.k_coefficient_24h == pytest.approx(200.0, rel=0.1)
+
+
+class TestClearAllCounters:
+    """clear_all must reset the energy/heating counters (derived_power inputs)."""
+
+    def test_clear_all_resets_energy_counters(self, zone_name: str):
+        """After clear_all, measured energy / heating hours / derived_power reset."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=None)
+        _fill_measured(model, 24, power_w=1000.0, delta_t=15.0)
+        assert model._measured_energy_kwh > 0
+        assert model._total_heating_hours > 0
+        assert model.derived_power is not None
+
+        model.clear_all()
+
+        assert model._measured_energy_kwh == 0.0
+        assert model._total_heating_hours == 0.0
+        assert model.derived_power is None
+        assert model.k_coefficient is None
+        assert model.samples_count == 0
+
+
+class TestInsulationStatusK7d:
+    """get_insulation_status should report status when only K_7d is available."""
+
+    def test_status_calculated_with_only_k7d(self, zone_name: str, heater_power: float):
+        """If only the 7-day K is set (e.g. after migration), report calculated."""
+        model = ThermalLossModel(zone_name=zone_name, heater_power=heater_power)
+        # Give it enough data so we pass the MIN_DATA_HOURS gate and heating season,
+        # but clear the 24h K to simulate a migrated model.
+        base_time = time.time() - 24 * SECONDS_PER_HOUR
+        for minute in range(24 * 60 + 1):
+            ts = base_time + minute * 60
+            model.add_data_point(
+                ThermalDataPoint(ts, 20.0, 5.0, minute < 6 * 60)
+            )
+        # Force the "only 7d available" scenario
+        model._k_coefficient = None
+        model._k_coefficient_7d = 25.0
+
+        status = model.get_insulation_status()
+        assert status["k_value"] == 25.0
+        assert status["k_source"] == "calculated"

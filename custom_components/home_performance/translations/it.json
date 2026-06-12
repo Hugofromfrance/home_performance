@@ -163,7 +163,8 @@
     },
     "error": {
       "entity_not_found": "Entità non trovata o non disponibile",
-      "invalid_power": "Potenza riscaldatore non valida"
+      "invalid_power": "Potenza riscaldatore non valida",
+      "energy_sensor_required": "Il sensore di energia è richiesto per questo tipo di fonte di calore"
     }
   },
   "entity": {

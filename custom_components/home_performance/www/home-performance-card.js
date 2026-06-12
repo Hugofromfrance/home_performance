@@ -49,6 +49,8 @@
         error_no_zone: "Please specify a zone",
         loading: "Loading...",
         loading_integration: "Loading integration...",
+        error_title: "Sensor unavailable",
+        error_unavailable: "The Home Performance sensors are unavailable. Check that the source sensors (temperature, heating) are working.",
 
         // Section headers
         isolation: "INSULATION",
@@ -162,6 +164,8 @@
         error_no_zone: "Veuillez spécifier une zone",
         loading: "Chargement...",
         loading_integration: "Chargement de l'intégration...",
+        error_title: "Capteurs indisponibles",
+        error_unavailable: "Les capteurs Home Performance sont indisponibles. Vérifiez que les capteurs source (température, chauffage) fonctionnent.",
 
         // Section headers
         isolation: "ISOLATION",
@@ -275,6 +279,8 @@
         error_no_zone: "Specificare una zona",
         loading: "Caricamento...",
         loading_integration: "Caricamento integrazione...",
+        error_title: "Sensori non disponibili",
+        error_unavailable: "I sensori Home Performance non sono disponibili. Verifica che i sensori sorgente (temperatura, riscaldamento) funzionino.",
 
         // Section headers
         isolation: "ISOLAMENTO",
@@ -419,6 +425,8 @@
         show_sparklines: true,
         ...config,
       };
+      // Reset resolved entity-id cache (zone/variants may have changed)
+      this._entityIdCache = {};
       // Initialize multi-zone view state
       if (this.config.layout === "multi") {
         this._multiView = this.config.default_view || "list";
@@ -437,6 +445,33 @@
       if (changedProps.has("hass") && this.hass && !this._versionChecked) {
         this._checkVersion();
       }
+    }
+
+    // Avoid a full re-render on every hass tick (HA pushes a new hass object ~1/s).
+    // Only render when our config, internal view state, or a relevant
+    // home_performance entity actually changed.
+    shouldUpdate(changedProps) {
+      if (!changedProps.has("hass")) return true;  // config or internal requestUpdate()
+      if (changedProps.has("config")) return true;
+      const oldHass = changedProps.get("hass");
+      if (!oldHass) return true;
+      return this._relevantStatesChanged(oldHass, this.hass);
+    }
+
+    _relevantStatesChanged(oldHass, newHass) {
+      if (!oldHass || !newHass || !oldHass.states || !newHass.states) return true;
+      const oldStates = oldHass.states;
+      const newStates = newHass.states;
+      for (const id in newStates) {
+        if (
+          (id.startsWith("sensor.home_performance_") ||
+            id.startsWith("binary_sensor.home_performance_")) &&
+          oldStates[id] !== newStates[id]
+        ) {
+          return true;
+        }
+      }
+      return false;
     }
 
     async _checkVersion() {
@@ -470,20 +505,11 @@
           dismissable: true,
           action: {
             text: "Reload",
-            action: async () => {
-              // Clear caches if available
-              if ("caches" in window) {
-                try {
-                  const cacheNames = await caches.keys();
-                  await Promise.all(
-                    cacheNames.map((name) => caches.delete(name))
-                  );
-                } catch (e) {
-                  console.warn("[Home Performance] Could not clear caches:", e);
-                }
-              }
-              // Reload the page
-              window.location.reload(true);
+            action: () => {
+              // Reload the page. The card resource is cache-busted via ?v=,
+              // so we must NOT wipe every browser cache (that would impact
+              // other integrations and the whole HA frontend).
+              window.location.reload();
             },
           },
         },
@@ -538,34 +564,38 @@
       "heures_de_donnees": ["data_hours", "heures_de_donnees"],
     };
 
-    _getEntityId(suffix) {
-      const zone = this._slugifyZone(this.config.zone);
-      const variants = this._entityMappings[suffix] || [suffix];
+    // zoneOverride lets callers (multi-zone view) resolve entities for an
+    // arbitrary zone WITHOUT mutating this.config.zone.
+    // zoneOverride lets callers (multi-zone view) resolve entities for an
+    // arbitrary zone WITHOUT mutating this.config.zone. Resolved ids are cached
+    // (only once an existing entity is found) to skip the variant loop.
+    _resolveEntityId(domain, suffix, zoneOverride) {
+      const zone = this._slugifyZone(zoneOverride ?? this.config.zone);
+      const cacheKey = `${domain}|${zone}|${suffix}`;
+      this._entityIdCache = this._entityIdCache || {};
+      const cached = this._entityIdCache[cacheKey];
+      if (cached && this.hass?.states[cached] !== undefined) {
+        return cached;
+      }
 
-      // Try each variant and return the first one that exists
+      const variants = this._entityMappings[suffix] || [suffix];
       for (const variant of variants) {
-        const entityId = `sensor.home_performance_${zone}_${variant}`;
+        const entityId = `${domain}.home_performance_${zone}_${variant}`;
         if (this.hass?.states[entityId] !== undefined) {
+          this._entityIdCache[cacheKey] = entityId;
           return entityId;
         }
       }
-      // Fallback to primary (first) variant
-      return `sensor.home_performance_${zone}_${variants[0]}`;
+      // Fallback to primary (first) variant (not cached: entity may appear later)
+      return `${domain}.home_performance_${zone}_${variants[0]}`;
     }
 
-    _getBinaryEntityId(suffix) {
-      const zone = this._slugifyZone(this.config.zone);
-      const variants = this._entityMappings[suffix] || [suffix];
+    _getEntityId(suffix, zoneOverride) {
+      return this._resolveEntityId("sensor", suffix, zoneOverride);
+    }
 
-      // Try each variant and return the first one that exists
-      for (const variant of variants) {
-        const entityId = `binary_sensor.home_performance_${zone}_${variant}`;
-        if (this.hass?.states[entityId] !== undefined) {
-          return entityId;
-        }
-      }
-      // Fallback to primary (first) variant
-      return `binary_sensor.home_performance_${zone}_${variants[0]}`;
+    _getBinaryEntityId(suffix, zoneOverride) {
+      return this._resolveEntityId("binary_sensor", suffix, zoneOverride);
     }
 
     _getState(entityId) {
@@ -666,6 +696,15 @@
       return this._getState(entityId) === "on";
     }
 
+    // The integration is loaded (entity exists) but the coordinator update is
+    // failing, so entities report "unavailable". Distinct from "still loading".
+    _isIntegrationError() {
+      if (this.config.demo) return false;
+      const entityId = this._getBinaryEntityId("donnees_pretes");
+      const state = this.hass?.states[entityId];
+      return state !== undefined && state.state === "unavailable";
+    }
+
     _isStorageLoaded() {
       if (this.config.demo) return true;
       const entityId = this._getBinaryEntityId("donnees_pretes");
@@ -720,7 +759,7 @@
         const lastK = kValue ? `(K=${kValue} W/°C)` : "";
         return {
           label: this._t('summer_mode'),
-          color: "#f59e0b",
+          color: "var(--hp-warning)",
           icon: "mdi:weather-sunny",
           desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('summer_mode_desc')
         };
@@ -730,7 +769,7 @@
         const lastK = kValue ? `(K=${kValue} W/°C)` : "";
         return {
           label: this._t('off_season'),
-          color: "#8b5cf6",
+          color: "var(--info-color, #8b5cf6)",
           icon: "mdi:weather-partly-cloudy",
           desc: kValue ? `${this._t('last_measurement')} ${lastK}` : this._t('off_season_desc')
         };
@@ -888,20 +927,17 @@
 
     // Get all data for a specific zone (for multi-zone view)
     _getZoneData(zoneName) {
-      const savedZone = this.config.zone;
-      this.config.zone = zoneName;
-
-      const kCoefEntityId = this._getEntityId("coefficient_k");
-      const insulationEntityId = this._getEntityId("note_d_isolation");
-      const energyMeasuredId = this._getEntityId("energie_mesuree_jour");
-      const energyEstimatedId = this._getEntityId("energie_24h_estimee");
-      const heatingTimeId = this._getEntityId("temps_de_chauffe_24h");
-      const deltaTId = this._getEntityId("dt_moyen_24h");
-      const dataReadyId = this._getBinaryEntityId("donnees_pretes");
+      const kCoefEntityId = this._getEntityId("coefficient_k", zoneName);
+      const insulationEntityId = this._getEntityId("note_d_isolation", zoneName);
+      const energyMeasuredId = this._getEntityId("energie_mesuree_jour", zoneName);
+      const energyEstimatedId = this._getEntityId("energie_24h_estimee", zoneName);
+      const heatingTimeId = this._getEntityId("temps_de_chauffe_24h", zoneName);
+      const deltaTId = this._getEntityId("dt_moyen_24h", zoneName);
+      const dataReadyId = this._getBinaryEntityId("donnees_pretes", zoneName);
 
       const kCoef = this._getState(kCoefEntityId);
       const kCoef24h = this._getAttribute(kCoefEntityId, "k_24h");  // K instantané (24h)
-      const kPerM3 = this._getState(this._getEntityId("k_par_m3"));
+      const kPerM3 = this._getState(this._getEntityId("k_par_m3", zoneName));
       const insulation = this._getState(insulationEntityId);
       const insulationAttrs = {
         status: this._getAttribute(insulationEntityId, "status"),
@@ -941,9 +977,6 @@
       const tempVariation = this._getAttribute(kCoefEntityId, "temp_variation");
       const indoorTempMin = this._getAttribute(kCoefEntityId, "indoor_temp_min");
       const indoorTempMax = this._getAttribute(kCoefEntityId, "indoor_temp_max");
-
-      // Restore original zone
-      this.config.zone = savedZone;
 
       const insulationData = this._getInsulationData(insulation, insulationAttrs);
       const scoreLetter = this._getScoreLetter(insulation);
@@ -1161,11 +1194,27 @@
 
         <!-- Content -->
         <div class="content">
-          ${!integrationReady
+          ${this._isIntegrationError()
+          ? this._renderError()
+          : !integrationReady
           ? this._renderLoading()
           : (!dataReady ? this._renderAnalyzing(progress) : this._renderData())}
         </div>
       </ha-card>
+    `;
+    }
+
+    _renderError() {
+      return html`
+      <div class="analyzing error-state" role="alert">
+        <ha-icon icon="mdi:alert-circle-outline" class="error-icon"></ha-icon>
+        <div class="analyzing-title" style="margin-top: 8px; color: var(--error-color, #ef4444);">
+          ${this._t('error_title')}
+        </div>
+        <div class="analyzing-info" style="margin-top: 8px;">
+          ${this._t('error_unavailable')}
+        </div>
+      </div>
     `;
     }
 
@@ -1204,7 +1253,7 @@
             <span class="badge-progress-text">${Math.round(progress)}%</span>
           </div>
           <div class="badge-zone-name">${this.config.zone}</div>
-          <div class="badge-status">Analyse en cours</div>
+          <div class="badge-status">${this._t('analyzing')}</div>
         </ha-card>
       `;
       }
@@ -1292,7 +1341,7 @@
           </div>
           <div class="pill-zone-section">
             <div class="pill-zone-name">${this.config.zone}</div>
-            <div class="pill-zone-rating">Analyse en cours</div>
+            <div class="pill-zone-rating">${this._t('analyzing')}</div>
           </div>
           <div class="pill-separator"></div>
           <div class="pill-progress-track-wrapper">
@@ -1361,7 +1410,7 @@
             <div class="pill-stat-label">ΔT</div>
           </div>
         </div>
-        ${hasTempWarning ? html`<div class="pill-temp-warning">⚠️</div>` : ''}
+        ${hasTempWarning ? html`<div class="pill-temp-warning" role="img" aria-label="${this._t('temp_variation')}">⚠️</div>` : ''}
       </ha-card>
     `;
     }
@@ -1405,13 +1454,17 @@
             <div class="multi-avg-score" style="--accent: ${avgScore.color}">
               ${avgScore.letter} ${this._t('multi_avg')}
             </div>
-            <div class="multi-toggle">
+            <div class="multi-toggle" role="group" aria-label="${this._t('multi_avg')}">
               <button
+                type="button"
                 class="multi-toggle-btn ${this._multiView === 'list' ? 'active' : ''}"
+                aria-pressed=${this._multiView === 'list'}
                 @click=${() => this._setMultiView('list')}
               >${this._t('multi_list')}</button>
               <button
+                type="button"
                 class="multi-toggle-btn ${this._multiView === 'compare' ? 'active' : ''}"
+                aria-pressed=${this._multiView === 'compare'}
                 @click=${() => this._setMultiView('compare')}
               >${this._t('multi_compare')}</button>
             </div>
@@ -1436,6 +1489,14 @@
     _toggleZoneExpanded(zoneName) {
       this._expandedZone = this._expandedZone === zoneName ? null : zoneName;
       this.requestUpdate();
+    }
+
+    // Activate a role="button" element with Enter/Space (keyboard accessibility).
+    _onActivateKey(event, action) {
+      if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
+        action();
+      }
     }
 
     _calculateAverageScore(zonesData) {
@@ -1479,7 +1540,12 @@
       <div
         class="multi-zone-row ${isExpanded ? 'expanded' : ''} ${isOptimal ? 'multi-zone-row-optimal' : ''}"
         style="--accent-color: ${accentColor}"
+        role="button"
+        tabindex="0"
+        aria-expanded=${isExpanded}
+        aria-label="${zone.name}"
         @click=${() => this._toggleZoneExpanded(zone.name)}
+        @keydown=${(e) => this._onActivateKey(e, () => this._toggleZoneExpanded(zone.name))}
       >
         <div class="multi-zone-row-main">
           <div class="multi-zone-score ${isOptimal ? 'multi-zone-score-optimal' : ''}">${zone.scoreLetter || '?'}</div>
@@ -1487,7 +1553,7 @@
             <div class="multi-zone-name">${zone.name}</div>
             <div class="multi-zone-rating-row">
               <span class="multi-zone-rating">${zone.insulationData?.label || ''}</span>
-              ${hasTempWarning ? html`<span class="multi-zone-temp-warning">⚠️</span>` : ''}
+              ${hasTempWarning ? html`<span class="multi-zone-temp-warning" role="img" aria-label="${this._t('temp_variation')}">⚠️</span>` : ''}
             </div>
           </div>
           <div class="multi-zone-stats">
@@ -1835,7 +1901,7 @@
           </div>
         </div>
 
-        <div class="score-card temp-card" style="--accent: #6366f1">
+        <div class="score-card temp-card" style="--accent: var(--hp-accent)">
           <div class="score-icon">
             <ha-icon icon="mdi:thermometer"></ha-icon>
           </div>
@@ -1954,12 +2020,22 @@
     static get styles() {
       return css`
       :host {
-        --bg-primary: var(--card-background-color, #1a1a2e);
-        --bg-secondary: var(--secondary-background-color, #16213e);
-        --text-primary: var(--primary-text-color, #e4e4e7);
-        --text-secondary: var(--secondary-text-color, #a1a1aa);
-        --border-color: var(--divider-color, rgba(255,255,255,0.08));
-        --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        --bg-primary: var(--ha-card-background, var(--card-background-color, #fff));
+        --bg-secondary: var(--secondary-background-color, #f5f5f5);
+        --text-primary: var(--primary-text-color, #212121);
+        --text-secondary: var(--secondary-text-color, #727272);
+        --border-color: var(--divider-color, rgba(127,127,127,0.2));
+        /* Brand accent follows the user's HA theme primary color */
+        --hp-accent: var(--primary-color, #6366f1);
+        --hp-warning: var(--warning-color, #f59e0b);
+        --accent-gradient: linear-gradient(135deg, var(--hp-accent) 0%, var(--hp-accent) 100%);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :host *, :host *::before, :host *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
       }
 
       ha-card {
@@ -1967,6 +2043,14 @@
         border-radius: 14px;
         overflow: hidden;
         border: 1px solid var(--border-color);
+      }
+
+      /* Visible keyboard focus for interactive elements */
+      .multi-zone-row:focus-visible,
+      .multi-toggle-btn:focus-visible,
+      .layout-option:focus-visible {
+        outline: 2px solid var(--hp-accent);
+        outline-offset: 2px;
       }
 
       /* Header - Compact */
@@ -2017,7 +2101,7 @@
       .dot {
         width: 8px;
         height: 8px;
-        background: #6366f1;
+        background: var(--hp-accent);
         border-radius: 50%;
         animation: pulse 2s ease-in-out infinite;
       }
@@ -2043,9 +2127,17 @@
         width: 40px;
         height: 40px;
         border: 3px solid var(--border-color);
-        border-top-color: #6366f1;
+        border-top-color: var(--hp-accent);
         border-radius: 50%;
         animation: spin 1s linear infinite;
+      }
+
+      .error-state {
+        text-align: center;
+      }
+      .error-icon {
+        --mdc-icon-size: 40px;
+        color: var(--error-color, #ef4444);
       }
 
       /* Content - Compact */
@@ -2396,7 +2488,7 @@
       .temp-warning-banner .warning-title {
         font-size: 1em;
         font-weight: 600;
-        color: #f59e0b;
+        color: var(--hp-warning);
       }
 
       .temp-warning-banner .warning-desc {
@@ -2638,7 +2730,7 @@
         gap: 2px;
         font-size: 0.75em;
         font-weight: 600;
-        color: #f59e0b;
+        color: var(--hp-warning);
         text-transform: uppercase;
         letter-spacing: 0.2px;
       }
@@ -2646,7 +2738,7 @@
       .badge-warning-value {
         font-size: 0.8em;
         font-weight: 700;
-        color: #f59e0b;
+        color: var(--hp-warning);
       }
 
       .badge-wind {
@@ -2676,7 +2768,7 @@
 
       /* Badge Analyzing State */
       .badge-analyzing {
-        --accent: #6366f1;
+        --accent: var(--hp-accent);
         justify-content: center;
         align-items: center;
       }
@@ -2698,7 +2790,7 @@
       }
 
       .badge-progress-fill {
-        stroke: #6366f1;
+        stroke: var(--hp-accent);
         stroke-linecap: round;
         transition: stroke-dashoffset 0.5s ease;
       }
@@ -2710,7 +2802,7 @@
         transform: translate(-50%, -50%);
         font-size: 14px;
         font-weight: 700;
-        color: #6366f1;
+        color: var(--hp-accent);
       }
 
       .badge-status {
@@ -2840,17 +2932,17 @@
 
       /* Pill Analyzing State */
       .pill-analyzing {
-        --accent: #6366f1;
+        --accent: var(--hp-accent);
       }
 
       .pill-analyzing .pill-accent-bar {
-        background: #6366f1;
+        background: var(--hp-accent);
       }
 
       .pill-progress-badge {
         width: 42px;
         height: 42px;
-        background: color-mix(in srgb, #6366f1 20%, transparent);
+        background: color-mix(in srgb, var(--hp-accent) 20%, transparent);
         border-radius: 10px;
         display: flex;
         align-items: center;
@@ -2862,7 +2954,7 @@
       .pill-progress-percent {
         font-size: 13px;
         font-weight: 800;
-        color: #6366f1;
+        color: var(--hp-accent);
       }
 
       .pill-progress-track-wrapper {
@@ -2881,7 +2973,7 @@
 
       .pill-progress-fill {
         height: 100%;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: var(--accent-gradient);
         border-radius: 2px;
         transition: width 0.5s ease;
       }
@@ -3067,7 +3159,7 @@
       .multi-zone-temp-warning-banner .warning-title {
         font-size: 0.85em;
         font-weight: 600;
-        color: #f59e0b;
+        color: var(--hp-warning);
       }
 
       .multi-zone-temp-warning-banner .warning-desc {
@@ -3452,7 +3544,6 @@
         });
       }
 
-      console.log("[Home Performance] Available zones:", zones);
       return zones.sort((a, b) => a.displayName.localeCompare(b.displayName));
     }
 
@@ -3489,6 +3580,13 @@
         composed: true,
       });
       this.dispatchEvent(event);
+    }
+
+    _onLayoutKey(event, layout) {
+      if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
+        this._setLayout(layout);
+      }
     }
 
     _onZoneSelected(ev) {
@@ -3555,7 +3653,11 @@
           <div class="layout-options">
             <div
               class="layout-option ${this.config.layout === "full" || !this.config.layout ? "selected" : ""}"
+              role="button"
+              tabindex="0"
+              aria-pressed=${this.config.layout === "full" || !this.config.layout}
               @click=${() => this._setLayout("full")}
+              @keydown=${(e) => this._onLayoutKey(e, "full")}
             >
               <div class="layout-preview layout-full">
                 <div class="lp-header"></div>
@@ -3565,7 +3667,11 @@
             </div>
             <div
               class="layout-option ${this.config.layout === "badge" ? "selected" : ""}"
+              role="button"
+              tabindex="0"
+              aria-pressed=${this.config.layout === "badge"}
               @click=${() => this._setLayout("badge")}
+              @keydown=${(e) => this._onLayoutKey(e, "badge")}
             >
               <div class="layout-preview layout-badge">
                 <div class="lp-circle"></div>
@@ -3575,7 +3681,11 @@
             </div>
             <div
               class="layout-option ${this.config.layout === "pill" ? "selected" : ""}"
+              role="button"
+              tabindex="0"
+              aria-pressed=${this.config.layout === "pill"}
               @click=${() => this._setLayout("pill")}
+              @keydown=${(e) => this._onLayoutKey(e, "pill")}
             >
               <div class="layout-preview layout-pill">
                 <div class="lp-dot"></div>
@@ -3585,7 +3695,11 @@
             </div>
             <div
               class="layout-option ${this.config.layout === "multi" ? "selected" : ""}"
+              role="button"
+              tabindex="0"
+              aria-pressed=${this.config.layout === "multi"}
               @click=${() => this._setLayout("multi")}
+              @keydown=${(e) => this._onLayoutKey(e, "multi")}
             >
               <div class="layout-preview layout-multi">
                 <div class="lp-row"></div>

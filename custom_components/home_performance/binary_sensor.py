@@ -91,11 +91,11 @@ class WindowOpenSensor(HomePerformanceBaseBinarySensor):
         super().__init__(coordinator, zone_name, "window_open")
 
     @property
-    def is_on(self) -> bool:
-        """Return true if window is detected as open."""
+    def is_on(self) -> bool | None:
+        """Return true if window is detected as open (None until first data)."""
         if self.coordinator.data:
             return self.coordinator.data.get("window_open", False)
-        return False
+        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -130,11 +130,11 @@ class HeatingActiveSensor(HomePerformanceBaseBinarySensor):
         super().__init__(coordinator, zone_name, "heating_active")
 
     @property
-    def is_on(self) -> bool:
-        """Return true if heating is currently active."""
+    def is_on(self) -> bool | None:
+        """Return true if heating is currently active (None until first data)."""
         if self.coordinator.data:
             return self.coordinator.data.get("heating_on", False)
-        return False
+        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
